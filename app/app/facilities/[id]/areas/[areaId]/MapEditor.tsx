@@ -447,7 +447,7 @@ export default function MapEditor({
 
         {pestFormPos && (
           <div
-            className="absolute z-10 flex w-64 flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg"
+            className="card absolute z-10 flex w-64 flex-col gap-2 p-3"
             style={{ left: Math.min(pestFormPos.x, CANVAS_WIDTH - 260), top: Math.min(pestFormPos.y, CANVAS_HEIGHT - 180) }}
           >
             <div className="text-sm font-medium">New pest event</div>
@@ -492,7 +492,7 @@ export default function MapEditor({
 
         {selectedEvent && (
           <div
-            className="absolute z-10 flex w-64 flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg"
+            className="card absolute z-10 flex w-64 flex-col gap-2 p-3"
             style={{
               left: Math.min(selectedEvent.x ?? 0, CANVAS_WIDTH - 260),
               top: Math.min(selectedEvent.y ?? 0, CANVAS_HEIGHT - 140),

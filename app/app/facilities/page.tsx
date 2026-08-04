@@ -21,11 +21,7 @@ export default async function FacilitiesPage() {
       <div className="flex flex-col gap-2">
         {rows.length === 0 && <div className="text-[var(--text-dim)]">No facilities yet.</div>}
         {rows.map((f) => (
-          <Link
-            key={f.id}
-            href={`/app/facilities/${f.id}`}
-            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 hover:border-[var(--accent)]"
-          >
+          <Link key={f.id} href={`/app/facilities/${f.id}`} className="card card-interactive p-4">
             {f.name}
           </Link>
         ))}

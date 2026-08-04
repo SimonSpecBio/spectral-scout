@@ -2,6 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents } from "@/db/schema";
+import { speciesColor } from "@/lib/pest-colors";
 import { requireGrowerSession } from "@/lib/session";
 
 const SEVERITY_RANK = { low: 0, moderate: 1, high: 2, severe: 3 } as const;
@@ -42,7 +43,7 @@ export default async function Dashboard() {
     return (
       <div className="flex flex-col gap-6">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--text-dim)]">
+        <div className="card p-6 text-[var(--text-dim)]">
           No facilities yet.{" "}
           <Link href="/app/facilities" className="text-[var(--accent)]">
             Add your first facility
@@ -109,7 +110,7 @@ export default async function Dashboard() {
         <h1 className="text-2xl font-semibold">
           {orgFacilities.length === 1 ? orgFacilities[0].name : "All facilities"}
         </h1>
-        <div className="flex items-center gap-2 rounded-full border border-[var(--border)] px-3 py-1.5 text-sm">
+        <div className="card flex items-center gap-2 px-3 py-1.5 text-sm">
           <span>{overallStatus.emoji}</span>
           <span>{overallStatus.label}</span>
         </div>
@@ -118,16 +119,14 @@ export default async function Dashboard() {
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-[var(--text-dim)]">Today</h2>
         {todaysTasks.length === 0 ? (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--text-dim)]">
-            Nothing needs attention right now.
-          </div>
+          <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing needs attention right now.</div>
         ) : (
           <div className="flex flex-col gap-2">
             {todaysTasks.map((e) => (
               <Link
                 key={e.id}
                 href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`}
-                className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-sm hover:border-[var(--accent)]"
+                className="card card-interactive flex items-center justify-between p-3 text-sm"
               >
                 <span>
                   Follow-up inspection due -- {e.pestSpecies} ({e.areaName ?? e.facilityName})
@@ -142,27 +141,21 @@ export default async function Dashboard() {
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-[var(--text-dim)]">Active pest events</h2>
         {active.length === 0 ? (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--text-dim)]">
-            No active pest events.
-          </div>
+          <div className="card p-4 text-sm text-[var(--text-dim)]">No active pest events.</div>
         ) : (
           <div className="flex flex-col gap-2">
             {active.map((e) => (
-              <Link
-                key={e.id}
-                href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`}
-                className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 hover:border-[var(--accent)]"
-              >
-                <div>
-                  <div className="font-medium capitalize">{e.pestSpecies}</div>
-                  <div className="text-sm text-[var(--text-dim)]">
-                    {e.areaName ?? e.facilityName} -- started {relativeTime(e.createdAt)}
+              <Link key={e.id} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="card card-interactive flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: speciesColor(e.pestSpecies) }} />
+                  <div>
+                    <div className="font-medium capitalize">{e.pestSpecies}</div>
+                    <div className="text-sm text-[var(--text-dim)]">
+                      {e.areaName ?? e.facilityName} -- started {relativeTime(e.createdAt)}
+                    </div>
                   </div>
                 </div>
-                <span
-                  className="rounded-full px-2.5 py-1 text-xs capitalize"
-                  style={{ background: `${SEVERITY_COLOR[e.severity]}33`, color: SEVERITY_COLOR[e.severity] }}
-                >
+                <span className="badge capitalize" style={{ background: `${SEVERITY_COLOR[e.severity]}33`, color: SEVERITY_COLOR[e.severity] }}>
                   {e.severity}
                 </span>
               </Link>
@@ -176,7 +169,7 @@ export default async function Dashboard() {
         {activity.length === 0 ? (
           <div className="text-sm text-[var(--text-dim)]">Nothing yet.</div>
         ) : (
-          <div className="flex flex-col divide-y divide-[var(--border)] rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+          <div className="card flex flex-col divide-y divide-[var(--border)]">
             {activity.map((a, i) => (
               <div key={i} className="flex items-center justify-between px-4 py-3 text-sm">
                 <span>

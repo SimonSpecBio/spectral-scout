@@ -20,7 +20,7 @@ export default async function StaffOrgs() {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Organizations</h1>
 
-      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+      <div className="card p-4">
         <div className="text-3xl font-semibold">{generalCount}</div>
         <div className="text-sm text-[var(--text-dim)]">
           Free-tier organizations (aggregated only -- no per-org drill-down)
@@ -31,7 +31,7 @@ export default async function StaffOrgs() {
         <h2 className="text-lg font-medium">Pilot program organizations</h2>
         {pilotOrgs.length === 0 && <div className="text-[var(--text-dim)]">None yet.</div>}
         {pilotOrgs.map((org) => (
-          <div key={org.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div key={org.id} className="card p-4">
             {org.name} {org.pilotKey && <span className="text-[var(--text-dim)]">({org.pilotKey})</span>}
           </div>
         ))}

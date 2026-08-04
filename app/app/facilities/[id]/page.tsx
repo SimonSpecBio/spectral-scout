@@ -31,11 +31,7 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
       <div className="flex flex-col gap-2">
         {areas.length === 0 && <div className="text-[var(--text-dim)]">No areas yet -- add a room or greenhouse above.</div>}
         {areas.map((area) => (
-          <Link
-            key={area.id}
-            href={`/app/facilities/${id}/areas/${area.id}`}
-            className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 hover:border-[var(--accent)]"
-          >
+          <Link key={area.id} href={`/app/facilities/${id}/areas/${area.id}`} className="card card-interactive flex items-center justify-between p-4">
             <span>{area.name}</span>
             <span className="text-sm text-[var(--text-dim)]">{area.kind.replace("_", " ")}</span>
           </Link>

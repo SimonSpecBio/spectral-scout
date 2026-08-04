@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { speciesColor } from "@/lib/pest-colors";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
@@ -135,15 +136,15 @@ export default function PestEventDetail({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold capitalize">{event.pestSpecies}</h1>
-          <div className="text-sm text-[var(--text-dim)]">{locationLabel}</div>
+        <div className="flex items-center gap-3">
+          <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: speciesColor(event.pestSpecies) }} />
+          <div>
+            <h1 className="text-2xl font-semibold capitalize">{event.pestSpecies}</h1>
+            <div className="text-sm text-[var(--text-dim)]">{locationLabel}</div>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className="rounded-full px-2.5 py-1 text-xs capitalize"
-            style={{ background: `${SEVERITY_COLOR[event.severity]}33`, color: SEVERITY_COLOR[event.severity] }}
-          >
+          <span className="badge capitalize" style={{ background: `${SEVERITY_COLOR[event.severity]}33`, color: SEVERITY_COLOR[event.severity] }}>
             {event.severity}
           </span>
           <button
@@ -172,7 +173,7 @@ export default function PestEventDetail({
       </div>
 
       {tab === "timeline" && (
-        <div className="flex flex-col divide-y divide-[var(--border)] rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+        <div className="card flex flex-col divide-y divide-[var(--border)]">
           {timeline.map((item, i) => (
             <div key={i} className="flex items-center justify-between px-4 py-3 text-sm capitalize">
               <span>{item.label}</span>
@@ -189,7 +190,7 @@ export default function PestEventDetail({
 
       {tab === "treatments" && (
         <div className="flex flex-col gap-4">
-          <form onSubmit={applyTreatment} className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+          <form onSubmit={applyTreatment} className="card flex flex-col gap-2 p-4">
             <div className="text-sm font-medium">Apply treatment</div>
             <div className="flex gap-2">
               {(["biological", "pesticide", "spectral_light"] as const).map((t) => (
@@ -226,7 +227,7 @@ export default function PestEventDetail({
             </button>
           </form>
 
-          <div className="flex flex-col divide-y divide-[var(--border)] rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+          <div className="card flex flex-col divide-y divide-[var(--border)]">
             {treatmentsList.length === 0 && <div className="p-4 text-sm text-[var(--text-dim)]">No treatments logged yet.</div>}
             {treatmentsList.map((t) => (
               <div key={t.id} className="px-4 py-3 text-sm">
@@ -246,7 +247,7 @@ export default function PestEventDetail({
         <div className="flex flex-col gap-4">
           <label className="w-fit cursor-pointer rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
             {uploading ? "Uploading…" : "Add photo"}
-            <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
           </label>
           {photos.length === 0 ? (
             <div className="text-sm text-[var(--text-dim)]">No photos yet.</div>
@@ -262,7 +263,7 @@ export default function PestEventDetail({
       )}
 
       {tab === "monitoring" && (
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-dim)]">
+        <div className="card p-6 text-sm text-[var(--text-dim)]">
           Guided monitoring (standardized sampling protocol, density trend over time) is coming next -- this tab
           will show the severity curve once it exists.
         </div>
