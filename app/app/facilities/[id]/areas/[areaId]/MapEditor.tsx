@@ -35,9 +35,27 @@ interface Area {
   backgroundScale: number | null;
 }
 
+type Severity = "low" | "moderate" | "high" | "severe";
+
+interface PestEvent {
+  id: string;
+  x: number | null;
+  y: number | null;
+  pestSpecies: string;
+  severity: Severity;
+  status: "active" | "resolved";
+  notes: string | null;
+}
+
 const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 600;
 const COLORS = ["#35d0a3", "#e0b84b", "#e05b5b", "#5b8fe0", "#a35be0"];
+const SEVERITY_COLORS: Record<Severity, string> = {
+  low: "#e0d24b",
+  moderate: "#e0913d",
+  high: "#e0553d",
+  severe: "#a3193d",
+};
 
 function useBackgroundImage(url: string | null) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -59,24 +77,32 @@ export default function MapEditor({
   facilityId,
   area,
   initialObjects,
+  initialPestEvents,
 }: {
   facilityId: string;
   area: Area;
   initialObjects: MapObject[];
+  initialPestEvents: PestEvent[];
 }) {
   const [objects, setObjects] = useState<MapObject[]>(initialObjects);
-  const [tool, setTool] = useState<ShapeType | "select">("select");
+  const [pestEvents, setPestEvents] = useState<PestEvent[]>(initialPestEvents);
+  const [tool, setTool] = useState<ShapeType | "select" | "pest">("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [color, setColor] = useState(COLORS[0]);
   const [drawing, setDrawing] = useState<{ shapeType: ShapeType; geometry: Geometry } | null>(null);
   const [polygonPoints, setPolygonPoints] = useState<number[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [pestFormPos, setPestFormPos] = useState<{ x: number; y: number } | null>(null);
+  const [pestSpecies, setPestSpecies] = useState("");
+  const [pestSeverity, setPestSeverity] = useState<Severity>("moderate");
+  const [selectedEvent, setSelectedEvent] = useState<PestEvent | null>(null);
 
   const bgImage = useBackgroundImage(area.backgroundImageUrl);
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRefs = useRef<Map<string, Konva.Node>>(new Map());
 
   const base = `/api/facilities/${facilityId}/areas/${area.id}`;
+  const eventsBase = `/api/facilities/${facilityId}/pest-events`;
 
   useEffect(() => {
     if (!transformerRef.current) return;
@@ -113,6 +139,49 @@ export default function MapEditor({
     setSelectedId(null);
   }
 
+  async function submitPestEvent() {
+    if (!pestFormPos || !pestSpecies.trim()) return;
+    const res = await fetch(eventsBase, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        facilityAreaId: area.id,
+        x: pestFormPos.x,
+        y: pestFormPos.y,
+        pestSpecies: pestSpecies.trim(),
+        severity: pestSeverity,
+      }),
+    });
+    if (res.ok) {
+      const row = await res.json();
+      setPestEvents((prev) => [...prev, row]);
+    }
+    setPestFormPos(null);
+    setPestSpecies("");
+    setPestSeverity("moderate");
+    setTool("select");
+  }
+
+  async function resolveSelectedEvent() {
+    if (!selectedEvent) return;
+    const res = await fetch(`${eventsBase}/${selectedEvent.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "resolved" }),
+    });
+    if (res.ok) {
+      setPestEvents((prev) => prev.map((ev) => (ev.id === selectedEvent.id ? { ...ev, status: "resolved" } : ev)));
+    }
+    setSelectedEvent(null);
+  }
+
+  async function deleteSelectedEvent() {
+    if (!selectedEvent) return;
+    await fetch(`${eventsBase}/${selectedEvent.id}`, { method: "DELETE" });
+    setPestEvents((prev) => prev.filter((ev) => ev.id !== selectedEvent.id));
+    setSelectedEvent(null);
+  }
+
   async function handleBackgroundUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -131,10 +200,17 @@ export default function MapEditor({
 
   function handleMouseDown(e: Konva.KonvaEventObject<MouseEvent>) {
     if (tool === "select") {
-      if (e.target === e.target.getStage()) setSelectedId(null);
+      if (e.target === e.target.getStage()) {
+        setSelectedId(null);
+        setSelectedEvent(null);
+      }
       return;
     }
     const pos = stagePos(e);
+    if (tool === "pest") {
+      setPestFormPos(pos);
+      return;
+    }
     if (tool === "rect") {
       setDrawing({ shapeType: "rect", geometry: { x: pos.x, y: pos.y, width: 0, height: 0 } });
     } else if (tool === "circle") {
@@ -179,18 +255,19 @@ export default function MapEditor({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        {(["select", "rect", "circle", "polygon", "label"] as const).map((t) => (
+        {(["select", "rect", "circle", "polygon", "label", "pest"] as const).map((t) => (
           <button
             key={t}
             onClick={() => {
               setTool(t);
               setPolygonPoints([]);
+              setPestFormPos(null);
             }}
             className={`rounded-md border px-3 py-1.5 text-sm capitalize ${
               tool === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
             }`}
           >
-            {t}
+            {t === "pest" ? "Pest event" : t}
           </button>
         ))}
         {tool === "polygon" && (
@@ -219,7 +296,7 @@ export default function MapEditor({
         </label>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-[var(--border)]">
+      <div className="relative overflow-hidden rounded-lg border border-[var(--border)]">
         <Stage
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
@@ -233,18 +310,20 @@ export default function MapEditor({
             )}
 
             {objects.map((obj) => {
-              // key must be a literal JSX attribute at each element below,
-              // not spread via this object -- React strips/warns on a key
-              // passed inside a spread props object rather than treating it
-              // as the real reconciliation key.
+              // key AND ref must be literal JSX attributes on each element
+              // below, not spread via this object -- both are extracted by
+              // the JSX compiler statically, not read out of a merged props
+              // object at runtime, so either one arriving only via {...spread}
+              // silently fails to do its job (no reconciliation key, no ref
+              // callback ever fires).
+              const nodeRef = (node: Konva.Node | null) => {
+                if (node) shapeRefs.current.set(obj.id, node);
+                else shapeRefs.current.delete(obj.id);
+              };
               const commonProps = {
                 draggable: tool === "select",
                 onClick: () => tool === "select" && setSelectedId(obj.id),
                 onTap: () => tool === "select" && setSelectedId(obj.id),
-                ref: (node: Konva.Node | null) => {
-                  if (node) shapeRefs.current.set(obj.id, node);
-                  else shapeRefs.current.delete(obj.id);
-                },
                 onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) =>
                   updateGeometry(obj.id, { ...obj.geometry, x: e.target.x(), y: e.target.y() }),
                 onTransformEnd: (e: Konva.KonvaEventObject<Event>) => {
@@ -267,6 +346,7 @@ export default function MapEditor({
                 return (
                   <Rect
                     key={obj.id}
+                    ref={nodeRef}
                     {...commonProps}
                     x={obj.geometry.x}
                     y={obj.geometry.y}
@@ -283,6 +363,7 @@ export default function MapEditor({
                 return (
                   <Circle
                     key={obj.id}
+                    ref={nodeRef}
                     {...commonProps}
                     x={obj.geometry.x}
                     y={obj.geometry.y}
@@ -297,6 +378,7 @@ export default function MapEditor({
                 return (
                   <Line
                     key={obj.id}
+                    ref={nodeRef}
                     {...commonProps}
                     points={obj.geometry.points}
                     closed
@@ -310,6 +392,7 @@ export default function MapEditor({
                 return (
                   <Line
                     key={obj.id}
+                    ref={nodeRef}
                     {...commonProps}
                     points={obj.geometry.points}
                     stroke={obj.style?.fill ?? COLORS[0]}
@@ -320,6 +403,7 @@ export default function MapEditor({
               return (
                 <Text
                   key={obj.id}
+                  ref={nodeRef}
                   {...commonProps}
                   x={obj.geometry.x}
                   y={obj.geometry.y}
@@ -340,13 +424,104 @@ export default function MapEditor({
               <Line points={polygonPoints} stroke={color} strokeWidth={2} listening={false} />
             )}
 
+            {pestEvents
+              .filter((ev) => ev.status === "active" && ev.x != null && ev.y != null)
+              .map((ev) => (
+                <Circle
+                  key={ev.id}
+                  x={ev.x!}
+                  y={ev.y!}
+                  radius={9}
+                  fill={SEVERITY_COLORS[ev.severity]}
+                  stroke="#fff"
+                  strokeWidth={1.5}
+                  onClick={() => tool === "select" && setSelectedEvent(ev)}
+                  onTap={() => tool === "select" && setSelectedEvent(ev)}
+                />
+              ))}
+
             <Transformer ref={transformerRef} rotateEnabled />
           </Layer>
         </Stage>
+
+        {pestFormPos && (
+          <div
+            className="absolute z-10 flex w-64 flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg"
+            style={{ left: Math.min(pestFormPos.x, CANVAS_WIDTH - 260), top: Math.min(pestFormPos.y, CANVAS_HEIGHT - 180) }}
+          >
+            <div className="text-sm font-medium">New pest event</div>
+            <input
+              autoFocus
+              value={pestSpecies}
+              onChange={(e) => setPestSpecies(e.target.value)}
+              placeholder="Pest species (e.g. thrips)"
+              className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-sm"
+            />
+            <select
+              value={pestSeverity}
+              onChange={(e) => setPestSeverity(e.target.value as Severity)}
+              className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-sm"
+            >
+              {(["low", "moderate", "high", "severe"] as const).map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-2">
+              <button
+                onClick={submitPestEvent}
+                disabled={!pestSpecies.trim()}
+                className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+              >
+                Drop pin
+              </button>
+              <button
+                onClick={() => {
+                  setPestFormPos(null);
+                  setTool("select");
+                }}
+                className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {selectedEvent && (
+          <div
+            className="absolute z-10 flex w-64 flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg"
+            style={{
+              left: Math.min(selectedEvent.x ?? 0, CANVAS_WIDTH - 260),
+              top: Math.min(selectedEvent.y ?? 0, CANVAS_HEIGHT - 140),
+            }}
+          >
+            <div className="text-sm font-medium capitalize">{selectedEvent.pestSpecies}</div>
+            <div className="text-xs" style={{ color: SEVERITY_COLORS[selectedEvent.severity] }}>
+              {selectedEvent.severity} severity
+            </div>
+            {selectedEvent.notes && <div className="text-xs text-[var(--text-dim)]">{selectedEvent.notes}</div>}
+            <div className="flex gap-2">
+              <button
+                onClick={resolveSelectedEvent}
+                className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[#0B1626]"
+              >
+                Mark resolved
+              </button>
+              <button onClick={deleteSelectedEvent} className="rounded-md border border-red-400 px-3 py-1.5 text-sm text-red-400">
+                Delete
+              </button>
+            </div>
+            <button onClick={() => setSelectedEvent(null)} className="text-xs text-[var(--text-dim)]">
+              Close
+            </button>
+          </div>
+        )}
       </div>
       <p className="text-xs text-[var(--text-dim)]">
-        Select tool to move/resize existing shapes. Rect/circle: click-drag. Polygon: click to add points, then
-        &quot;Finish shape&quot;. Label: click to place text.
+        Select tool to move/resize existing shapes or click a pest pin. Rect/circle: click-drag. Polygon: click to
+        add points, then &quot;Finish shape&quot;. Label: click to place text. Pest event: click to drop a pin.
       </p>
     </div>
   );

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { facilityAreas, facilityMapObjects } from "@/db/schema";
+import { facilityAreas, facilityMapObjects, pestEvents } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
 import MapEditor from "./MapEditorClient";
@@ -25,6 +25,8 @@ export default async function AreaMapPage({ params }: { params: Promise<{ id: st
     .select()
     .from(facilityMapObjects)
     .where(eq(facilityMapObjects.facilityAreaId, areaId));
+
+  const events = await db.select().from(pestEvents).where(eq(pestEvents.facilityAreaId, areaId));
 
   return (
     <div className="flex flex-col gap-6">
@@ -50,6 +52,15 @@ export default async function AreaMapPage({ params }: { params: Promise<{ id: st
           style: o.style as never,
           label: o.label,
           zIndex: o.zIndex,
+        }))}
+        initialPestEvents={events.map((ev) => ({
+          id: ev.id,
+          x: ev.x,
+          y: ev.y,
+          pestSpecies: ev.pestSpecies,
+          severity: ev.severity,
+          status: ev.status,
+          notes: ev.notes,
         }))}
       />
     </div>
