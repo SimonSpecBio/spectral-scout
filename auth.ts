@@ -38,9 +38,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // Growers (both free-tier and pilot-program) sign in with email
     // magic-link -- this is a public self-serve tool, arbitrary email
     // domains, no Google account assumed.
+    //
+    // TEMP (until a verified Resend sending domain exists, see README):
+    // sendVerificationRequest logs the sign-in link instead of emailing it.
+    // This is NOT "no verification" -- it's still a real single-use token
+    // tied to the specific email that requested it, scoped by
+    // verificationTokens same as always. Only the delivery channel changes;
+    // nobody can sign in as an email they don't control just because this
+    // is active. Delete this override once EMAIL_SERVER points at a real
+    // verified domain.
     Nodemailer({
       server: process.env.EMAIL_SERVER,
       from: process.env.EMAIL_FROM,
+      sendVerificationRequest: async ({ identifier, url }) => {
+        console.log(`[scout] magic sign-in link for ${identifier}: ${url}`);
+      },
     }),
   ],
   session: { strategy: "database" },
