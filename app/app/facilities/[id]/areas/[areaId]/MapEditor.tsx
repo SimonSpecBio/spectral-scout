@@ -50,7 +50,10 @@ interface PestEvent {
 
 const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 600;
-const COLORS = ["#35d0a3", "#e0b84b", "#e05b5b", "#5b8fe0", "#a35be0"];
+// Konva renders to canvas, not DOM, so it can't read CSS custom properties
+// -- this has to match --map-blue in globals.css literally.
+const MAP_BLUE = "#7ec4f0";
+const COLORS = [MAP_BLUE, "#35d0a3", "#e0b84b", "#e05b5b", "#a35be0"];
 const SEVERITY_COLORS: Record<Severity, string> = {
   low: "#e0d24b",
   moderate: "#e0913d",
@@ -297,7 +300,7 @@ export default function MapEditor({
         </label>
       </div>
 
-      <div className="relative overflow-hidden rounded-lg border border-[var(--border)]">
+      <div className="relative map-canvas-frame">
         <Stage
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
@@ -356,7 +359,8 @@ export default function MapEditor({
                     rotation={obj.geometry.rotation ?? 0}
                     fill={obj.style?.fill ?? COLORS[0]}
                     opacity={0.7}
-                    stroke={selectedId === obj.id ? "#fff" : undefined}
+                    stroke={selectedId === obj.id ? "#ffffff" : MAP_BLUE}
+                    strokeWidth={selectedId === obj.id ? 3 : 1.5}
                   />
                 );
               }
@@ -371,7 +375,8 @@ export default function MapEditor({
                     radius={obj.geometry.radius}
                     fill={obj.style?.fill ?? COLORS[0]}
                     opacity={0.7}
-                    stroke={selectedId === obj.id ? "#fff" : undefined}
+                    stroke={selectedId === obj.id ? "#ffffff" : MAP_BLUE}
+                    strokeWidth={selectedId === obj.id ? 3 : 1.5}
                   />
                 );
               }
@@ -385,7 +390,8 @@ export default function MapEditor({
                     closed
                     fill={obj.style?.fill ?? COLORS[0]}
                     opacity={0.7}
-                    stroke={selectedId === obj.id ? "#fff" : undefined}
+                    stroke={selectedId === obj.id ? "#ffffff" : MAP_BLUE}
+                    strokeWidth={selectedId === obj.id ? 3 : 1.5}
                   />
                 );
               }

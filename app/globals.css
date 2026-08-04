@@ -8,6 +8,9 @@
   --text: #e7edf5;
   --text-dim: #93a3b8;
   --accent: #35d0a3;
+  --map-blue: #7ec4f0;
+  --map-blue-soft: #bfe3fa;
+  --map-grid-line: rgba(126, 196, 240, 0.09);
 }
 
 body {
@@ -38,4 +41,17 @@ body {
   border-radius: 999px;
   padding: 0.3rem 0.7rem;
   font-size: 0.75rem;
+}
+
+/* Blueprint-style frame for the facility map canvas -- a light blue edge
+   and faint grid distinguish it from the rest of the app's dark teal cards,
+   deliberately evoking a technical drawing surface since that's what it is. */
+.map-canvas-frame {
+  border-radius: 1.25rem;
+  border: 2px solid var(--map-blue);
+  background-color: var(--surface);
+  background-image: linear-gradient(var(--map-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--map-grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+  overflow: hidden;
 }
