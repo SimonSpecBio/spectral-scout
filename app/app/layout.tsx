@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireGrowerSession } from "@/lib/session";
+import FloatingAction from "./FloatingAction";
 import TabBar from "./TabBar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
       <TabBar />
       {children}
+      <FloatingAction />
     </div>
   );
 }

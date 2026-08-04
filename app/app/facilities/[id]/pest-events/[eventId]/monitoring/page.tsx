@@ -21,7 +21,10 @@ export default async function MonitoringPage({ params }: { params: Promise<{ id:
       <Link href={`/app/facilities/${id}/pest-events/${eventId}`} className="text-sm text-[var(--text-dim)]">
         ← {event.pestSpecies}
       </Link>
-      <MonitoringFlow facilityId={id} eventId={eventId} />
+      <MonitoringFlow
+        postUrl={`/api/facilities/${id}/pest-events/${eventId}/monitoring`}
+        redirectHref={`/app/facilities/${id}/pest-events/${eventId}`}
+      />
     </div>
   );
 }

@@ -18,7 +18,12 @@ const LEVELS = [
   { label: "Heavy", value: 3, color: "#c14b4b" },
 ] as const;
 
-export default function MonitoringFlow({ facilityId, eventId }: { facilityId: string; eventId: string }) {
+// Generic tap-through protocol -- used both from within a Pest Event's
+// Monitoring tab (postUrl targets that event, session gets linked via
+// promotedPestEventId) and from the global "+" quick action for routine,
+// unlinked scouting (postUrl targets the area directly). Same 30-tap flow
+// either way; only where the result gets posted/redirected differs.
+export default function MonitoringFlow({ postUrl, redirectHref }: { postUrl: string; redirectHref: string }) {
   const router = useRouter();
   const [started, setStarted] = useState(false);
   const [readings, setReadings] = useState<number[]>([]);
@@ -38,13 +43,13 @@ export default function MonitoringFlow({ facilityId, eventId }: { facilityId: st
 
   async function save() {
     setSaving(true);
-    const res = await fetch(`/api/facilities/${facilityId}/pest-events/${eventId}/monitoring`, {
+    const res = await fetch(postUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sampleSize: TOTAL, pestCount }),
     });
     setSaving(false);
-    if (res.ok) router.push(`/app/facilities/${facilityId}/pest-events/${eventId}`);
+    if (res.ok) router.push(redirectHref);
   }
 
   if (!started) {
