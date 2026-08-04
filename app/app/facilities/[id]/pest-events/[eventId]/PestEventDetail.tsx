@@ -23,6 +23,13 @@ interface Photo {
   caption: string | null;
 }
 
+interface MonitoringSession {
+  id: string;
+  date: string;
+  sampleSize: number;
+  pestCount: number;
+}
+
 interface Event {
   id: string;
   pestSpecies: string;
@@ -49,6 +56,7 @@ export default function PestEventDetail({
   mapHref,
   initialTreatments,
   initialPhotos,
+  initialMonitoring,
 }: {
   facilityId: string;
   event: Event;
@@ -56,6 +64,7 @@ export default function PestEventDetail({
   mapHref: string | null;
   initialTreatments: Treatment[];
   initialPhotos: Photo[];
+  initialMonitoring: MonitoringSession[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("timeline");
@@ -182,7 +191,7 @@ export default function PestEventDetail({
           ))}
           {mapHref && (
             <Link href={mapHref} className="px-4 py-3 text-sm text-[var(--accent)]">
-              View on facility map →
+              View on site map →
             </Link>
           )}
         </div>
@@ -263,9 +272,40 @@ export default function PestEventDetail({
       )}
 
       {tab === "monitoring" && (
-        <div className="card p-6 text-sm text-[var(--text-dim)]">
-          Guided monitoring (standardized sampling protocol, density trend over time) is coming next -- this tab
-          will show the severity curve once it exists.
+        <div className="flex flex-col gap-4">
+          <Link
+            href={`/app/facilities/${facilityId}/pest-events/${event.id}/monitoring`}
+            className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#0B1626]"
+          >
+            Start monitoring
+          </Link>
+
+          {initialMonitoring.length === 0 ? (
+            <div className="card p-6 text-sm text-[var(--text-dim)]">
+              No monitoring sessions yet. Run the guided protocol above to start building a density trend.
+            </div>
+          ) : (
+            <div className="card flex flex-col divide-y divide-[var(--border)]">
+              {initialMonitoring.map((s, i) => {
+                const density = s.sampleSize > 0 ? s.pestCount / s.sampleSize : 0;
+                const prev = initialMonitoring[i + 1]; // sorted newest-first
+                const prevDensity = prev && prev.sampleSize > 0 ? prev.pestCount / prev.sampleSize : null;
+                return (
+                  <div key={s.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                    <span>{new Date(s.date).toLocaleDateString()}</span>
+                    <span className="flex items-center gap-2">
+                      {density.toFixed(2)} density
+                      {prevDensity != null && (
+                        <span className={density > prevDensity ? "text-red-400" : density < prevDensity ? "text-[var(--accent)]" : "text-[var(--text-dim)]"}>
+                          {density > prevDensity ? "▲" : density < prevDensity ? "▼" : "→"}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="font-semibold">Spectral Scout</span>
           <nav className="flex gap-4 text-sm text-[var(--text-dim)]">
             <Link href="/app">Dashboard</Link>
-            <Link href="/app/facilities">Facilities</Link>
+            <Link href="/app/facilities">Sites</Link>
           </nav>
         </div>
         {session.accountTier === "pilot" && (

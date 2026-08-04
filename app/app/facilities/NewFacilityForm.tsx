@@ -34,7 +34,7 @@ export default function NewFacilityForm() {
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Facility name (e.g. Main Site)"
+        placeholder="Site name (e.g. West Campus)"
         required
         className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
       />

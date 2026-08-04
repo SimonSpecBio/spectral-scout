@@ -21,7 +21,7 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
     <div className="flex flex-col gap-6">
       <div>
         <Link href="/app/facilities" className="text-sm text-[var(--text-dim)]">
-          ← Facilities
+          ← Sites
         </Link>
         <h1 className="text-2xl font-semibold">{facility.name}</h1>
       </div>

@@ -30,6 +30,22 @@ function needsFollowUp(createdAt: Date): boolean {
   return Date.now() - createdAt.getTime() > FOLLOW_UP_AFTER_DAYS * DAY_MS;
 }
 
+// Two different facilities can both have a "Flowering Room 1" -- area name
+// alone is ambiguous once there's more than one facility, so group by
+// facility instead of just tacking the facility name onto every row.
+function groupByFacility<T extends { facilityId: string; facilityName: string }>(rows: T[]): [string, T[]][] {
+  const order: string[] = [];
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    if (!groups.has(row.facilityId)) {
+      groups.set(row.facilityId, []);
+      order.push(row.facilityId);
+    }
+    groups.get(row.facilityId)!.push(row);
+  }
+  return order.map((id) => [groups.get(id)![0].facilityName, groups.get(id)!]);
+}
+
 export default async function Dashboard() {
   const session = await requireGrowerSession();
   if (!session) return null;
@@ -44,9 +60,9 @@ export default async function Dashboard() {
       <div className="flex flex-col gap-6">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <div className="card p-6 text-[var(--text-dim)]">
-          No facilities yet.{" "}
+          No sites yet.{" "}
           <Link href="/app/facilities" className="text-[var(--accent)]">
-            Add your first facility
+            Add your first site
           </Link>{" "}
           to start scouting.
         </div>
@@ -96,10 +112,16 @@ export default async function Dashboard() {
   // key off last-activity-on-the-event instead of just its age.
   const todaysTasks = active.filter((e) => needsFollowUp(e.createdAt));
 
+  // Flat chronological feed spanning every facility, so (unlike the two
+  // sections above) grouping doesn't apply here -- each row spells out
+  // "area, facility" instead, same fix for the same area-name-collision
+  // problem.
+  const locationOf = (e: (typeof events)[number]) =>
+    orgFacilities.length > 1 && e.areaName ? `${e.areaName}, ${e.facilityName}` : (e.areaName ?? e.facilityName);
   const activity = events
     .flatMap((e) => [
-      { label: `${e.pestSpecies} detected`, sub: e.areaName ?? e.facilityName, at: e.createdAt },
-      ...(e.resolvedAt ? [{ label: `${e.pestSpecies} resolved`, sub: e.areaName ?? e.facilityName, at: e.resolvedAt }] : []),
+      { label: `${e.pestSpecies} detected`, sub: locationOf(e), at: e.createdAt },
+      ...(e.resolvedAt ? [{ label: `${e.pestSpecies} resolved`, sub: locationOf(e), at: e.resolvedAt }] : []),
     ])
     .sort((a, b) => b.at.getTime() - a.at.getTime())
     .slice(0, 8);
@@ -108,7 +130,7 @@ export default async function Dashboard() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">
-          {orgFacilities.length === 1 ? orgFacilities[0].name : "All facilities"}
+          {orgFacilities.length === 1 ? orgFacilities[0].name : "All sites"}
         </h1>
         <div className="card flex items-center gap-2 px-3 py-1.5 text-sm">
           <span>{overallStatus.emoji}</span>
@@ -121,18 +143,24 @@ export default async function Dashboard() {
         {todaysTasks.length === 0 ? (
           <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing needs attention right now.</div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {todaysTasks.map((e) => (
-              <Link
-                key={e.id}
-                href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`}
-                className="card card-interactive flex items-center justify-between p-3 text-sm"
-              >
-                <span>
-                  Follow-up inspection due -- {e.pestSpecies} ({e.areaName ?? e.facilityName})
-                </span>
-                <span className="text-[var(--text-dim)]">→</span>
-              </Link>
+          <div className="flex flex-col gap-4">
+            {groupByFacility(todaysTasks).map(([facilityName, rows]) => (
+              <div key={facilityName} className="flex flex-col gap-2">
+                {orgFacilities.length > 1 && <div className="text-xs text-[var(--text-dim)]">{facilityName}</div>}
+                {rows.map((e) => (
+                  <Link
+                    key={e.id}
+                    href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`}
+                    className="card card-interactive flex items-center justify-between p-3 text-sm"
+                  >
+                    <span>
+                      Follow-up inspection due -- {e.pestSpecies}
+                      {e.areaName && ` (${e.areaName})`}
+                    </span>
+                    <span className="text-[var(--text-dim)]">→</span>
+                  </Link>
+                ))}
+              </div>
             ))}
           </div>
         )}
@@ -143,22 +171,27 @@ export default async function Dashboard() {
         {active.length === 0 ? (
           <div className="card p-4 text-sm text-[var(--text-dim)]">No active pest events.</div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {active.map((e) => (
-              <Link key={e.id} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="card card-interactive flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: speciesColor(e.pestSpecies) }} />
-                  <div>
-                    <div className="font-medium capitalize">{e.pestSpecies}</div>
-                    <div className="text-sm text-[var(--text-dim)]">
-                      {e.areaName ?? e.facilityName} -- started {relativeTime(e.createdAt)}
+          <div className="flex flex-col gap-4">
+            {groupByFacility(active).map(([facilityName, rows]) => (
+              <div key={facilityName} className="flex flex-col gap-2">
+                {orgFacilities.length > 1 && <div className="text-xs text-[var(--text-dim)]">{facilityName}</div>}
+                {rows.map((e) => (
+                  <Link key={e.id} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="card card-interactive flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: speciesColor(e.pestSpecies) }} />
+                      <div>
+                        <div className="font-medium capitalize">{e.pestSpecies}</div>
+                        <div className="text-sm text-[var(--text-dim)]">
+                          {e.areaName ?? "Unassigned area"} -- started {relativeTime(e.createdAt)}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <span className="badge capitalize" style={{ background: `${SEVERITY_COLOR[e.severity]}33`, color: SEVERITY_COLOR[e.severity] }}>
-                  {e.severity}
-                </span>
-              </Link>
+                    <span className="badge capitalize" style={{ background: `${SEVERITY_COLOR[e.severity]}33`, color: SEVERITY_COLOR[e.severity] }}>
+                      {e.severity}
+                    </span>
+                  </Link>
+                ))}
+              </div>
             ))}
           </div>
         )}

@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { facilityAreas, observationPhotos, treatments } from "@/db/schema";
+import { facilityAreas, observationPhotos, scoutingObservations, treatments } from "@/db/schema";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
@@ -24,6 +24,11 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
     : null;
   const eventTreatments = await db.select().from(treatments).where(eq(treatments.pestEventId, eventId));
   const photos = await db.select().from(observationPhotos).where(eq(observationPhotos.pestEventId, eventId));
+  const monitoringSessions = await db
+    .select()
+    .from(scoutingObservations)
+    .where(eq(scoutingObservations.promotedPestEventId, eventId))
+    .orderBy(desc(scoutingObservations.createdAt));
 
   return (
     <div className="flex flex-col gap-6">
@@ -58,6 +63,12 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
           appliedAt: t.appliedAt.toISOString(),
         }))}
         initialPhotos={photos.map((p) => ({ id: p.id, blobUrl: p.blobUrl, caption: p.caption }))}
+        initialMonitoring={monitoringSessions.map((s) => ({
+          id: s.id,
+          date: s.date,
+          sampleSize: s.sampleSize ?? 0,
+          pestCount: s.pestCount ?? 0,
+        }))}
       />
     </div>
   );
