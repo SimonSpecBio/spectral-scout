@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { speciesColor } from "@/lib/pest-colors";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
@@ -146,7 +145,7 @@ export default function PestEventDetail({
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: speciesColor(event.pestSpecies) }} />
+          <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[event.severity] }} />
           <div>
             <h1 className="text-2xl font-semibold capitalize">{event.pestSpecies}</h1>
             <div className="text-sm text-[var(--text-dim)]">{locationLabel}</div>
