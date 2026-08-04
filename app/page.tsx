@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 
@@ -16,12 +17,12 @@ export default async function Home() {
       <p className="text-[var(--text-dim)]">
         Free pest scouting, hotspot monitoring, and treatment history for greenhouse and indoor growers.
       </p>
-      <a
+      <Link
         href="/api/auth/signin"
         className="rounded-md bg-[var(--accent)] px-5 py-2.5 font-medium text-[#0B1626]"
       >
         Sign in
-      </a>
+      </Link>
     </main>
   );
 }
