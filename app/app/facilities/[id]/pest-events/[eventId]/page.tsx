@@ -1,0 +1,64 @@
+import Link from "next/link";
+import { eq } from "drizzle-orm";
+import { notFound } from "next/navigation";
+import { db } from "@/db";
+import { facilityAreas, observationPhotos, treatments } from "@/db/schema";
+import { getOwnedPestEvent } from "@/lib/pest-events";
+import { getOwnedFacility } from "@/lib/facilities";
+import { requireGrowerSession } from "@/lib/session";
+import PestEventDetail from "./PestEventDetail";
+
+export default async function PestEventPage({ params }: { params: Promise<{ id: string; eventId: string }> }) {
+  const session = await requireGrowerSession();
+  if (!session) return null;
+
+  const { id, eventId } = await params;
+  const facility = await getOwnedFacility(id, session.organizationId!);
+  if (!facility) notFound();
+
+  const event = await getOwnedPestEvent(id, eventId, session.organizationId!);
+  if (!event) notFound();
+
+  const area = event.facilityAreaId
+    ? (await db.select().from(facilityAreas).where(eq(facilityAreas.id, event.facilityAreaId)))[0]
+    : null;
+  const eventTreatments = await db.select().from(treatments).where(eq(treatments.pestEventId, eventId));
+  const photos = await db.select().from(observationPhotos).where(eq(observationPhotos.pestEventId, eventId));
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Link
+          href={area ? `/app/facilities/${id}/areas/${area.id}` : `/app/facilities/${id}`}
+          className="text-sm text-[var(--text-dim)]"
+        >
+          ← {area ? area.name : facility.name}
+        </Link>
+      </div>
+
+      <PestEventDetail
+        facilityId={id}
+        event={{
+          id: event.id,
+          pestSpecies: event.pestSpecies,
+          severity: event.severity,
+          status: event.status,
+          notes: event.notes,
+          createdAt: event.createdAt.toISOString(),
+          resolvedAt: event.resolvedAt ? event.resolvedAt.toISOString() : null,
+        }}
+        locationLabel={area ? `${area.name}, ${facility.name}` : facility.name}
+        mapHref={area ? `/app/facilities/${id}/areas/${area.id}` : null}
+        initialTreatments={eventTreatments.map((t) => ({
+          id: t.id,
+          type: t.type,
+          product: t.product,
+          targetPest: t.targetPest,
+          notes: t.notes,
+          appliedAt: t.appliedAt.toISOString(),
+        }))}
+        initialPhotos={photos.map((p) => ({ id: p.id, blobUrl: p.blobUrl, caption: p.caption }))}
+      />
+    </div>
+  );
+}

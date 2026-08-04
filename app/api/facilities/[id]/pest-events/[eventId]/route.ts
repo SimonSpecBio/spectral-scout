@@ -1,18 +1,19 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { pestEventStatusEnum, pestEvents, severityEnum } from "@/db/schema";
-import { getOwnedFacility } from "@/lib/facilities";
+import { getOwnedPestEvent as ownedEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
 
-async function ownedEvent(facilityId: string, eventId: string, organizationId: string) {
-  const facility = await getOwnedFacility(facilityId, organizationId);
-  if (!facility) return null;
-  const [event] = await db
-    .select()
-    .from(pestEvents)
-    .where(and(eq(pestEvents.id, eventId), eq(pestEvents.facilityId, facilityId)));
-  return event ?? null;
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string; eventId: string }> }) {
+  const session = await requireGrowerSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id, eventId } = await params;
+  const event = await ownedEvent(id, eventId, session.organizationId!);
+  if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  return NextResponse.json(event);
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; eventId: string }> }) {

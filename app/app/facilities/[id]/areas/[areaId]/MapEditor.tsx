@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from "react-konva";
 import type Konva from "konva";
@@ -502,6 +503,9 @@ export default function MapEditor({
               {selectedEvent.severity} severity
             </div>
             {selectedEvent.notes && <div className="text-xs text-[var(--text-dim)]">{selectedEvent.notes}</div>}
+            <Link href={`/app/facilities/${facilityId}/pest-events/${selectedEvent.id}`} className="text-xs text-[var(--accent)]">
+              View details →
+            </Link>
             <div className="flex gap-2">
               <button
                 onClick={resolveSelectedEvent}

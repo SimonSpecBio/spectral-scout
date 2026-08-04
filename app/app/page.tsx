@@ -126,7 +126,7 @@ export default async function Dashboard() {
             {todaysTasks.map((e) => (
               <Link
                 key={e.id}
-                href={e.facilityAreaId ? `/app/facilities/${e.facilityId}/areas/${e.facilityAreaId}` : `/app/facilities/${e.facilityId}`}
+                href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`}
                 className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-sm hover:border-[var(--accent)]"
               >
                 <span>
@@ -150,7 +150,7 @@ export default async function Dashboard() {
             {active.map((e) => (
               <Link
                 key={e.id}
-                href={e.facilityAreaId ? `/app/facilities/${e.facilityId}/areas/${e.facilityAreaId}` : `/app/facilities/${e.facilityId}`}
+                href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`}
                 className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 hover:border-[var(--accent)]"
               >
                 <div>
