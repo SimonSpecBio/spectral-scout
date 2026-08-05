@@ -2,14 +2,13 @@ import { redirect } from "next/navigation";
 import { requireGrowerSession } from "@/lib/session";
 import FloatingAction from "./FloatingAction";
 import HeaderMenu from "./HeaderMenu";
-import TabBar from "./TabBar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireGrowerSession();
   if (!session) redirect("/");
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8 pb-24 sm:pb-8">
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
       <header className="flex items-center justify-between">
         <span className="font-semibold">Spectral Scout</span>
         <div className="flex items-center gap-2">
@@ -21,7 +20,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <HeaderMenu email={session.user?.email} />
         </div>
       </header>
-      <TabBar />
       {children}
       <FloatingAction />
     </div>

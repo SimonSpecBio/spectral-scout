@@ -55,7 +55,15 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
           <line x1="22" y1="8" x2="252" y2="8" />
           <line x1="22" y1="52" x2="252" y2="52" />
         </g>
-        <polyline points={sparkPoints(days, 226, 44, 4)} fill="none" stroke="var(--accent)" strokeWidth="1.75" transform="translate(22, 4)" />
+        <polyline
+          points={sparkPoints(days, 226, 44, 4)}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="1"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          transform="translate(22, 4)"
+        />
       </svg>
     </div>
   );

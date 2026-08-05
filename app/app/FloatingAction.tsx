@@ -12,7 +12,7 @@ export default function FloatingAction() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="fixed bottom-20 right-4 z-30 flex flex-col items-end gap-2 sm:bottom-6">
+    <div className="fixed bottom-6 right-4 z-30 flex flex-col items-end gap-2">
       {open && (
         <div className="card flex flex-col gap-1 p-2">
           <Link
@@ -31,10 +31,13 @@ export default function FloatingAction() {
           </Link>
         </div>
       )}
+      {/* Small and muted, not a bright circle -- per the reference design
+          (the mockup file was literally named "muted_fab"). */}
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label="Quick actions"
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-2xl font-medium text-[#0B1626] shadow-lg transition-transform active:scale-95"
+        className="flex h-[46px] w-[46px] items-center justify-center rounded-2xl text-xl transition-transform active:scale-95"
+        style={{ background: "var(--surface-raised)", border: "0.5px solid var(--border-soft)", color: "var(--text-dim)" }}
       >
         {open ? "×" : "+"}
       </button>

@@ -3,10 +3,18 @@
 import Link from "next/link";
 import { useState } from "react";
 
-// The account/settings entry point -- didn't exist anywhere in the app
-// before this (no sign-out button existed at all). Kept separate from the
-// "More" tab, which is about app features (Sites, Coming soon); this is
-// specifically account-level.
+const NAV = [
+  { href: "/app", label: "Home" },
+  { href: "/app/events", label: "Events" },
+  { href: "/app/timeline", label: "Timeline" },
+  { href: "/app/more", label: "More" },
+] as const;
+
+// The one navigation menu -- also holds the account/settings entry point
+// (no sign-out button existed anywhere in the app before this). Replaces
+// the old fixed bottom tab bar entirely: one corner menu for everything,
+// matching the reference design's single "..." affordance instead of a
+// persistent bottom bar competing for screen space on a phone.
 export default function HeaderMenu({ email }: { email: string | null | undefined }) {
   const [open, setOpen] = useState(false);
 
@@ -21,6 +29,17 @@ export default function HeaderMenu({ email }: { email: string | null | undefined
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div className="card absolute right-0 top-10 z-40 flex w-56 flex-col gap-1 p-2">
+            {NAV.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className="rounded-md px-3 py-2 text-sm hover:bg-[var(--surface-raised)]"
+              >
+                {item.label}
+              </Link>
+            ))}
+            <div className="my-1 border-t border-[var(--border)]" />
             {email && <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{email}</div>}
             <Link href="/api/auth/signout" className="rounded-md px-3 py-2 text-sm hover:bg-[var(--surface-raised)]">
               Sign out
