@@ -47,11 +47,22 @@ body {
    and faint grid distinguish it from the rest of the app's dark teal cards,
    deliberately evoking a technical drawing surface since that's what it is. */
 .map-canvas-frame {
+  position: relative;
   border-radius: 1.25rem;
   border: 2px solid var(--map-blue);
   background-color: var(--surface);
+  overflow: hidden;
+}
+
+/* Grid lives on its own layer (not directly on the frame) so the fade mask
+   only affects the grid, not the crisp border around it. */
+.map-canvas-grid {
+  position: absolute;
+  inset: 0;
   background-image: linear-gradient(var(--map-grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--map-grid-line) 1px, transparent 1px);
   background-size: 32px 32px;
-  overflow: hidden;
+  -webkit-mask-image: radial-gradient(ellipse at center, black 35%, transparent 80%);
+  mask-image: radial-gradient(ellipse at center, black 35%, transparent 80%);
+  pointer-events: none;
 }

@@ -51,15 +51,59 @@ interface PestEvent {
 const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 600;
 // Konva renders to canvas, not DOM, so it can't read CSS custom properties
-// -- this has to match --map-blue in globals.css literally.
+// -- these have to match --map-blue/--map-blue-soft in globals.css literally.
 const MAP_BLUE = "#7ec4f0";
-const COLORS = [MAP_BLUE, "#35d0a3", "#e0b84b", "#e05b5b", "#a35be0"];
+const MAP_BLUE_FILL = "#bfe3fa";
 const SEVERITY_COLORS: Record<Severity, string> = {
   low: "#e0d24b",
   moderate: "#e0913d",
   high: "#e0553d",
   severe: "#a3193d",
 };
+const SEVERITY_RANK: Record<Severity, number> = { low: 0, moderate: 1, high: 2, severe: 3 };
+
+// Every drawn zone is the same calm light blue by default -- color is a
+// hotspot signal, not a decoration a grower picks per-shape. If an active
+// pest event's pin falls inside a zone, that zone tints to the worst
+// severity found inside it instead.
+function pointInShape(px: number, py: number, obj: Pick<MapObject, "shapeType" | "geometry">): boolean {
+  const g = obj.geometry;
+  if (obj.shapeType === "rect") {
+    const x0 = Math.min(g.x ?? 0, (g.x ?? 0) + (g.width ?? 0));
+    const x1 = Math.max(g.x ?? 0, (g.x ?? 0) + (g.width ?? 0));
+    const y0 = Math.min(g.y ?? 0, (g.y ?? 0) + (g.height ?? 0));
+    const y1 = Math.max(g.y ?? 0, (g.y ?? 0) + (g.height ?? 0));
+    return px >= x0 && px <= x1 && py >= y0 && py <= y1;
+  }
+  if (obj.shapeType === "circle") {
+    const dx = px - (g.x ?? 0);
+    const dy = py - (g.y ?? 0);
+    return Math.sqrt(dx * dx + dy * dy) <= (g.radius ?? 0);
+  }
+  if (obj.shapeType === "polygon" && g.points) {
+    let inside = false;
+    const pts = g.points;
+    for (let i = 0, j = pts.length / 2 - 1; i < pts.length / 2; j = i++) {
+      const xi = pts[i * 2],
+        yi = pts[i * 2 + 1];
+      const xj = pts[j * 2],
+        yj = pts[j * 2 + 1];
+      if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  return false;
+}
+
+function hotspotSeverity(obj: MapObject, events: PestEvent[]): Severity | null {
+  let worst: Severity | null = null;
+  for (const ev of events) {
+    if (ev.status !== "active" || ev.x == null || ev.y == null) continue;
+    if (!pointInShape(ev.x, ev.y, obj)) continue;
+    if (!worst || SEVERITY_RANK[ev.severity] > SEVERITY_RANK[worst]) worst = ev.severity;
+  }
+  return worst;
+}
 
 function useBackgroundImage(url: string | null) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -92,7 +136,6 @@ export default function MapEditor({
   const [pestEvents, setPestEvents] = useState<PestEvent[]>(initialPestEvents);
   const [tool, setTool] = useState<ShapeType | "select" | "pest">("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [color, setColor] = useState(COLORS[0]);
   const [drawing, setDrawing] = useState<{ shapeType: ShapeType; geometry: Geometry } | null>(null);
   const [polygonPoints, setPolygonPoints] = useState<number[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -119,7 +162,7 @@ export default function MapEditor({
     const res = await fetch(`${base}/objects`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shapeType, geometry, style: { fill: color }, label }),
+      body: JSON.stringify({ shapeType, geometry, label }),
     });
     if (res.ok) {
       const row = await res.json();
@@ -279,16 +322,6 @@ export default function MapEditor({
             Finish shape ({polygonPoints.length / 2} pts)
           </button>
         )}
-        <div className="flex gap-1">
-          {COLORS.map((c) => (
-            <button
-              key={c}
-              onClick={() => setColor(c)}
-              className="h-6 w-6 rounded-full border-2"
-              style={{ background: c, borderColor: color === c ? "#fff" : "transparent" }}
-            />
-          ))}
-        </div>
         {selectedId && (
           <button onClick={deleteSelected} className="rounded-md border border-red-400 px-3 py-1.5 text-sm text-red-400">
             Delete selected
@@ -301,6 +334,7 @@ export default function MapEditor({
       </div>
 
       <div className="relative map-canvas-frame">
+        <div className="map-canvas-grid" />
         <Stage
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
@@ -346,6 +380,11 @@ export default function MapEditor({
                 },
               };
 
+              const hotspot = hotspotSeverity(obj, pestEvents);
+              const zoneFill = hotspot ? `${SEVERITY_COLORS[hotspot]}55` : MAP_BLUE_FILL;
+              const zoneStroke = selectedId === obj.id ? "#ffffff" : hotspot ? SEVERITY_COLORS[hotspot] : MAP_BLUE;
+              const zoneStrokeWidth = selectedId === obj.id ? 3 : hotspot ? 2.5 : 1.5;
+
               if (obj.shapeType === "rect") {
                 return (
                   <Rect
@@ -357,10 +396,9 @@ export default function MapEditor({
                     width={obj.geometry.width}
                     height={obj.geometry.height}
                     rotation={obj.geometry.rotation ?? 0}
-                    fill={obj.style?.fill ?? COLORS[0]}
-                    opacity={0.7}
-                    stroke={selectedId === obj.id ? "#ffffff" : MAP_BLUE}
-                    strokeWidth={selectedId === obj.id ? 3 : 1.5}
+                    fill={zoneFill}
+                    stroke={zoneStroke}
+                    strokeWidth={zoneStrokeWidth}
                   />
                 );
               }
@@ -373,10 +411,9 @@ export default function MapEditor({
                     x={obj.geometry.x}
                     y={obj.geometry.y}
                     radius={obj.geometry.radius}
-                    fill={obj.style?.fill ?? COLORS[0]}
-                    opacity={0.7}
-                    stroke={selectedId === obj.id ? "#ffffff" : MAP_BLUE}
-                    strokeWidth={selectedId === obj.id ? 3 : 1.5}
+                    fill={zoneFill}
+                    stroke={zoneStroke}
+                    strokeWidth={zoneStrokeWidth}
                   />
                 );
               }
@@ -388,10 +425,9 @@ export default function MapEditor({
                     {...commonProps}
                     points={obj.geometry.points}
                     closed
-                    fill={obj.style?.fill ?? COLORS[0]}
-                    opacity={0.7}
-                    stroke={selectedId === obj.id ? "#ffffff" : MAP_BLUE}
-                    strokeWidth={selectedId === obj.id ? 3 : 1.5}
+                    fill={zoneFill}
+                    stroke={zoneStroke}
+                    strokeWidth={zoneStrokeWidth}
                   />
                 );
               }
@@ -402,7 +438,7 @@ export default function MapEditor({
                     ref={nodeRef}
                     {...commonProps}
                     points={obj.geometry.points}
-                    stroke={obj.style?.fill ?? COLORS[0]}
+                    stroke={MAP_BLUE}
                     strokeWidth={obj.style?.strokeWidth ?? 4}
                   />
                 );
@@ -422,13 +458,21 @@ export default function MapEditor({
             })}
 
             {drawing?.shapeType === "rect" && (
-              <Rect {...drawing.geometry} fill={color} opacity={0.4} listening={false} />
+              <Rect {...drawing.geometry} fill={MAP_BLUE_FILL} stroke={MAP_BLUE} opacity={0.6} listening={false} />
             )}
             {drawing?.shapeType === "circle" && (
-              <Circle x={drawing.geometry.x} y={drawing.geometry.y} radius={drawing.geometry.radius} fill={color} opacity={0.4} listening={false} />
+              <Circle
+                x={drawing.geometry.x}
+                y={drawing.geometry.y}
+                radius={drawing.geometry.radius}
+                fill={MAP_BLUE_FILL}
+                stroke={MAP_BLUE}
+                opacity={0.6}
+                listening={false}
+              />
             )}
             {tool === "polygon" && polygonPoints.length >= 2 && (
-              <Line points={polygonPoints} stroke={color} strokeWidth={2} listening={false} />
+              <Line points={polygonPoints} stroke={MAP_BLUE} strokeWidth={2} listening={false} />
             )}
 
             {pestEvents

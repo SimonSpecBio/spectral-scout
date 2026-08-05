@@ -23,6 +23,17 @@ import {
 // anonymized stats are the only thing staff ever see for 'general' orgs.
 export const accountTierEnum = pgEnum("scout_account_tier", ["general", "pilot"]);
 
+// Every table in this file is .enableRLS() -- this app's Postgres instance
+// is shared with spectral-ops/spectral-pilot/spectral-rnd, and Supabase
+// auto-exposes every public-schema table via its REST API regardless of how
+// the app itself connects. This app only ever uses a direct DATABASE_URL
+// Postgres connection, so RLS with zero policies fully blocks the public API
+// without affecting the app. Same fix already applied to the other three
+// apps' tables -- see spectral-ops's "Enable RLS on all tables to close
+// public API exposure" commit. Missing this here was a real gap (Supabase's
+// security scanner caught scout_organization/scout_facility/etc. publicly
+// readable/writable), not a style choice -- never add a table to this file
+// without it.
 export const organizations = pgTable("scout_organization", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
@@ -33,7 +44,7 @@ export const organizations = pgTable("scout_organization", {
   // accountTier = 'pilot'.
   pilotKey: text("pilot_key"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();
 
 export const membershipRoleEnum = pgEnum("scout_membership_role", ["owner", "member"]);
 
@@ -49,7 +60,7 @@ export const memberships = pgTable("scout_membership", {
     .references(() => organizations.id, { onDelete: "cascade" }),
   role: membershipRoleEnum("role").notNull().default("owner"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();
 
 // Internal Spectral staff (Google-login, allowlist-gated same as
 // spectral-ops/spectral-rnd) -- separate from organizations/memberships,
@@ -61,7 +72,7 @@ export const staff = pgTable("scout_staff", {
   userId: uuid("user_id").notNull().unique(),
   role: staffRoleEnum("role").notNull().default("staff"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();
 
 // ---------------------------------------------------------------------------
 // Facilities
@@ -74,7 +85,7 @@ export const facilities = pgTable("scout_facility", {
     .references(() => organizations.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();
 
 export const areaKindEnum = pgEnum("scout_area_kind", [
   "building",
@@ -106,7 +117,7 @@ export const facilityAreas = pgTable("scout_facility_area", {
   backgroundScale: numeric("background_scale", { mode: "number" }), // feet per canvas unit
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();
 
 // Generic canvas object -- deliberately NOT one table per shape type
 // (bench/row/table/room). geometry/style/metadata are jsonb so a grower can
@@ -128,7 +139,7 @@ export const facilityMapObjects = pgTable("scout_facility_map_object", {
   zIndex: integer("z_index").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();
 
 // ---------------------------------------------------------------------------
 // Pest events, scouting, treatments
@@ -161,7 +172,7 @@ export const pestEvents = pgTable("scout_pest_event", {
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
-});
+}).enableRLS();
 
 export const deviceStatusEnum = pgEnum("scout_device_status", ["working", "needs_attention", "down"]);
 export const plantHealthEnum = pgEnum("scout_plant_health", ["normal", "phytotoxicity_observed", "other_concern"]);
@@ -193,7 +204,7 @@ export const scoutingObservations = pgTable("scout_observation", {
   satisfactionRating: integer("satisfaction_rating"), // 1-5, pilot-tier only
   promotedPestEventId: uuid("promoted_pest_event_id").references(() => pestEvents.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();
 
 export const observationPhotos = pgTable("scout_observation_photo", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -202,7 +213,7 @@ export const observationPhotos = pgTable("scout_observation_photo", {
   blobUrl: text("blob_url").notNull(),
   caption: text("caption"),
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}).enableRLS();
 
 // Chemical pesticide applications, biological releases, and (eventually)
 // Spectral light treatments all share this one model per the product brief
@@ -223,4 +234,4 @@ export const treatments = pgTable("scout_treatment", {
   operatorUserId: uuid("operator_user_id"),
   appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
   notes: text("notes"),
-});
+}).enableRLS();
