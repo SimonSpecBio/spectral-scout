@@ -4,10 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/app/map", label: "Map" },
+  { href: "/app", label: "Home" },
   { href: "/app/events", label: "Events" },
   { href: "/app/timeline", label: "Timeline" },
-  { href: "/app/today", label: "Today" },
   { href: "/app/more", label: "More" },
 ] as const;
 
@@ -21,7 +20,10 @@ export default function TabBar() {
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--border)] bg-[var(--surface)] sm:static sm:border-0 sm:bg-transparent">
       <div className="mx-auto flex max-w-5xl justify-around px-2 py-2 sm:justify-start sm:gap-6 sm:px-0 sm:py-0">
         {TABS.map((tab) => {
-          const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+          // "/app" itself would match every sub-route's startsWith check --
+          // Home needs an exact match, the other tabs still want their
+          // whole subtree (e.g. /app/events/[id]) to read as active.
+          const active = tab.href === "/app" ? pathname === "/app" : pathname.startsWith(tab.href);
           return (
             <Link
               key={tab.href}

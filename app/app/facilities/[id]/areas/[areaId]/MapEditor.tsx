@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from "react-konva";
 import type Konva from "konva";
@@ -46,7 +47,25 @@ interface PestEvent {
   severity: Severity;
   status: "active" | "resolved";
   notes: string | null;
+  createdAt: string;
+  lastTreatedAt: string | null;
+  trend: "up" | "down" | "stable" | null;
 }
+
+const FOLLOW_UP_AFTER_DAYS = 3;
+const RECENTLY_TREATED_DAYS = 7;
+const DAY_MS = 86_400_000;
+function needsFollowUp(createdAt: string): boolean {
+  return Date.now() - new Date(createdAt).getTime() > FOLLOW_UP_AFTER_DAYS * DAY_MS;
+}
+function wasRecentlyTreated(lastTreatedAt: string | null): boolean {
+  return lastTreatedAt != null && Date.now() - new Date(lastTreatedAt).getTime() < RECENTLY_TREATED_DAYS * DAY_MS;
+}
+// Bigger pin = worse severity -- one of the two always-on visual channels
+// (color being the other), per the "glanceable, not click-to-learn" design
+// direction. Ring/halo/arrow are secondary accents, only drawn when there's
+// something to say, not competing dimensions on every pin.
+const SEVERITY_RADIUS: Record<Severity, number> = { low: 7, moderate: 9.5, high: 12, severe: 15 };
 
 const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 600;
@@ -132,6 +151,8 @@ export default function MapEditor({
   initialObjects: MapObject[];
   initialPestEvents: PestEvent[];
 }) {
+  const router = useRouter();
+  const [mode, setMode] = useState<"view" | "edit">("view");
   const [objects, setObjects] = useState<MapObject[]>(initialObjects);
   const [pestEvents, setPestEvents] = useState<PestEvent[]>(initialPestEvents);
   const [tool, setTool] = useState<ShapeType | "select" | "pest">("select");
@@ -246,6 +267,7 @@ export default function MapEditor({
   }
 
   function handleMouseDown(e: Konva.KonvaEventObject<MouseEvent>) {
+    if (mode === "view") return; // view mode has no drawing/selection tools -- pins handle their own click
     if (tool === "select") {
       if (e.target === e.target.getStage()) {
         setSelectedId(null);
@@ -301,37 +323,55 @@ export default function MapEditor({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {(["select", "rect", "circle", "polygon", "label", "pest"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => {
-              setTool(t);
-              setPolygonPoints([]);
-              setPestFormPos(null);
-            }}
-            className={`rounded-md border px-3 py-1.5 text-sm capitalize ${
-              tool === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
-            }`}
-          >
-            {t === "pest" ? "Pest event" : t}
-          </button>
-        ))}
-        {tool === "polygon" && (
-          <button onClick={finishPolygon} className="rounded-md border border-[var(--accent)] px-3 py-1.5 text-sm text-[var(--accent)]">
-            Finish shape ({polygonPoints.length / 2} pts)
-          </button>
-        )}
-        {selectedId && (
-          <button onClick={deleteSelected} className="rounded-md border border-red-400 px-3 py-1.5 text-sm text-red-400">
-            Delete selected
-          </button>
-        )}
-        <label className="ml-auto cursor-pointer rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
-          {uploading ? "Uploading…" : "Upload blueprint/background"}
-          <input type="file" accept="image/*" className="hidden" onChange={handleBackgroundUpload} />
-        </label>
+      <div className="flex items-center justify-end">
+        <button
+          onClick={() => {
+            setMode((m) => (m === "view" ? "edit" : "view"));
+            setSelectedId(null);
+            setSelectedEvent(null);
+            setTool("select");
+          }}
+          className={`rounded-md border px-3 py-1.5 text-sm ${
+            mode === "edit" ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+          }`}
+        >
+          {mode === "edit" ? "Done editing" : "Edit facility layout"}
+        </button>
       </div>
+
+      {mode === "edit" && (
+        <div className="flex flex-wrap items-center gap-2">
+          {(["select", "rect", "circle", "polygon", "label", "pest"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => {
+                setTool(t);
+                setPolygonPoints([]);
+                setPestFormPos(null);
+              }}
+              className={`rounded-md border px-3 py-1.5 text-sm capitalize ${
+                tool === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+              }`}
+            >
+              {t === "pest" ? "Pest event" : t}
+            </button>
+          ))}
+          {tool === "polygon" && (
+            <button onClick={finishPolygon} className="rounded-md border border-[var(--accent)] px-3 py-1.5 text-sm text-[var(--accent)]">
+              Finish shape ({polygonPoints.length / 2} pts)
+            </button>
+          )}
+          {selectedId && (
+            <button onClick={deleteSelected} className="rounded-md border border-red-400 px-3 py-1.5 text-sm text-red-400">
+              Delete selected
+            </button>
+          )}
+          <label className="ml-auto cursor-pointer rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
+            {uploading ? "Uploading…" : "Upload blueprint/background"}
+            <input type="file" accept="image/*" className="hidden" onChange={handleBackgroundUpload} />
+          </label>
+        </div>
+      )}
 
       <div className="relative map-canvas-frame">
         <div className="map-canvas-grid" />
@@ -359,9 +399,9 @@ export default function MapEditor({
                 else shapeRefs.current.delete(obj.id);
               };
               const commonProps = {
-                draggable: tool === "select",
-                onClick: () => tool === "select" && setSelectedId(obj.id),
-                onTap: () => tool === "select" && setSelectedId(obj.id),
+                draggable: mode === "edit" && tool === "select",
+                onClick: () => mode === "edit" && tool === "select" && setSelectedId(obj.id),
+                onTap: () => mode === "edit" && tool === "select" && setSelectedId(obj.id),
                 onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) =>
                   updateGeometry(obj.id, { ...obj.geometry, x: e.target.x(), y: e.target.y() }),
                 onTransformEnd: (e: Konva.KonvaEventObject<Event>) => {
@@ -507,19 +547,72 @@ export default function MapEditor({
 
             {pestEvents
               .filter((ev) => ev.status === "active" && ev.x != null && ev.y != null)
-              .map((ev) => (
-                <Circle
-                  key={ev.id}
-                  x={ev.x!}
-                  y={ev.y!}
-                  radius={9}
-                  fill={SEVERITY_COLORS[ev.severity]}
-                  stroke="#fff"
-                  strokeWidth={1.5}
-                  onClick={() => tool === "select" && setSelectedEvent(ev)}
-                  onTap={() => tool === "select" && setSelectedEvent(ev)}
-                />
-              ))}
+              .flatMap((ev) => {
+                const r = SEVERITY_RADIUS[ev.severity];
+                const onActivate = () => {
+                  if (mode === "view") router.push(`/app/facilities/${facilityId}/pest-events/${ev.id}`);
+                  else if (tool === "select") setSelectedEvent(ev);
+                };
+                const nodes: React.ReactNode[] = [];
+                // Halo: a soft glow behind the pin if treated in the last
+                // week -- "calming down," not a hard status like the ring.
+                if (wasRecentlyTreated(ev.lastTreatedAt)) {
+                  nodes.push(
+                    <Circle
+                      key={`${ev.id}-halo`}
+                      x={ev.x!}
+                      y={ev.y!}
+                      radius={r + 8}
+                      fill={MAP_BLUE}
+                      opacity={0.18}
+                      listening={false}
+                    />
+                  );
+                }
+                // Ring: a thin outer stroke, only drawn if a follow-up is
+                // actually due -- absence of a ring is itself information.
+                if (needsFollowUp(ev.createdAt)) {
+                  nodes.push(
+                    <Circle
+                      key={`${ev.id}-ring`}
+                      x={ev.x!}
+                      y={ev.y!}
+                      radius={r + 5}
+                      stroke="#ffffff"
+                      strokeWidth={1.5}
+                      dash={[3, 3]}
+                      listening={false}
+                    />
+                  );
+                }
+                nodes.push(
+                  <Circle
+                    key={ev.id}
+                    x={ev.x!}
+                    y={ev.y!}
+                    radius={r}
+                    fill={SEVERITY_COLORS[ev.severity]}
+                    stroke="#fff"
+                    strokeWidth={1.5}
+                    onClick={onActivate}
+                    onTap={onActivate}
+                  />
+                );
+                if (ev.trend === "up" || ev.trend === "down") {
+                  nodes.push(
+                    <Text
+                      key={`${ev.id}-trend`}
+                      x={ev.x! + r + 2}
+                      y={ev.y! - r - 2}
+                      text={ev.trend === "up" ? "▲" : "▼"}
+                      fontSize={11}
+                      fill={ev.trend === "up" ? "#e0553d" : "#7fb87a"}
+                      listening={false}
+                    />
+                  );
+                }
+                return nodes;
+              })}
 
             <Transformer ref={transformerRef} rotateEnabled />
           </Layer>
@@ -603,10 +696,12 @@ export default function MapEditor({
           </div>
         )}
       </div>
-      <p className="text-xs text-[var(--text-dim)]">
-        Select tool to move/resize existing shapes or click a pest pin. Rect/circle: click-drag. Polygon: click to
-        add points, then &quot;Finish shape&quot;. Label: click to place text. Pest event: click to drop a pin.
-      </p>
+      {mode === "edit" && (
+        <p className="text-xs text-[var(--text-dim)]">
+          Select tool to move/resize existing shapes or click a pest pin. Rect/circle: click-drag. Polygon: click to
+          add points, then &quot;Finish shape&quot;. Label: click to place text. Pest event: click to drop a pin.
+        </p>
+      )}
     </div>
   );
 }

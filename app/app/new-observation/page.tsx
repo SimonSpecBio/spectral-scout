@@ -87,7 +87,7 @@ export default async function NewObservationPage({
       <h1 className="text-2xl font-semibold">New observation</h1>
       <MonitoringFlow
         postUrl={`/api/facilities/${facilityId}/areas/${areaId}/scouting`}
-        redirectHref="/app/today"
+        redirectHref="/app"
         isPilotTier={session.accountTier === "pilot"}
       />
     </div>

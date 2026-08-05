@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { facilityAreas, facilityMapObjects, pestEvents } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
+import { computeEventSignals } from "@/lib/pest-event-signals";
 import { requireGrowerSession } from "@/lib/session";
 import MapEditor from "./MapEditorClient";
 
@@ -27,6 +28,7 @@ export default async function AreaMapPage({ params }: { params: Promise<{ id: st
     .where(eq(facilityMapObjects.facilityAreaId, areaId));
 
   const events = await db.select().from(pestEvents).where(eq(pestEvents.facilityAreaId, areaId));
+  const signals = await computeEventSignals(events.map((e) => e.id));
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,6 +63,9 @@ export default async function AreaMapPage({ params }: { params: Promise<{ id: st
           severity: ev.severity,
           status: ev.status,
           notes: ev.notes,
+          createdAt: ev.createdAt.toISOString(),
+          lastTreatedAt: signals.get(ev.id)?.lastTreatedAt ?? null,
+          trend: signals.get(ev.id)?.trend ?? null,
         }))}
       />
     </div>
