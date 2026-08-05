@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { sparkPoints } from "@/lib/density";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
@@ -141,6 +142,15 @@ export default function PestEventDetail({
     ...(event.resolvedAt ? [{ label: "Resolved", at: event.resolvedAt }] : []),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
+  // initialMonitoring arrives newest-first (matches the Monitoring tab's
+  // list order); the graph needs oldest-first for a left-to-right timeline.
+  const chronological = [...initialMonitoring].reverse();
+  const densities = chronological.map((s) => (s.sampleSize > 0 ? (s.pestCount / s.sampleSize) * 100 : 0));
+  const latestDensity = densities[densities.length - 1];
+  const baselineDensity = densities[0];
+  const changeVsBaseline =
+    densities.length >= 2 && baselineDensity > 0 ? Math.round(((baselineDensity - latestDensity) / baselineDensity) * 100) : null;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
@@ -165,6 +175,32 @@ export default function PestEventDetail({
           </button>
         </div>
       </div>
+
+      {densities.length > 0 && (
+        <div className="card flex items-center gap-6 p-4">
+          <svg width={220} height={52} className="shrink-0">
+            <polyline points={sparkPoints(densities, 220, 52)} fill="none" stroke="var(--accent)" strokeWidth={2} />
+          </svg>
+          <div className="flex gap-6">
+            <div>
+              <div className="text-2xl font-semibold">{Math.round(latestDensity)}%</div>
+              <div className="text-xs text-[var(--text-dim)]">latest infested</div>
+            </div>
+            {changeVsBaseline != null && (
+              <div>
+                <div className={`text-2xl font-semibold ${changeVsBaseline >= 0 ? "text-[var(--accent)]" : "text-red-400"}`}>
+                  {changeVsBaseline >= 0 ? "▼" : "▲"} {Math.abs(changeVsBaseline)}%
+                </div>
+                <div className="text-xs text-[var(--text-dim)]">vs first session</div>
+              </div>
+            )}
+            <div>
+              <div className="text-2xl font-semibold">{densities.length}</div>
+              <div className="text-xs text-[var(--text-dim)]">sessions logged</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-4 border-b border-[var(--border)]">
         {TABS.map((t) => (

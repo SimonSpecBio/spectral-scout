@@ -32,6 +32,22 @@ export function estDensityFromPct(pct: number): EstDensity {
   return "None";
 }
 
+// Polyline points for a simple inline sparkline SVG (oldest to newest) --
+// ported from spectral-pilot's lib/density.ts, same convention.
+export function sparkPoints(values: number[], w = 300, h = 44, pad = 4): string {
+  if (!values.length) return "";
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const span = max - min || 1;
+  return values
+    .map((v, i) => {
+      const x = values.length === 1 ? w / 2 : pad + (i * (w - 2 * pad)) / (values.length - 1);
+      const y = h - pad - ((v - min) / span) * (h - 2 * pad);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
+
 // Server-authoritative: recompute aggregates from the raw grid rather than
 // trusting numbers the client sent.
 export function aggregateLeafGrid(grid: PlantLeaves[]): ScoutAggregate {
