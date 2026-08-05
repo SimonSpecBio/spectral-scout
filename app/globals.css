@@ -1,13 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0b1626;
-  --surface: #121f33;
-  --surface-raised: #172741;
-  --border: #223046;
-  --text: #e7edf5;
-  --text-dim: #93a3b8;
-  --accent: #35d0a3;
+  /* Deep navy + rust palette, matching the reference mockup -- replaces
+     the earlier dark-teal system everywhere var(--accent)/var(--bg)/etc
+     get used, not just on the screens built this pass. */
+  --bg: #070c14;
+  --surface: #0d1524;
+  --surface-raised: #172234;
+  --border: #172236;
+  --border-soft: #1b2740;
+  --text: #e6ecf5;
+  --text-dim: #8595ad;
+  --text-faint: #4a5a75;
+  --accent: #ce5d40;
+  --accent-soft: #c79a3a;
   --map-blue: #7ec4f0;
   --map-blue-soft: #bfe3fa;
   --map-grid-line: rgba(126, 196, 240, 0.09);
@@ -17,6 +23,17 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Uppercase, letter-spaced, monospace micro-labels for section headers and
+   metadata (timestamps, locations) -- distinct from body text, matching
+   the reference mockup's typographic hierarchy. */
+.label-mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
 
 /* Rounded, shadow-based cards instead of the bordered/gridline look --

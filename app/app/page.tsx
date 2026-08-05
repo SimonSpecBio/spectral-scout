@@ -3,6 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, facilityMapObjects, pestEvents, treatments } from "@/db/schema";
 import { computeEventSignals } from "@/lib/pest-event-signals";
+import { requireGrowerSession } from "@/lib/session";
+import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
+import PressureGraph from "./PressureGraph";
+import PressureHeatmapPlaceholder from "./PressureHeatmapPlaceholder";
 
 // Next.js's Router Cache can reuse a cached render for this route on a
 // search-params-only navigation (e.g. clicking a different site pill),
@@ -10,21 +14,17 @@ import { computeEventSignals } from "@/lib/pest-event-signals";
 // force-dynamic guarantees a real server render (and a real DB query) on
 // every visit, no stale reuse across facility=/area= values.
 export const dynamic = "force-dynamic";
-import { requireGrowerSession } from "@/lib/session";
-import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
 
 const SEVERITY_RANK = { low: 0, moderate: 1, high: 2, severe: 3 } as const;
-const SEVERITY_COLOR: Record<string, string> = {
-  low: "#e0d24b",
-  moderate: "#e0913d",
-  high: "#e0553d",
-  severe: "#a3193d",
-};
 const FOLLOW_UP_AFTER_DAYS = 3;
 const DAY_MS = 86_400_000;
 
 function needsFollowUp(createdAt: Date): boolean {
   return Date.now() - createdAt.getTime() > FOLLOW_UP_AFTER_DAYS * DAY_MS;
+}
+function isToday(date: Date): boolean {
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
 }
 function relativeTime(date: Date): string {
   const days = Math.floor((Date.now() - date.getTime()) / DAY_MS);
@@ -32,28 +32,14 @@ function relativeTime(date: Date): string {
   if (days === 1) return "Yesterday";
   return `${days} days ago`;
 }
-// Two different facilities can both have a "Flowering Room 1" -- group by
-// facility instead of just tacking the facility name onto every row.
-function groupByFacility<T extends { facilityId: string; facilityName: string }>(rows: T[]): [string, T[]][] {
-  const order: string[] = [];
-  const groups = new Map<string, T[]>();
-  for (const row of rows) {
-    if (!groups.has(row.facilityId)) {
-      groups.set(row.facilityId, []);
-      order.push(row.facilityId);
-    }
-    groups.get(row.facilityId)!.push(row);
-  }
-  return order.map((id) => [groups.get(id)![0].facilityName, groups.get(id)!]);
-}
 
 // The whole app in one screen, per the "mission control, not a drawing
-// tool" direction: facility selector, health summary, the map itself
-// (view mode by default -- editing the layout is a rare action behind its
-// own button, not the default state), today's tasks, active hotspots, and
-// a trimmed recent-activity feed. Map/Today/Events(preview)/Timeline
-// (preview) used to be four separate tab destinations; this is what a
-// grower opens every morning instead of clicking through all four.
+// tool" direction. Mobile shows a placeholder pressure heatmap where the
+// real interactive map would go (dragging precise shapes doesn't work on a
+// phone screen, and the real row/bay data model doesn't exist yet -- see
+// PressureHeatmapPlaceholder); desktop keeps the real interactive Konva map.
+// Everything else (pressure graph, attention required, today's tasks,
+// recent activity) is real data on both.
 export default async function HomePage({
   searchParams,
 }: {
@@ -84,8 +70,6 @@ export default async function HomePage({
     );
   }
 
-  // One joined query feeds the health summary, facility/area defaulting,
-  // today's tasks, and the active-hotspots list.
   const events = await db
     .select({
       id: pestEvents.id,
@@ -108,23 +92,20 @@ export default async function HomePage({
     .filter((e) => e.status === "active")
     .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
 
-  const overallSeverity = active.reduce<keyof typeof SEVERITY_RANK>(
-    (worst, e) => (SEVERITY_RANK[e.severity] > SEVERITY_RANK[worst] ? e.severity : worst),
-    "low"
-  );
-  const overallStatus =
-    active.length === 0
-      ? { emoji: "🟢", label: "Healthy" }
-      : overallSeverity === "high" || overallSeverity === "severe"
-        ? { emoji: "🔴", label: "Needs attention" }
-        : overallSeverity === "moderate"
-          ? { emoji: "🟠", label: "Watch" }
-          : { emoji: "🟢", label: "Healthy" };
+  const todaysFollowUps = active.filter((e) => needsFollowUp(e.createdAt));
+  const resolvedToday = events.filter((e) => e.status === "resolved" && e.resolvedAt && isToday(e.resolvedAt));
 
-  const todaysTasks = active.filter((e) => needsFollowUp(e.createdAt));
+  const eventSignals = await computeEventSignals(active.map((e) => e.id));
+  // Attention Required: real exceptions, not a generic list -- an overdue
+  // follow-up, or an active event whose density is trending up (computed
+  // from real monitoring session history, not a guess).
+  const attention = [
+    ...todaysFollowUps.map((e) => ({ kind: "followup" as const, event: e })),
+    ...active
+      .filter((e) => eventSignals.get(e.id)?.trend === "up" && (e.severity === "high" || e.severity === "severe"))
+      .map((e) => ({ kind: "trending" as const, event: e })),
+  ].slice(0, 4);
 
-  // Recent activity: same merge Timeline uses, trimmed to a short preview
-  // here -- Timeline itself is still the full, filterable version.
   const orgTreatments = await db
     .select({ pestEventId: treatments.pestEventId, type: treatments.type, appliedAt: treatments.appliedAt })
     .from(treatments)
@@ -140,11 +121,11 @@ export default async function HomePage({
   const activity = events
     .flatMap((e) => {
       const loc = locationOf(e);
-      const list = [{ label: `${e.pestSpecies} detected`, sub: loc, at: e.createdAt }];
+      const list = [{ label: `${e.pestSpecies} detected`, sub: loc, at: e.createdAt, alert: true }];
       for (const t of treatmentsByEvent.get(e.id) ?? []) {
-        list.push({ label: `${t.type.replace("_", " ")} applied -- ${e.pestSpecies}`, sub: loc, at: t.appliedAt });
+        list.push({ label: `${t.type.replace("_", " ")} applied -- ${e.pestSpecies}`, sub: loc, at: t.appliedAt, alert: false });
       }
-      if (e.resolvedAt) list.push({ label: `${e.pestSpecies} resolved`, sub: loc, at: e.resolvedAt });
+      if (e.resolvedAt) list.push({ label: `${e.pestSpecies} resolved`, sub: loc, at: e.resolvedAt, alert: false });
       return list;
     })
     .sort((a, b) => b.at.getTime() - a.at.getTime())
@@ -154,14 +135,13 @@ export default async function HomePage({
   const hottestEvent = active[0];
   const selectedFacilityId = facilityParam ?? hottestEvent?.facilityId ?? orgFacilities[0].id;
   const selectedFacility = orgFacilities.find((f) => f.id === selectedFacilityId) ?? orgFacilities[0];
+  const facilityEvents = active.filter((e) => e.facilityId === selectedFacility.id);
 
   const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, selectedFacility.id));
-  const facilityEvents = active.filter((e) => e.facilityId === selectedFacility.id);
-  const facilityFollowUps = facilityEvents.filter((e) => needsFollowUp(e.createdAt));
 
-  let mapSection: React.ReactNode;
+  let desktopMapSection: React.ReactNode = null;
   if (areas.length === 0) {
-    mapSection = (
+    desktopMapSection = (
       <div className="card p-6 text-[var(--text-dim)]">
         {selectedFacility.name} has no areas yet.{" "}
         <Link href={`/app/facilities/${selectedFacility.id}`} className="text-[var(--accent)]">
@@ -179,7 +159,7 @@ export default async function HomePage({
     const areaPestEvents = await db.select().from(pestEvents).where(and(eq(pestEvents.facilityAreaId, selectedArea.id)));
     const signals = await computeEventSignals(areaPestEvents.map((e) => e.id));
 
-    mapSection = (
+    desktopMapSection = (
       <div className="flex flex-col gap-3">
         {areas.length > 1 && (
           <div className="flex flex-wrap gap-2">
@@ -196,15 +176,6 @@ export default async function HomePage({
             ))}
           </div>
         )}
-
-        <div className="card flex items-center justify-between p-3 text-sm">
-          <span>{selectedFacility.name}</span>
-          <span className="text-[var(--text-dim)]">
-            {facilityEvents.length} open hotspot{facilityEvents.length === 1 ? "" : "s"} -- {facilityFollowUps.length}{" "}
-            follow-up{facilityFollowUps.length === 1 ? "" : "s"} due
-          </span>
-        </div>
-
         <MapEditor
           facilityId={selectedFacility.id}
           area={{
@@ -239,7 +210,7 @@ export default async function HomePage({
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         {orgFacilities.length > 1 ? (
           <div className="flex flex-wrap gap-2">
@@ -256,69 +227,67 @@ export default async function HomePage({
             ))}
           </div>
         ) : (
-          <h1 className="text-2xl font-semibold">{selectedFacility.name}</h1>
+          <span className="font-medium">{selectedFacility.name}</span>
         )}
-        <div className="card flex items-center gap-2 px-3 py-1.5 text-sm">
-          <span>{overallStatus.emoji}</span>
-          <span>{overallStatus.label}</span>
-        </div>
+        {facilityEvents.length > 0 && (
+          <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "#231411" }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
+            <span className="label-mono" style={{ color: "var(--accent)" }}>
+              {facilityEvents.length} ALERT{facilityEvents.length === 1 ? "" : "S"}
+            </span>
+          </span>
+        )}
       </div>
 
-      {mapSection}
+      <div className="sm:hidden">
+        <PressureHeatmapPlaceholder />
+      </div>
+      <div className="hidden sm:block">{desktopMapSection}</div>
+
+      <PressureGraph events={events.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-[var(--text-dim)]">Today</h2>
-        {todaysTasks.length === 0 ? (
+        <span className="label-mono">Attention required</span>
+        {attention.length === 0 ? (
           <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing needs attention right now.</div>
         ) : (
-          <div className="flex flex-col gap-4">
-            {groupByFacility(todaysTasks).map(([facilityName, rows]) => (
-              <div key={facilityName} className="flex flex-col gap-2">
-                {orgFacilities.length > 1 && <div className="text-xs text-[var(--text-dim)]">{facilityName}</div>}
-                {rows.map((e) => (
-                  <Link
-                    key={e.id}
-                    href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`}
-                    className="card card-interactive flex items-center justify-between p-3 text-sm"
-                  >
-                    <span>
-                      Follow-up inspection due -- {e.pestSpecies}
-                      {e.areaName && ` (${e.areaName})`}
-                    </span>
-                    <span className="text-[var(--text-dim)]">→</span>
-                  </Link>
-                ))}
-              </div>
+          <div className="card flex flex-col divide-y divide-[var(--border)]">
+            {attention.map(({ kind, event: e }) => (
+              <Link key={`${kind}-${e.id}`} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="flex items-center gap-3 p-3.5">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                <div className="flex-1">
+                  <div className="text-sm capitalize">{kind === "followup" ? `${e.pestSpecies} recheck overdue` : `${e.pestSpecies} trending up`}</div>
+                  <div className="label-mono">
+                    {(e.areaName ?? e.facilityName).toUpperCase()} &middot; {kind === "followup" ? relativeTime(e.createdAt) : e.severity.toUpperCase()}
+                  </div>
+                </div>
+                <span className="text-[var(--text-faint)]">›</span>
+              </Link>
             ))}
           </div>
         )}
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-[var(--text-dim)]">Active pest events</h2>
-        {active.length === 0 ? (
-          <div className="card p-4 text-sm text-[var(--text-dim)]">No active pest events.</div>
+        <span className="label-mono">Today&apos;s tasks</span>
+        {todaysFollowUps.length === 0 && resolvedToday.length === 0 ? (
+          <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing on the list today.</div>
         ) : (
-          <div className="flex flex-col gap-4">
-            {groupByFacility(active).map(([facilityName, rows]) => (
-              <div key={facilityName} className="flex flex-col gap-2">
-                {orgFacilities.length > 1 && <div className="text-xs text-[var(--text-dim)]">{facilityName}</div>}
-                {rows.map((e) => (
-                  <Link key={e.id} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="card card-interactive flex items-center justify-between p-4">
-                    <div className="flex items-center gap-3">
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[e.severity] }} />
-                      <div>
-                        <div className="font-medium capitalize">{e.pestSpecies}</div>
-                        <div className="text-sm text-[var(--text-dim)]">
-                          {e.areaName ?? "Unassigned area"} -- started {relativeTime(e.createdAt)}
-                        </div>
-                      </div>
-                    </div>
-                    <span className="badge capitalize" style={{ background: `${SEVERITY_COLOR[e.severity]}33`, color: SEVERITY_COLOR[e.severity] }}>
-                      {e.severity}
-                    </span>
-                  </Link>
-                ))}
+          <div className="card flex flex-col gap-3 p-4">
+            {todaysFollowUps.map((e) => (
+              <Link key={e.id} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="flex items-center gap-3">
+                <span className="h-4 w-4 shrink-0 rounded border border-[var(--text-faint)]" />
+                <span className="text-sm">
+                  Follow up {e.pestSpecies} -- {e.areaName ?? e.facilityName}
+                </span>
+              </Link>
+            ))}
+            {resolvedToday.map((e) => (
+              <div key={e.id} className="flex items-center gap-3">
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[var(--surface-raised)] text-[10px] text-[var(--text-faint)]">
+                  ✓
+                </span>
+                <span className="text-sm text-[var(--text-faint)] line-through">{e.pestSpecies} resolved</span>
               </div>
             ))}
           </div>
@@ -327,7 +296,7 @@ export default async function HomePage({
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-[var(--text-dim)]">Recent activity</h2>
+          <span className="label-mono">Recent activity</span>
           <Link href="/app/timeline" className="text-xs text-[var(--accent)]">
             View all →
           </Link>
@@ -335,14 +304,24 @@ export default async function HomePage({
         {activity.length === 0 ? (
           <div className="text-sm text-[var(--text-dim)]">Nothing yet.</div>
         ) : (
-          <div className="card flex flex-col divide-y divide-[var(--border)]">
+          <div className="card relative p-4 pl-6">
+            <div className="absolute bottom-4 left-[11px] top-4 w-px" style={{ background: "var(--border-soft)" }} />
             {activity.map((a, i) => (
-              <div key={i} className="flex items-center justify-between px-4 py-3 text-sm">
-                <span>
-                  {a.label}
-                  {a.sub && <span className="text-[var(--text-dim)]"> -- {a.sub}</span>}
-                </span>
-                <span className="text-[var(--text-dim)]">{relativeTime(a.at)}</span>
+              <div key={i} className="relative flex items-start justify-between pb-3.5 last:pb-0">
+                <div className="flex items-start gap-3">
+                  <span
+                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ background: a.alert ? "var(--accent)" : "var(--border-soft)", marginLeft: "-19px" }}
+                  />
+                  <div>
+                    <div className="text-sm" style={{ color: a.alert ? "var(--text)" : "var(--text-dim)" }}>
+                      {a.label}
+                    </div>
+                    <div className="label-mono">
+                      {relativeTime(a.at).toUpperCase()} {a.sub && `· ${a.sub.toUpperCase()}`}
+                    </div>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
