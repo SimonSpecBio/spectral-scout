@@ -3,6 +3,13 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, facilityMapObjects, pestEvents, treatments } from "@/db/schema";
 import { computeEventSignals } from "@/lib/pest-event-signals";
+
+// Next.js's Router Cache can reuse a cached render for this route on a
+// search-params-only navigation (e.g. clicking a different site pill),
+// which is exactly the "every site shows the same map" bug this fixes --
+// force-dynamic guarantees a real server render (and a real DB query) on
+// every visit, no stale reuse across facility=/area= values.
+export const dynamic = "force-dynamic";
 import { requireGrowerSession } from "@/lib/session";
 import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
 

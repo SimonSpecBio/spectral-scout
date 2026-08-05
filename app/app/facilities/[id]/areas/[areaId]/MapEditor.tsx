@@ -168,6 +168,25 @@ export default function MapEditor({
   const bgImage = useBackgroundImage(area.backgroundImageUrl);
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRefs = useRef<Map<string, Konva.Node>>(new Map());
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // The canvas's internal coordinate system stays a fixed 900x600 (every
+  // shape's x/y/width/height is stored in that space) -- only how it's
+  // *rendered* shrinks to fit narrower viewports, via Konva's own
+  // scaleX/scaleY on the Stage. Without this, a 900px-wide canvas overflows
+  // any container narrower than that and gets clipped on the right, which
+  // is exactly the "square gets cut off as I move it right" bug: the shape
+  // was never actually off-canvas, the canvas itself just didn't fit.
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setScale(Math.min(1, entry.contentRect.width / CANVAS_WIDTH));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const base = `/api/facilities/${facilityId}/areas/${area.id}`;
   const eventsBase = `/api/facilities/${facilityId}/pest-events`;
@@ -263,7 +282,13 @@ export default function MapEditor({
 
   function stagePos(e: Konva.KonvaEventObject<MouseEvent>) {
     const stage = e.target.getStage();
-    return stage?.getPointerPosition() ?? { x: 0, y: 0 };
+    // getPointerPosition() returns raw container pixels, not adjusted for
+    // the stage's own scaleX/scaleY -- with the responsive scale added
+    // above, that would land every drawn shape/dropped pin in the wrong
+    // spot whenever scale != 1. getRelativePointerPosition() accounts for
+    // the stage's full transform, giving back real 900x600-space
+    // coordinates regardless of how small the stage is currently rendered.
+    return stage?.getRelativePointerPosition() ?? { x: 0, y: 0 };
   }
 
   function handleMouseDown(e: Konva.KonvaEventObject<MouseEvent>) {
@@ -322,7 +347,7 @@ export default function MapEditor({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={containerRef} className="flex flex-col gap-3">
       <div className="flex items-center justify-end">
         <button
           onClick={() => {
@@ -335,7 +360,7 @@ export default function MapEditor({
             mode === "edit" ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
           }`}
         >
-          {mode === "edit" ? "Done editing" : "Edit facility layout"}
+          {mode === "edit" ? "Done editing" : "Edit site layout"}
         </button>
       </div>
 
@@ -376,8 +401,10 @@ export default function MapEditor({
       <div className="relative map-canvas-frame">
         <div className="map-canvas-grid" />
         <Stage
-          width={CANVAS_WIDTH}
-          height={CANVAS_HEIGHT}
+          width={CANVAS_WIDTH * scale}
+          height={CANVAS_HEIGHT * scale}
+          scaleX={scale}
+          scaleY={scale}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -621,7 +648,10 @@ export default function MapEditor({
         {pestFormPos && (
           <div
             className="card absolute z-10 flex w-64 flex-col gap-2 p-3"
-            style={{ left: Math.min(pestFormPos.x, CANVAS_WIDTH - 260), top: Math.min(pestFormPos.y, CANVAS_HEIGHT - 180) }}
+            style={{
+              left: Math.min(pestFormPos.x * scale, CANVAS_WIDTH * scale - 260),
+              top: Math.min(pestFormPos.y * scale, CANVAS_HEIGHT * scale - 180),
+            }}
           >
             <div className="text-sm font-medium">New pest event</div>
             <input
@@ -667,8 +697,8 @@ export default function MapEditor({
           <div
             className="card absolute z-10 flex w-64 flex-col gap-2 p-3"
             style={{
-              left: Math.min(selectedEvent.x ?? 0, CANVAS_WIDTH - 260),
-              top: Math.min(selectedEvent.y ?? 0, CANVAS_HEIGHT - 140),
+              left: Math.min((selectedEvent.x ?? 0) * scale, CANVAS_WIDTH * scale - 260),
+              top: Math.min((selectedEvent.y ?? 0) * scale, CANVAS_HEIGHT * scale - 140),
             }}
           >
             <div className="text-sm font-medium capitalize">{selectedEvent.pestSpecies}</div>

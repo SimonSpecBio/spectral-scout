@@ -4,6 +4,11 @@ import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents, treatments } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
 
+// See app/app/page.tsx's identical export for why: without this, the
+// facility=-only navigation here can reuse a cached render instead of
+// re-querying.
+export const dynamic = "force-dynamic";
+
 function relativeTime(date: Date): string {
   const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
   if (days <= 0) return "Today";

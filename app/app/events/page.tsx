@@ -4,6 +4,11 @@ import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
 
+// See app/app/page.tsx's identical export for why: without this, the
+// filter=/facility=-only navigation here can reuse a cached render instead
+// of re-querying.
+export const dynamic = "force-dynamic";
+
 const SEVERITY_RANK = { low: 0, moderate: 1, high: 2, severe: 3 } as const;
 const SEVERITY_COLOR: Record<string, string> = {
   low: "#e0d24b",
