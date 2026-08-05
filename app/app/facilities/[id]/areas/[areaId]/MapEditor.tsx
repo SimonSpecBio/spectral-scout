@@ -182,7 +182,10 @@ export default function MapEditor({
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver(([entry]) => {
-      setScale(Math.min(1, entry.contentRect.width / CANVAS_WIDTH));
+      // Capped at 1.4x, not 1x -- the map should fill most of its card on
+      // a normal desktop width, not stay pinned to 900px with dead space
+      // around it, but an ultrawide monitor shouldn't blow it up absurdly.
+      setScale(Math.min(1.4, entry.contentRect.width / CANVAS_WIDTH));
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -398,7 +401,14 @@ export default function MapEditor({
         </div>
       )}
 
-      <div className="relative map-canvas-frame">
+      {/* Explicit pixel size, not "shrink to fit content" -- this div is a
+          flex-column child, and flex's default align-items:stretch would
+          otherwise stretch it to the full width of its parent (which can be
+          wider than the Stage's actual rendered size), leaving the Stage
+          -- and everything drawn on it -- pushed into the left portion of a
+          too-wide bordered frame. That mismatch was the real cause of "zones
+          crushed to the left," not a spacing bug in the zones themselves. */}
+      <div className="relative map-canvas-frame" style={{ width: CANVAS_WIDTH * scale, height: CANVAS_HEIGHT * scale }}>
         <div className="map-canvas-grid" />
         <Stage
           width={CANVAS_WIDTH * scale}
@@ -448,7 +458,11 @@ export default function MapEditor({
               };
 
               const hotspot = hotspotSeverity(obj, pestEvents);
-              const zoneFill = hotspot ? `${SEVERITY_COLORS[hotspot]}55` : MAP_BLUE_FILL;
+              // Alpha suffix so a zone with no hotspot reads as a faint tint
+              // over the dark canvas, not a solid bright block -- that
+              // solid fill was exactly what made "Zone 1"/"Zone 2" labels
+              // unreadable (light text on a bright light-blue fill).
+              const zoneFill = hotspot ? `${SEVERITY_COLORS[hotspot]}55` : `${MAP_BLUE_FILL}2e`;
               const zoneStroke = selectedId === obj.id ? "#ffffff" : hotspot ? SEVERITY_COLORS[hotspot] : MAP_BLUE;
               const zoneStrokeWidth = selectedId === obj.id ? 3 : hotspot ? 2.5 : 1.5;
 
