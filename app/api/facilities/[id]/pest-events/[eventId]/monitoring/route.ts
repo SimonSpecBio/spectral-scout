@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { scoutingObservations } from "@/db/schema";
+import { parseMonitoringPayload } from "@/lib/monitoring";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -40,12 +41,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Event has no facility area to monitor" }, { status: 400 });
   }
 
-  const body = await request.json();
-  const sampleSize = typeof body.sampleSize === "number" ? body.sampleSize : null;
-  const pestCount = typeof body.pestCount === "number" ? body.pestCount : null;
-  if (sampleSize == null || pestCount == null) {
-    return NextResponse.json({ error: "sampleSize and pestCount are required" }, { status: 400 });
-  }
+  const parsed = parseMonitoringPayload(await request.json());
+  if (!parsed) return NextResponse.json({ error: "sampleSize and pestCount are required" }, { status: 400 });
 
   const [row] = await db
     .insert(scoutingObservations)
@@ -54,9 +51,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       facilityAreaId: event.facilityAreaId,
       submittedByUserId: session.user!.id!,
       date: new Date().toISOString().slice(0, 10),
-      sampleSize,
-      pestCount,
       promotedPestEventId: eventId,
+      ...parsed,
     })
     .returning();
   return NextResponse.json(row);

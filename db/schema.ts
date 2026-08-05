@@ -180,10 +180,14 @@ export const plantHealthEnum = pgEnum("scout_plant_health", ["normal", "phytotox
 // Routine scouting stays independent from Pest Events -- a scout logs
 // observations while walking a facility, and if one identifies a meaningful
 // infestation it gets promoted into a Pest Event (promotedPestEventId).
-// Field shape is ported from spectral-pilot's pp_reports (proven UX), but
-// deviceStatus/satisfactionRating are nullable here since most Scout users
-// have no Spectral hardware and no pilot relationship to rate -- the UI only
-// shows those fields when the org's accountTier is 'pilot'.
+// Field shape is ported from spectral-pilot's pp_reports (proven UX, since
+// updated there to a live-editable 10-plant x 3-leaf grid with environmental
+// readings -- ported again here to match). deviceStatus/satisfactionRating
+// stay nullable/pilot-tier-only since most Scout users have no Spectral
+// hardware and no pilot relationship to rate; sampleSize/pestCount are the
+// leavesChecked/leavesInfested rollup of leafGrid (still what the trend/
+// density displays elsewhere in the app read), leafGrid is the raw grid for
+// anything that wants the full per-leaf detail later.
 export const scoutingObservations = pgTable("scout_observation", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
@@ -196,9 +200,13 @@ export const scoutingObservations = pgTable("scout_observation", {
   date: date("date", { mode: "string" }).notNull(),
   sampleSize: integer("sample_size"),
   pestCount: integer("pest_count"),
+  leafGrid: jsonb("leaf_grid"), // raw PlantLeaves[10] grid, each a [top, middle, bottom] LeafState triple
+  avgTempF: integer("avg_temp_f"),
+  avgHumidityPct: integer("avg_humidity_pct"),
+  avgLightHrs: integer("avg_light_hrs"),
   deviceStatus: deviceStatusEnum("device_status"), // pilot-tier orgs with Spectral hardware only
   plantHealthFlag: plantHealthEnum("plant_health_flag"),
-  weatherNotes: text("weather_notes"),
+  weatherNotes: text("weather_notes"), // superseded by avgTempF/avgHumidityPct/avgLightHrs above; kept, unused by current UI
   otherTreatmentsNotes: text("other_treatments_notes"),
   notes: text("notes"),
   satisfactionRating: integer("satisfaction_rating"), // 1-5, pilot-tier only

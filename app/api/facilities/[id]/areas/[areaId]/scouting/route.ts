@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { facilityAreas, scoutingObservations } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
+import { parseMonitoringPayload } from "@/lib/monitoring";
 import { requireGrowerSession } from "@/lib/session";
 
 // Routine scouting, independent of any Pest Event -- promotedPestEventId
@@ -23,12 +24,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .where(and(eq(facilityAreas.id, areaId), eq(facilityAreas.facilityId, id)));
   if (!area) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const body = await request.json();
-  const sampleSize = typeof body.sampleSize === "number" ? body.sampleSize : null;
-  const pestCount = typeof body.pestCount === "number" ? body.pestCount : null;
-  if (sampleSize == null || pestCount == null) {
-    return NextResponse.json({ error: "sampleSize and pestCount are required" }, { status: 400 });
-  }
+  const parsed = parseMonitoringPayload(await request.json());
+  if (!parsed) return NextResponse.json({ error: "sampleSize and pestCount are required" }, { status: 400 });
 
   const [row] = await db
     .insert(scoutingObservations)
@@ -37,8 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       facilityAreaId: areaId,
       submittedByUserId: session.user!.id!,
       date: new Date().toISOString().slice(0, 10),
-      sampleSize,
-      pestCount,
+      ...parsed,
     })
     .returning();
   return NextResponse.json(row);

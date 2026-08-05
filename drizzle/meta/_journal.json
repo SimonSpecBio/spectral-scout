@@ -15,6 +15,13 @@
       "when": 1785881529514,
       "tag": "0001_tricky_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785961037861,
+      "tag": "0002_outgoing_cerebro",
+      "breakpoints": true
     }
   ]
 }

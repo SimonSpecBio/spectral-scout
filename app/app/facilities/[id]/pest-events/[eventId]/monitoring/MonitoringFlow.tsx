@@ -1,126 +1,316 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { aggregateLeafGrid, emptyLeafGrid, type LeafState, type PlantLeaves } from "@/lib/density";
 
-// Fixed protocol for v1 -- 10 plants x 3 leaf positions = 30 tap-through
-// readings, matching the design brief exactly. Configurable plant counts /
-// custom protocols are a real feature but not needed to prove this out;
-// hardcoding keeps the guided flow itself (the actual point) simple.
-const PLANT_COUNT = 10;
 const POSITIONS = ["Top", "Middle", "Bottom"] as const;
-const TOTAL = PLANT_COUNT * POSITIONS.length;
+const CYCLE: LeafState[] = ["unchecked", "absent", "low", "medium", "high"];
+const STATE_LABEL: Record<LeafState, string> = { unchecked: "", absent: "Absent", low: "Low", medium: "Medium", high: "High" };
 
-const LEVELS = [
-  { label: "None", value: 0, color: "#7fb87a" },
-  { label: "Low", value: 1, color: "#d9c15b" },
-  { label: "Moderate", value: 2, color: "#d98f41" },
-  { label: "Heavy", value: 3, color: "#c14b4b" },
+const DEVICE_STATUS = [
+  { value: "working", label: "Working" },
+  { value: "needs_attention", label: "Needs attention" },
+  { value: "down", label: "Down" },
+] as const;
+const PLANT_HEALTH = [
+  { value: "normal", label: "Normal" },
+  { value: "phytotoxicity_observed", label: "Phytotoxicity observed" },
+  { value: "other_concern", label: "Other concern" },
 ] as const;
 
-// Generic tap-through protocol -- used both from within a Pest Event's
-// Monitoring tab (postUrl targets that event, session gets linked via
-// promotedPestEventId) and from the global "+" quick action for routine,
-// unlinked scouting (postUrl targets the area directly). Same 30-tap flow
-// either way; only where the result gets posted/redirected differs.
-export default function MonitoringFlow({ postUrl, redirectHref }: { postUrl: string; redirectHref: string }) {
+// Ported from spectral-pilot's ReportForm -- a live-editable grid (tap any
+// leaf in any order, tap again to correct a mistake) instead of the earlier
+// forced-linear tap-through, plus environmental readings and a local draft
+// autosave. Shared between event-scoped Monitoring (postUrl targets that
+// event) and the global "+" quick action for routine, unlinked scouting
+// (postUrl targets the area directly) -- same form either way.
+export default function MonitoringFlow({
+  postUrl,
+  redirectHref,
+  isPilotTier,
+}: {
+  postUrl: string;
+  redirectHref: string;
+  isPilotTier: boolean;
+}) {
   const router = useRouter();
-  const [started, setStarted] = useState(false);
-  const [readings, setReadings] = useState<number[]>([]);
-  const [saving, setSaving] = useState(false);
+  const draftKey = `scout-monitoring-draft:${postUrl}`;
 
-  const index = readings.length;
-  const done = index >= TOTAL;
-  const plant = Math.floor(index / POSITIONS.length) + 1;
-  const position = POSITIONS[index % POSITIONS.length];
+  // Read any in-progress draft once, synchronously, as part of the initial
+  // render (a lazy useState initializer, not an effect) -- avoids both a
+  // flash of empty state before restoration and the react-hooks/set-state-
+  // in-effect lint rule, which flags setState calls inside an effect body.
+  const [draft] = useState(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
 
-  const pestCount = readings.reduce((sum, v) => sum + v, 0);
-  const infestationPct = readings.length ? Math.round((readings.filter((v) => v > 0).length / readings.length) * 100) : 0;
+  const [grid, setGrid] = useState<PlantLeaves[]>(() =>
+    Array.isArray(draft?.grid) && draft.grid.length === 10 ? draft.grid : emptyLeafGrid()
+  );
+  const [deviceStatus, setDeviceStatus] = useState<(typeof DEVICE_STATUS)[number]["value"]>(draft?.deviceStatus ?? "working");
+  const [plantHealth, setPlantHealth] = useState<(typeof PLANT_HEALTH)[number]["value"]>(draft?.plantHealth ?? "normal");
+  const [tempUnit, setTempUnit] = useState<"F" | "C">(draft?.tempUnit ?? "F");
+  const [temp, setTemp] = useState<number | "">(typeof draft?.temp === "number" ? draft.temp : "");
+  const [humidity, setHumidity] = useState<number | "">(typeof draft?.humidity === "number" ? draft.humidity : "");
+  const [light, setLight] = useState<number | "">(typeof draft?.light === "number" ? draft.light : "");
+  const [notes, setNotes] = useState(typeof draft?.notes === "string" ? draft.notes : "");
+  const [satisfaction, setSatisfaction] = useState<number | null>(typeof draft?.satisfaction === "number" ? draft.satisfaction : null);
+  const [submitting, setSubmitting] = useState(false);
 
-  function record(value: number) {
-    setReadings((prev) => [...prev, value]);
+  // Autosave -- this write is a side effect on an external system
+  // (localStorage), which is exactly what effects are for; no setState here.
+  useEffect(() => {
+    const nextDraft = { grid, deviceStatus, plantHealth, temp, tempUnit, humidity, light, notes, satisfaction };
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(nextDraft));
+    } catch {
+      /* storage full or unavailable */
+    }
+  }, [draftKey, grid, deviceStatus, plantHealth, temp, tempUnit, humidity, light, notes, satisfaction]);
+
+  const agg = aggregateLeafGrid(grid);
+
+  function cycleLeaf(p: number, l: number) {
+    setGrid((prev) => {
+      const next = prev.map((row) => [...row]) as PlantLeaves[];
+      next[p][l] = CYCLE[(CYCLE.indexOf(next[p][l]) + 1) % CYCLE.length];
+      return next;
+    });
   }
 
-  async function save() {
-    setSaving(true);
+  function toggleUnit(u: "F" | "C") {
+    if (u === tempUnit) return;
+    if (typeof temp === "number") {
+      setTemp(Math.round(u === "C" ? ((temp - 32) * 5) / 9 : (temp * 9) / 5 + 32));
+    }
+    setTempUnit(u);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    const avgTempF = temp === "" ? null : tempUnit === "F" ? temp : Math.round((temp * 9) / 5 + 32);
     const res = await fetch(postUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sampleSize: TOTAL, pestCount }),
+      body: JSON.stringify({
+        sampleSize: agg.leavesChecked,
+        pestCount: agg.leavesInfested,
+        leafGrid: grid,
+        avgTempF,
+        avgHumidityPct: humidity === "" ? null : humidity,
+        avgLightHrs: light === "" ? null : light,
+        deviceStatus: isPilotTier ? deviceStatus : null,
+        plantHealthFlag: plantHealth,
+        notes: notes || null,
+        satisfactionRating: isPilotTier ? satisfaction : null,
+      }),
     });
-    setSaving(false);
-    if (res.ok) router.push(redirectHref);
-  }
-
-  if (!started) {
-    return (
-      <div className="card flex flex-col items-center gap-4 p-8 text-center">
-        <div className="text-lg font-medium">Monitoring protocol</div>
-        <div className="text-sm text-[var(--text-dim)]">
-          {PLANT_COUNT} plants x {POSITIONS.join("/")} leaf = {TOTAL} observations. Rate each leaf, tap through --
-          about a minute.
-        </div>
-        <button onClick={() => setStarted(true)} className="rounded-md bg-[var(--accent)] px-6 py-3 font-medium text-[#0B1626]">
-          Start monitoring
-        </button>
-      </div>
-    );
-  }
-
-  if (done) {
-    return (
-      <div className="card flex flex-col items-center gap-4 p-8 text-center">
-        <div className="text-lg font-medium">Session complete</div>
-        <div className="flex gap-8">
-          <div>
-            <div className="text-3xl font-semibold">{(pestCount / TOTAL).toFixed(2)}</div>
-            <div className="text-sm text-[var(--text-dim)]">density / sample unit</div>
-          </div>
-          <div>
-            <div className="text-3xl font-semibold">{infestationPct}%</div>
-            <div className="text-sm text-[var(--text-dim)]">of leaves affected</div>
-          </div>
-        </div>
-        <button
-          onClick={save}
-          disabled={saving}
-          className="rounded-md bg-[var(--accent)] px-6 py-3 font-medium text-[#0B1626] disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save session"}
-        </button>
-      </div>
-    );
+    if (res.ok) {
+      localStorage.removeItem(draftKey);
+      router.push(redirectHref);
+    } else {
+      setSubmitting(false);
+    }
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between text-sm text-[var(--text-dim)]">
-        <span>
-          Plant {plant} of {PLANT_COUNT}
-        </span>
-        <span>
-          {index + 1} / {TOTAL}
-        </span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border)]">
-        <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${(index / TOTAL) * 100}%` }} />
-      </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="card flex flex-col gap-3 p-4">
+        <div className="text-sm font-medium">Leaf check</div>
+        <p className="text-xs text-[var(--text-dim)]">
+          Pick 10 plants at random. On each, check a top, middle, and bottom leaf. Tap a leaf to record it; tap again
+          to change it.
+        </p>
 
-      <div className="card flex flex-col items-center gap-6 p-10 text-center">
-        <div className="text-xl font-medium">{position} leaf</div>
-        <div className="grid w-full grid-cols-2 gap-3">
-          {LEVELS.map((level) => (
-            <button
-              key={level.value}
-              onClick={() => record(level.value)}
-              className="rounded-xl py-6 text-lg font-medium text-white shadow-sm transition-transform active:scale-95"
-              style={{ background: level.color }}
-            >
-              {level.label}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {grid.map((leaves, p) => {
+            const done = leaves.every((s) => s !== "unchecked");
+            return (
+              <div key={p} className="flex flex-col gap-1 rounded-lg border border-[var(--border)] p-2">
+                <div className="flex items-center justify-between text-xs text-[var(--text-dim)]">
+                  Plant {p + 1}
+                  {done && <span className="text-[var(--accent)]">✓</span>}
+                </div>
+                {leaves.map((s, l) => (
+                  <button
+                    type="button"
+                    key={l}
+                    onClick={() => cycleLeaf(p, l)}
+                    className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs"
+                    style={{
+                      background:
+                        s === "unchecked"
+                          ? "transparent"
+                          : s === "absent"
+                            ? "#2a3b52"
+                            : s === "low"
+                              ? "#6bb77b55"
+                              : s === "medium"
+                                ? "#e8b84b66"
+                                : "#d96b6b77",
+                      border: s === "unchecked" ? "1px dashed var(--border)" : "1px solid transparent",
+                    }}
+                  >
+                    <span className="text-[var(--text-dim)]">{POSITIONS[l]}</span>
+                    <span>{STATE_LABEL[s] || "·"}</span>
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex gap-6 pt-2">
+          <div>
+            <div className="text-2xl font-semibold">{agg.infestedPct}%</div>
+            <div className="text-xs text-[var(--text-dim)]">
+              Infested ({agg.leavesInfested}/{agg.leavesChecked} checked)
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-semibold">{agg.estDensity}</div>
+            <div className="text-xs text-[var(--text-dim)]">Estimated density</div>
+          </div>
+          <div>
+            <div className="text-2xl font-semibold">{agg.leavesChecked}/30</div>
+            <div className="text-xs text-[var(--text-dim)]">Leaves checked</div>
+          </div>
         </div>
       </div>
-    </div>
+
+      <div className="card flex flex-col gap-3 p-4">
+        <div className="text-sm font-medium">Plant status{isPilotTier && " & device"}</div>
+        {isPilotTier && (
+          <label className="flex flex-col gap-1 text-sm">
+            Are all units working?
+            <select
+              value={deviceStatus}
+              onChange={(e) => setDeviceStatus(e.target.value as typeof deviceStatus)}
+              className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2"
+            >
+              {DEVICE_STATUS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label className="flex flex-col gap-1 text-sm">
+          Plant health
+          <select
+            value={plantHealth}
+            onChange={(e) => setPlantHealth(e.target.value as typeof plantHealth)}
+            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2"
+          >
+            {PLANT_HEALTH.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="card flex flex-col gap-3 p-4">
+        <div className="text-sm font-medium">Environment</div>
+        <label className="flex flex-col gap-1 text-sm">
+          Average temperature
+          <div className="flex gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              value={temp}
+              onChange={(e) => setTemp(e.target.value === "" ? "" : Number(e.target.value))}
+              placeholder={tempUnit === "F" ? "73" : "23"}
+              className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2"
+            />
+            <div className="flex overflow-hidden rounded-md border border-[var(--border)]">
+              {(["F", "C"] as const).map((u) => (
+                <button
+                  type="button"
+                  key={u}
+                  onClick={() => toggleUnit(u)}
+                  className={`px-3 text-sm ${tempUnit === u ? "bg-[var(--accent)] text-[#0B1626]" : "text-[var(--text-dim)]"}`}
+                >
+                  °{u}
+                </button>
+              ))}
+            </div>
+          </div>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Average humidity (%)
+          <input
+            type="number"
+            inputMode="numeric"
+            value={humidity}
+            onChange={(e) => setHumidity(e.target.value === "" ? "" : Number(e.target.value))}
+            placeholder="61"
+            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Average light (hours/day)
+          <input
+            type="number"
+            inputMode="numeric"
+            value={light}
+            onChange={(e) => setLight(e.target.value === "" ? "" : Number(e.target.value))}
+            placeholder="11"
+            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2"
+          />
+        </label>
+      </div>
+
+      <div className="card flex flex-col gap-3 p-4">
+        <div className="text-sm font-medium">Notes</div>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Anything unusual, questions, feedback…"
+          rows={3}
+          className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+        />
+        {isPilotTier && (
+          <label className="flex flex-col gap-2 text-sm">
+            How satisfied are you with results so far?
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  type="button"
+                  key={n}
+                  onClick={() => setSatisfaction(n)}
+                  className="flex-1 rounded-md border px-3 py-1.5 text-sm"
+                  style={
+                    satisfaction === n
+                      ? { background: "var(--accent)", color: "#0B1626", borderColor: "var(--accent)" }
+                      : { borderColor: "var(--border)" }
+                  }
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </label>
+        )}
+      </div>
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+      >
+        {submitting ? "Submitting…" : "Submit session"}
+      </button>
+      <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
+    </form>
   );
 }

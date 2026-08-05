@@ -24,6 +24,7 @@ export default async function MonitoringPage({ params }: { params: Promise<{ id:
       <MonitoringFlow
         postUrl={`/api/facilities/${id}/pest-events/${eventId}/monitoring`}
         redirectHref={`/app/facilities/${id}/pest-events/${eventId}`}
+        isPilotTier={session.accountTier === "pilot"}
       />
     </div>
   );

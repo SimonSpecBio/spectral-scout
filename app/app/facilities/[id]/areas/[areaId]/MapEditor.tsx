@@ -385,51 +385,81 @@ export default function MapEditor({
               const zoneStroke = selectedId === obj.id ? "#ffffff" : hotspot ? SEVERITY_COLORS[hotspot] : MAP_BLUE;
               const zoneStrokeWidth = selectedId === obj.id ? 3 : hotspot ? 2.5 : 1.5;
 
+              // A zone's name isn't visible unless it's rendered as its own
+              // text -- unlike the dedicated "label" shape type, rect/circle/
+              // polygon zones don't have anywhere else to show it. Rendered
+              // as a plain sibling Text recomputed from the same geometry
+              // each render, not attached to the shape via a Group, so
+              // dragging/resizing the zone doesn't need extra transform math.
+              const labelNode = (cx: number, cy: number) =>
+                obj.label ? (
+                  <Text
+                    key={`${obj.id}-label`}
+                    x={cx}
+                    y={cy}
+                    text={obj.label}
+                    fontSize={14}
+                    fill="#e7edf5"
+                    align="center"
+                    offsetX={obj.label.length * 3.5}
+                    listening={false}
+                  />
+                ) : null;
+
               if (obj.shapeType === "rect") {
-                return (
+                const { x = 0, y = 0, width = 0, height = 0 } = obj.geometry;
+                return [
                   <Rect
                     key={obj.id}
                     ref={nodeRef}
                     {...commonProps}
-                    x={obj.geometry.x}
-                    y={obj.geometry.y}
-                    width={obj.geometry.width}
-                    height={obj.geometry.height}
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={height}
                     rotation={obj.geometry.rotation ?? 0}
                     fill={zoneFill}
                     stroke={zoneStroke}
                     strokeWidth={zoneStrokeWidth}
-                  />
-                );
+                  />,
+                  labelNode(x + width / 2, y + height / 2 - 7),
+                ];
               }
               if (obj.shapeType === "circle") {
-                return (
+                const { x = 0, y = 0 } = obj.geometry;
+                return [
                   <Circle
                     key={obj.id}
                     ref={nodeRef}
                     {...commonProps}
-                    x={obj.geometry.x}
-                    y={obj.geometry.y}
+                    x={x}
+                    y={y}
                     radius={obj.geometry.radius}
                     fill={zoneFill}
                     stroke={zoneStroke}
                     strokeWidth={zoneStrokeWidth}
-                  />
-                );
+                  />,
+                  labelNode(x, y - 7),
+                ];
               }
               if (obj.shapeType === "polygon") {
-                return (
+                const pts = obj.geometry.points ?? [];
+                const n = pts.length / 2;
+                const cx = n ? pts.filter((_, i) => i % 2 === 0).reduce((a, b) => a + b, 0) / n : 0;
+                const cy = n ? pts.filter((_, i) => i % 2 === 1).reduce((a, b) => a + b, 0) / n : 0;
+                return [
                   <Line
                     key={obj.id}
                     ref={nodeRef}
                     {...commonProps}
-                    points={obj.geometry.points}
+                    points={pts}
                     closed
                     fill={zoneFill}
                     stroke={zoneStroke}
                     strokeWidth={zoneStrokeWidth}
-                  />
-                );
+                  />,
+                  labelNode(cx, cy - 7),
+                ];
               }
               if (obj.shapeType === "line") {
                 return (
