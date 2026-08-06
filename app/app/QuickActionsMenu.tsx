@@ -45,7 +45,7 @@ export default function QuickActionsMenu({ variant }: { variant: "corner" | "cen
         className={
           isCorner
             ? "flex h-[46px] w-[46px] items-center justify-center rounded-2xl text-xl transition-transform active:scale-95"
-            : "flex h-14 w-14 -translate-y-4 items-center justify-center rounded-full text-2xl shadow-lg transition-transform active:scale-95"
+            : "flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg transition-transform active:scale-95"
         }
         style={{ background: "var(--surface-raised)", border: "0.5px solid var(--border-soft)", color: "var(--text-dim)" }}
       >

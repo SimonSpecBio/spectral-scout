@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import BayBarMap from "./BayBarMap";
 import PressureHeatmapPlaceholder from "./PressureHeatmapPlaceholder";
 
@@ -15,16 +15,20 @@ export interface BayLensEntry {
 
 const OVERDUE_AFTER_DAYS = 7;
 const DAY_MS = 86_400_000;
+const SWIPE_THRESHOLD_PX = 40;
 
 const LENSES = ["pests", "scouted", "temp", "humidity"] as const;
 type Lens = (typeof LENSES)[number];
-const LENS_LABEL: Record<Lens, string> = { pests: "Pests", scouted: "Last scouted", temp: "Temp", humidity: "Humid" };
+const LENS_LABEL: Record<Lens, string> = { pests: "Pests", scouted: "Last scouted", temp: "Temp", humidity: "Humidity" };
 
 // The dashboard map's lens switcher (ARCHITECTURE.md's map screen) --
 // same 20-bay canvas recolored per lens, per the "one map, several views"
-// rule rather than four separate maps. Pests reuses the existing
-// PressureHeatmapPlaceholder as-is; the other three lenses are computed
-// here from bay-keyed scouting data (lib/map-lenses.ts).
+// rule rather than four separate maps. Swipe left/right on the map to
+// step through lenses; the dropdown below is the same control for anyone
+// who'd rather jump straight to one (or is on a mouse, where swipe isn't
+// natural). Pests reuses the existing PressureHeatmapPlaceholder as-is;
+// the other three are computed from bay-keyed scouting data
+// (lib/map-lenses.ts).
 export default function MapLensSwitcher({
   events,
   bayLensEntries,
@@ -33,6 +37,23 @@ export default function MapLensSwitcher({
   bayLensEntries: BayLensEntry[];
 }) {
   const [lens, setLens] = useState<Lens>("pests");
+  const touchStartX = useRef<number | null>(null);
+
+  function step(dir: 1 | -1) {
+    const i = LENSES.indexOf(lens);
+    setLens(LENSES[(i + dir + LENSES.length) % LENSES.length]);
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current == null) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return;
+    step(delta < 0 ? 1 : -1);
+  }
 
   const colorByBay = new Map<string, string>();
   const badgeByBay = new Map<string, string>();
@@ -61,20 +82,20 @@ export default function MapLensSwitcher({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex gap-1.5 overflow-x-auto">
-        {LENSES.map((l) => (
-          <button
-            key={l}
-            onClick={() => setLens(l)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs ${
-              lens === l ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
-            }`}
-          >
-            {LENS_LABEL[l]}
-          </button>
-        ))}
+      <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        {lens === "pests" ? <PressureHeatmapPlaceholder events={events} /> : <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} />}
       </div>
-      {lens === "pests" ? <PressureHeatmapPlaceholder events={events} /> : <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} />}
+      <select
+        value={lens}
+        onChange={(e) => setLens(e.target.value as Lens)}
+        className="self-center rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-xs text-[var(--text-dim)]"
+      >
+        {LENSES.map((l) => (
+          <option key={l} value={l} style={{ background: "var(--surface)" }}>
+            {LENS_LABEL[l]}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
