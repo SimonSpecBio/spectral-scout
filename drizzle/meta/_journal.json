@@ -22,6 +22,13 @@
       "when": 1785961037861,
       "tag": "0002_outgoing_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785973094754,
+      "tag": "0003_brainy_the_fury",
+      "breakpoints": true
     }
   ]
 }

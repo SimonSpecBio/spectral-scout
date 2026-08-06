@@ -147,6 +147,13 @@ export const facilityMapObjects = pgTable("scout_facility_map_object", {
 
 export const severityEnum = pgEnum("scout_severity", ["low", "moderate", "high", "severe"]);
 export const pestEventStatusEnum = pgEnum("scout_pest_event_status", ["active", "resolved"]);
+// Disease/pathogen outbreaks share the exact same lifecycle as a pest
+// infestation (detected -> monitored -> treated -> resolved), same map pin,
+// same timeline, same treatments -- this is the "everything is a Pest
+// Event, different views onto the same object" model, extended with a
+// discriminator instead of a parallel table. `kind` is the only thing that
+// changes what an assessment session means (see assessmentTypeEnum below).
+export const eventKindEnum = pgEnum("scout_event_kind", ["pest", "pathogen"]);
 
 // The central object per the product brief: every infestation is its own
 // living record that scouting observations, treatments, and photos attach
@@ -166,7 +173,9 @@ export const pestEvents = pgTable("scout_pest_event", {
   mapObjectId: uuid("map_object_id").references(() => facilityMapObjects.id, { onDelete: "set null" }),
   x: numeric("x", { mode: "number" }),
   y: numeric("y", { mode: "number" }),
-  pestSpecies: text("pest_species").notNull(),
+  kind: eventKindEnum("kind").notNull().default("pest"),
+  pestSpecies: text("pest_species").notNull(), // common name either way -- insect species name, or disease/pathogen name
+  scientificName: text("scientific_name"), // optional Latin binomial, either kind
   severity: severityEnum("severity").notNull().default("moderate"),
   status: pestEventStatusEnum("status").notNull().default("active"),
   notes: text("notes"),
@@ -188,6 +197,14 @@ export const plantHealthEnum = pgEnum("scout_plant_health", ["normal", "phytotox
 // leavesChecked/leavesInfested rollup of leafGrid (still what the trend/
 // density displays elsewhere in the app read), leafGrid is the raw grid for
 // anything that wants the full per-leaf detail later.
+// Which protocol produced this session's leafGrid -- pest_count grid is
+// unchecked/absent/low/medium/high per leaf (aggregateLeafGrid in
+// lib/density.ts); disease_severity grid is null/0-4 percent-leaf-area
+// classes per leaf (aggregateDiseaseGrid in lib/disease.ts). Without this,
+// a disease event's grid would be silently misread by the pest aggregator
+// (or vice versa) since leafGrid itself is untyped jsonb.
+export const assessmentTypeEnum = pgEnum("scout_assessment_type", ["pest_count", "disease_severity"]);
+
 export const scoutingObservations = pgTable("scout_observation", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
@@ -198,9 +215,10 @@ export const scoutingObservations = pgTable("scout_observation", {
     .references(() => facilityAreas.id, { onDelete: "cascade" }),
   submittedByUserId: uuid("submitted_by_user_id").notNull(),
   date: date("date", { mode: "string" }).notNull(),
+  assessmentType: assessmentTypeEnum("assessment_type").notNull().default("pest_count"),
   sampleSize: integer("sample_size"),
   pestCount: integer("pest_count"),
-  leafGrid: jsonb("leaf_grid"), // raw PlantLeaves[10] grid, each a [top, middle, bottom] LeafState triple
+  leafGrid: jsonb("leaf_grid"), // shape depends on assessmentType -- see enum comment above
   avgTempF: integer("avg_temp_f"),
   avgHumidityPct: integer("avg_humidity_pct"),
   avgLightHrs: integer("avg_light_hrs"),

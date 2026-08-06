@@ -6,8 +6,9 @@ import { useState } from "react";
 // Global quick-action per the design brief -- "New Treatment"/"Photo"/
 // "Quick note" all need an existing Pest Event as their target, so those
 // stay inside that event's detail tabs (Treatments/Photos/Notes) rather
-// than living here; this covers the two actions that make sense with no
-// prior context: starting a new pest event, or logging routine scouting.
+// than living here; this covers the actions that make sense with no prior
+// context: starting a new pest event, a new pathogen (disease) event, or
+// logging routine scouting.
 export default function FloatingAction() {
   const [open, setOpen] = useState(false);
 
@@ -20,14 +21,21 @@ export default function FloatingAction() {
             onClick={() => setOpen(false)}
             className="rounded-md px-4 py-2 text-sm hover:bg-[var(--surface-raised)]"
           >
-            New pest event
+            Pest event
+          </Link>
+          <Link
+            href="/app/new-disease-event"
+            onClick={() => setOpen(false)}
+            className="rounded-md px-4 py-2 text-sm hover:bg-[var(--surface-raised)]"
+          >
+            Pathogen event
           </Link>
           <Link
             href="/app/new-observation"
             onClick={() => setOpen(false)}
             className="rounded-md px-4 py-2 text-sm hover:bg-[var(--surface-raised)]"
           >
-            New scouting observation
+            Scouting log
           </Link>
         </div>
       )}

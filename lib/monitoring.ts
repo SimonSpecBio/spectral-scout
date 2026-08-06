@@ -1,10 +1,10 @@
-import { deviceStatusEnum, plantHealthEnum } from "@/db/schema";
+import { assessmentTypeEnum, deviceStatusEnum, plantHealthEnum } from "@/db/schema";
 
 // Shared by both monitoring POST routes (event-scoped and general/unlinked)
 // so the field extraction/validation isn't duplicated. Server-authoritative:
 // this trusts sampleSize/pestCount as sent (the client already recomputed
-// them from leafGrid via aggregateLeafGrid), but validates enum fields
-// rather than trusting arbitrary strings.
+// them from leafGrid via aggregateLeafGrid/aggregateDiseaseGrid), but
+// validates enum fields rather than trusting arbitrary strings.
 export function parseMonitoringPayload(body: unknown) {
   const b = body as Record<string, unknown>;
   const sampleSize = typeof b.sampleSize === "number" ? b.sampleSize : null;
@@ -14,6 +14,9 @@ export function parseMonitoringPayload(body: unknown) {
   return {
     sampleSize,
     pestCount,
+    assessmentType: assessmentTypeEnum.enumValues.includes(b.assessmentType as never)
+      ? (b.assessmentType as (typeof assessmentTypeEnum.enumValues)[number])
+      : "pest_count",
     leafGrid: Array.isArray(b.leafGrid) ? b.leafGrid : null,
     avgTempF: typeof b.avgTempF === "number" ? b.avgTempF : null,
     avgHumidityPct: typeof b.avgHumidityPct === "number" ? b.avgHumidityPct : null,

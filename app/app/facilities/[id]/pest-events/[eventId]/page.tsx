@@ -45,7 +45,9 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
         facilityId={id}
         event={{
           id: event.id,
+          kind: event.kind,
           pestSpecies: event.pestSpecies,
+          scientificName: event.scientificName,
           severity: event.severity,
           status: event.status,
           notes: event.notes,

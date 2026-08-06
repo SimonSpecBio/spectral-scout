@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { pestEvents, severityEnum } from "@/db/schema";
+import { eventKindEnum, pestEvents, severityEnum } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -35,6 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const pestSpecies = typeof body.pestSpecies === "string" ? body.pestSpecies.trim() : "";
   if (!pestSpecies) return NextResponse.json({ error: "pestSpecies is required" }, { status: 400 });
   const severity = severityEnum.enumValues.includes(body.severity) ? body.severity : "moderate";
+  const kind = eventKindEnum.enumValues.includes(body.kind) ? body.kind : "pest";
 
   const [row] = await db
     .insert(pestEvents)
@@ -44,7 +45,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       mapObjectId: typeof body.mapObjectId === "string" ? body.mapObjectId : null,
       x: typeof body.x === "number" ? body.x : null,
       y: typeof body.y === "number" ? body.y : null,
+      kind,
       pestSpecies,
+      scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,
       severity,
       notes: typeof body.notes === "string" && body.notes ? body.notes : null,
     })
