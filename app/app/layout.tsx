@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation";
 import { requireGrowerSession } from "@/lib/session";
-import FloatingAction from "./FloatingAction";
+import BottomNav from "./BottomNav";
 import HeaderMenu from "./HeaderMenu";
+import QuickActionsMenu from "./QuickActionsMenu";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireGrowerSession();
   if (!session) redirect("/");
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 pb-28 pt-8 lg:pb-8">
       <header className="flex items-center justify-between">
         <span className="font-semibold">Spectral Scout</span>
         <div className="flex items-center gap-2">
@@ -17,11 +18,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               Pilot program
             </span>
           )}
-          <HeaderMenu email={session.user?.email} />
+          {/* Desktop only -- mobile/tablet's nav + account access lives in
+              BottomNav (destinations) and the More page (account/sign-out)
+              instead. */}
+          <div className="hidden lg:block">
+            <HeaderMenu email={session.user?.email} />
+          </div>
         </div>
       </header>
       {children}
-      <FloatingAction />
+      <div className="hidden lg:block">
+        <QuickActionsMenu variant="corner" />
+      </div>
+      <BottomNav />
     </div>
   );
 }
