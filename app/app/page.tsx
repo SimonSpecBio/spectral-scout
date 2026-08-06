@@ -304,22 +304,27 @@ export default async function HomePage({
         {activity.length === 0 ? (
           <div className="text-sm text-[var(--text-dim)]">Nothing yet.</div>
         ) : (
-          <div className="card relative p-4 pl-6">
-            <div className="absolute bottom-4 left-[11px] top-4 w-px" style={{ background: "var(--border-soft)" }} />
+          <div className="card p-4">
+            {/* Each row is its own flex container with a rail column (dot +
+                a line segment that grows to fill the row's own height) --
+                self-adjusting to whatever height the text takes, instead of
+                the previous fixed negative-margin trick that only lined up
+                for single-line entries. */}
             {activity.map((a, i) => (
-              <div key={i} className="relative flex items-start justify-between pb-3.5 last:pb-0">
-                <div className="flex items-start gap-3">
+              <div key={i} className="flex gap-3">
+                <div className="flex w-3 shrink-0 flex-col items-center">
                   <span
                     className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{ background: a.alert ? "var(--accent)" : "var(--border-soft)", marginLeft: "-19px" }}
+                    style={{ background: a.alert ? "var(--accent)" : "var(--border-soft)" }}
                   />
-                  <div>
-                    <div className="text-sm" style={{ color: a.alert ? "var(--text)" : "var(--text-dim)" }}>
-                      {a.label}
-                    </div>
-                    <div className="label-mono">
-                      {relativeTime(a.at).toUpperCase()} {a.sub && `· ${a.sub.toUpperCase()}`}
-                    </div>
+                  {i < activity.length - 1 && <span className="mt-1 w-px flex-1" style={{ background: "var(--border-soft)" }} />}
+                </div>
+                <div className="pb-3.5">
+                  <div className="text-sm" style={{ color: a.alert ? "var(--text)" : "var(--text-dim)" }}>
+                    {a.label}
+                  </div>
+                  <div className="label-mono">
+                    {relativeTime(a.at).toUpperCase()} {a.sub && `· ${a.sub.toUpperCase()}`}
                   </div>
                 </div>
               </div>

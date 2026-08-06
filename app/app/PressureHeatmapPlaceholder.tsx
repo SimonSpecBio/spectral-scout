@@ -14,12 +14,15 @@ export default function PressureHeatmapPlaceholder() {
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
           </radialGradient>
         </defs>
+        {/* Row labels sit at each bar-pair's vertical center (same y as the
+            gridlines below) -- the original y-6 offset put them visually a
+            row high, floating over the pair above the one they labeled. */}
         <g fontFamily="ui-monospace, monospace" fontSize="7.5">
-          <text x="16" y="48" fill="#374763">01</text>
-          <text x="16" y="104" fill="#374763">02</text>
-          <text x="16" y="160" fill="#374763">03</text>
-          <text x="16" y="216" fill="#374763">04</text>
-          <text x="16" y="272" fill="#374763">05</text>
+          <text x="16" y="54" fill="#374763">01</text>
+          <text x="16" y="110" fill="#374763">02</text>
+          <text x="16" y="166" fill="#374763">03</text>
+          <text x="16" y="222" fill="#374763">04</text>
+          <text x="16" y="278" fill="#374763">05</text>
         </g>
         <g stroke="#111c2d" strokeWidth="0.5">
           <line x1="14" y1="54" x2="284" y2="54" />

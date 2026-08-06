@@ -10,6 +10,7 @@ import {
   type DiseaseClass,
   type DiseaseLeaves,
 } from "@/lib/disease";
+import LocationPlacement from "../LocationPlacement";
 
 const POSITIONS = ["Bot", "Mid", "Top"] as const;
 // Same fills as the reference design: transparent/dashed for unassessed,
@@ -39,6 +40,7 @@ export default function DiseaseEventForm({
   const [grid, setGrid] = useState<DiseaseLeaves[]>(emptyDiseaseGrid);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [placingLocation, setPlacingLocation] = useState(false);
 
   const agg = aggregateDiseaseGrid(grid);
 
@@ -50,8 +52,10 @@ export default function DiseaseEventForm({
     });
   }
 
-  async function handleSubmit() {
-    if (!commonName.trim()) return;
+  // "Create disease event" opens the location placement screen instead of
+  // submitting directly -- this is what actually finishes the submission,
+  // once a real pin position exists.
+  async function handleConfirmLocation(x: number, y: number) {
     setSubmitting(true);
     const eventRes = await fetch(`/api/facilities/${facilityId}/pest-events`, {
       method: "POST",
@@ -63,10 +67,13 @@ export default function DiseaseEventForm({
         scientificName: scientificName.trim() || null,
         severity: severityFromDiseaseAggregate(agg),
         notes: notes || null,
+        x,
+        y,
       }),
     });
     if (!eventRes.ok) {
       setSubmitting(false);
+      setPlacingLocation(false);
       return;
     }
     const event = await eventRes.json();
@@ -85,6 +92,10 @@ export default function DiseaseEventForm({
     }
 
     router.push(`/app/facilities/${facilityId}/pest-events/${event.id}`);
+  }
+
+  if (placingLocation) {
+    return <LocationPlacement onConfirm={handleConfirmLocation} onCancel={() => setPlacingLocation(false)} />;
   }
 
   return (
@@ -199,7 +210,7 @@ export default function DiseaseEventForm({
 
       <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-5xl border-t border-[var(--border)] p-4" style={{ background: "var(--surface)" }}>
         <button
-          onClick={handleSubmit}
+          onClick={() => setPlacingLocation(true)}
           disabled={submitting || !commonName.trim()}
           className="w-full rounded-xl py-3.5 text-sm font-medium disabled:opacity-50"
           style={{ background: "#25385a", border: "0.5px solid #37507a", color: "var(--text)" }}

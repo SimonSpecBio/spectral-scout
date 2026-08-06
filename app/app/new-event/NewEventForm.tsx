@@ -2,39 +2,47 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import LocationPlacement from "../LocationPlacement";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 const SEVERITIES: Severity[] = ["low", "moderate", "high", "severe"];
 
-// No x/y here -- this event isn't pinned to a spot on the map yet (that
-// needs the canvas, which this quick-create deliberately skips for speed).
-// It shows up on the Map screen unpositioned; drop a pin for it there later
-// if you want it placed.
 export default function NewEventForm({ facilityId, areaId }: { facilityId: string; areaId: string }) {
   const router = useRouter();
   const [species, setSpecies] = useState("");
   const [severity, setSeverity] = useState<Severity>("moderate");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [placingLocation, setPlacingLocation] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleConfirmLocation(x: number, y: number) {
     setSubmitting(true);
     const res = await fetch(`/api/facilities/${facilityId}/pest-events`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ facilityAreaId: areaId, pestSpecies: species, severity, notes }),
+      body: JSON.stringify({ facilityAreaId: areaId, pestSpecies: species, severity, notes, x, y }),
     });
     if (res.ok) {
       const row = await res.json();
       router.push(`/app/facilities/${facilityId}/pest-events/${row.id}`);
     } else {
       setSubmitting(false);
+      setPlacingLocation(false);
     }
   }
 
+  if (placingLocation) {
+    return <LocationPlacement onConfirm={handleConfirmLocation} onCancel={() => setPlacingLocation(false)} />;
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="card flex flex-col gap-3 p-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        setPlacingLocation(true);
+      }}
+      className="card flex flex-col gap-3 p-4"
+    >
       <input
         autoFocus
         value={species}
@@ -68,7 +76,7 @@ export default function NewEventForm({ facilityId, areaId }: { facilityId: strin
         disabled={submitting || !species.trim()}
         className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#0B1626] disabled:opacity-50"
       >
-        {submitting ? "Creating…" : "Create pest event"}
+        {submitting ? "Creating…" : "Continue to place location"}
       </button>
     </form>
   );
