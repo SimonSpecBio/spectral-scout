@@ -1,9 +1,59 @@
-// Static placeholder, per explicit instruction -- not wired to real zone/
-// row data yet ("we'll come to the map fixing perfectly later"). The real
-// interactive map (drag/drop editing, real pest pins) still lives on
-// desktop and on the site/area detail pages; this only stands in for the
-// mobile home-screen visual until the real row/bay data model exists.
-export default function PressureHeatmapPlaceholder() {
+import { BAYS, nearestBay } from "@/lib/floorplan-bays";
+
+type Severity = "low" | "moderate" | "high" | "severe";
+const SEVERITY_RANK: Record<Severity, number> = { low: 0, moderate: 1, high: 2, severe: 3 };
+const SEVERITY_COLOR: Record<Severity, string> = {
+  low: "#e0d24b",
+  moderate: "#e0913d",
+  high: "#e0553d",
+  severe: "#a3193d",
+};
+const IDLE_FILL = "#172234";
+
+interface EventInput {
+  x: number;
+  y: number;
+  severity: Severity;
+}
+
+// Placeholder floor plan ("we'll come to the map fixing perfectly later"),
+// but the colors are real: each event's stored (x, y) gets matched to its
+// nearest of the 20 shared bay slots (lib/floorplan-bays.ts -- the same
+// slots LocationPlacement writes to), and that bay's bar is colored by the
+// worst severity of whatever landed there. A bay with nothing nearby stays
+// idle. Same visual as before, no longer decorative.
+export default function PressureHeatmapPlaceholder({ events }: { events: EventInput[] }) {
+  const colorByBay = new Map<string, Severity>();
+  for (const ev of events) {
+    const bay = nearestBay(ev.x, ev.y);
+    const key = `${bay.row}${bay.index}`;
+    const existing = colorByBay.get(key);
+    if (!existing || SEVERITY_RANK[ev.severity] > SEVERITY_RANK[existing]) colorByBay.set(key, ev.severity);
+  }
+
+  const rowA = BAYS.filter((b) => b.row === "A");
+  const rowB = BAYS.filter((b) => b.row === "B");
+  const barYs = [32, 60, 88, 116, 144, 172, 200, 228, 256, 284];
+
+  const fillFor = (bay: (typeof BAYS)[number]) => {
+    const sev = colorByBay.get(`${bay.row}${bay.index}`);
+    return sev ? SEVERITY_COLOR[sev] : IDLE_FILL;
+  };
+
+  // Glow centers on the worst active hotspot, if any -- follows real data
+  // instead of sitting on a hardcoded bar.
+  let glowBar: { x: number; y: number } | null = null;
+  let worst: Severity | null = null;
+  for (const bay of [...rowA, ...rowB]) {
+    const sev = colorByBay.get(`${bay.row}${bay.index}`);
+    if (sev && (!worst || SEVERITY_RANK[sev] > SEVERITY_RANK[worst])) {
+      worst = sev;
+      const isRowA = bay.row === "A";
+      const idx = (isRowA ? rowA : rowB).indexOf(bay);
+      glowBar = { x: isRowA ? 99 : 223, y: barYs[idx] + 4 }; // row bar horizontal centers (x=50/174, width=98)
+    }
+  }
+
   return (
     <div className="overflow-hidden rounded-2xl" style={{ background: "#0a1120" }}>
       <svg viewBox="0 0 296 322" className="block w-full">
@@ -15,8 +65,7 @@ export default function PressureHeatmapPlaceholder() {
           </radialGradient>
         </defs>
         {/* Row labels sit at each bar-pair's vertical center (same y as the
-            gridlines below) -- the original y-6 offset put them visually a
-            row high, floating over the pair above the one they labeled. */}
+            gridlines below). */}
         <g fontFamily="ui-monospace, monospace" fontSize="7.5">
           <text x="16" y="54" fill="#374763">01</text>
           <text x="16" y="110" fill="#374763">02</text>
@@ -33,19 +82,13 @@ export default function PressureHeatmapPlaceholder() {
         </g>
         <rect x="38" y="18" width="246" height="288" rx="3" fill="none" stroke="#1e2c46" strokeWidth="1" />
         <line x1="161" y1="22" x2="161" y2="302" stroke="#111c2d" strokeWidth="0.75" strokeDasharray="1 5" />
-        <circle cx="88" cy="46" r="62" fill="url(#heatGlow)" />
+        {glowBar && <circle cx={glowBar.x} cy={glowBar.y} r={62} fill="url(#heatGlow)" />}
         <g>
-          <rect x="50" y="32" width="98" height="8" rx="4" fill="var(--accent)" />
-          <rect x="50" y="60" width="98" height="8" rx="4" fill="#4a2a22" />
-          {[88, 116, 144, 172, 200, 228, 256, 284].map((y) => (
-            <rect key={y} x="50" y={y} width="98" height="8" rx="4" fill="#172234" />
+          {rowA.map((bay, i) => (
+            <rect key={`A${bay.index}`} x="50" y={barYs[i]} width="98" height="8" rx="4" fill={fillFor(bay)} />
           ))}
-          {[32, 60, 88, 116, 144].map((y) => (
-            <rect key={y} x="174" y={y} width="98" height="8" rx="4" fill="#172234" />
-          ))}
-          <rect x="174" y="172" width="98" height="8" rx="4" fill="#3a3220" />
-          {[200, 228, 256, 284].map((y) => (
-            <rect key={y} x="174" y={y} width="98" height="8" rx="4" fill="#172234" />
+          {rowB.map((bay, i) => (
+            <rect key={`B${bay.index}`} x="174" y={barYs[i]} width="98" height="8" rx="4" fill={fillFor(bay)} />
           ))}
         </g>
         <g fontFamily="ui-monospace, monospace" fontSize="8" letterSpacing="0.14em">

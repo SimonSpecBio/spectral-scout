@@ -140,6 +140,7 @@ export default async function HomePage({
   const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, selectedFacility.id));
 
   let desktopMapSection: React.ReactNode = null;
+  let heatmapEvents: { x: number; y: number; severity: "low" | "moderate" | "high" | "severe" }[] = [];
   if (areas.length === 0) {
     desktopMapSection = (
       <div className="card p-6 text-[var(--text-dim)]">
@@ -158,6 +159,10 @@ export default async function HomePage({
     const objects = await db.select().from(facilityMapObjects).where(eq(facilityMapObjects.facilityAreaId, selectedArea.id));
     const areaPestEvents = await db.select().from(pestEvents).where(and(eq(pestEvents.facilityAreaId, selectedArea.id)));
     const signals = await computeEventSignals(areaPestEvents.map((e) => e.id));
+
+    heatmapEvents = areaPestEvents
+      .filter((ev) => ev.status === "active" && ev.x != null && ev.y != null)
+      .map((ev) => ({ x: ev.x!, y: ev.y!, severity: ev.severity }));
 
     desktopMapSection = (
       <div className="flex flex-col gap-3">
@@ -240,7 +245,7 @@ export default async function HomePage({
       </div>
 
       <div className="sm:hidden">
-        <PressureHeatmapPlaceholder />
+        <PressureHeatmapPlaceholder events={heatmapEvents} />
       </div>
       <div className="hidden sm:block">{desktopMapSection}</div>
 

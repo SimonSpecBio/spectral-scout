@@ -1,0 +1,51 @@
+// Canvas-space (900x600, the same space the real Konva map and stored
+// pest_events x/y already use) positions of the 20 placeholder "bay" slots.
+// Single source of truth for both LocationPlacement (tap-to-place, writes
+// an event's x/y from a bay) and PressureHeatmapPlaceholder (colors a bay's
+// bar by finding which real events are nearest to it) -- so "Bay A3" means
+// the exact same physical point in both places, not two independently-
+// eyeballed layouts that can drift apart.
+export const CANVAS_W = 900;
+export const CANVAS_H = 600;
+
+// Source layout: a 296x400 bench-grid viewBox (LocationPlacement's visual
+// arrangement). Canvas positions below are derived from it once, here --
+// everything else works from the canvas coordinates, not this viewBox.
+const VIEW_W = 296;
+const VIEW_H = 400;
+const BENCH_W = 86;
+const BENCH_H = 9;
+const BENCH_YS = [34, 66, 98, 130, 162, 194, 226, 258, 290, 322];
+const ROW_X = { A: 50, B: 160 } as const;
+
+export interface Bay {
+  row: "A" | "B";
+  index: number; // 1-based within the row
+  x: number; // canvas-space, 0-900
+  y: number; // canvas-space, 0-600
+}
+
+export const BAYS: Bay[] = (["A", "B"] as const).flatMap((row) =>
+  BENCH_YS.map((benchY, i) => {
+    const cx = ROW_X[row] + BENCH_W / 2;
+    const cy = benchY + BENCH_H / 2;
+    return { row, index: i + 1, x: (cx / VIEW_W) * CANVAS_W, y: (cy / VIEW_H) * CANVAS_H };
+  })
+);
+
+export function nearestBay(x: number, y: number): Bay {
+  let best = BAYS[0];
+  let bestDist = Infinity;
+  for (const bay of BAYS) {
+    const d = (bay.x - x) ** 2 + (bay.y - y) ** 2;
+    if (d < bestDist) {
+      bestDist = d;
+      best = bay;
+    }
+  }
+  return best;
+}
+
+export function bayLabel(bay: Pick<Bay, "row" | "index">): string {
+  return `Bay ${bay.row}${bay.index}`;
+}
