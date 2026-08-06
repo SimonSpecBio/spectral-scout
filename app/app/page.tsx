@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, facilityMapObjects, pestEvents, treatments } from "@/db/schema";
+import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
+import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { requireGrowerSession } from "@/lib/session";
 import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
+import MapLensSwitcher, { type BayLensEntry } from "./MapLensSwitcher";
 import PressureGraph from "./PressureGraph";
-import PressureHeatmapPlaceholder from "./PressureHeatmapPlaceholder";
 
 // Next.js's Router Cache can reuse a cached render for this route on a
 // search-params-only navigation (e.g. clicking a different site pill),
@@ -96,14 +98,27 @@ export default async function HomePage({
   const resolvedToday = events.filter((e) => e.status === "resolved" && e.resolvedAt && isToday(e.resolvedAt));
 
   const eventSignals = await computeEventSignals(active.map((e) => e.id));
+
+  // Trap spikes needing confirmation -- deduped alerts (an open event
+  // already tracks this pest+zone) don't get a second, competing card here;
+  // they're still visible from the trap's own row on the Traps screen.
+  const trapAlerts = (await computeTrapAlerts(session.organizationId!)).filter((a) => !a.dedupedIntoEventId);
+  const trapAlertAreaIds = [...new Set(trapAlerts.map((a) => a.facilityAreaId))];
+  const trapAlertAreas = trapAlertAreaIds.length
+    ? await db.select().from(facilityAreas).where(inArray(facilityAreas.id, trapAlertAreaIds))
+    : [];
+  const trapAreaNameById = new Map(trapAlertAreas.map((a) => [a.id, a.name]));
+
   // Attention Required: real exceptions, not a generic list -- an overdue
-  // follow-up, or an active event whose density is trending up (computed
-  // from real monitoring session history, not a guess).
+  // follow-up, an active event whose density is trending up (computed from
+  // real monitoring session history, not a guess), or a trap over its
+  // per-pest threshold awaiting a scout's confirmation.
   const attention = [
     ...todaysFollowUps.map((e) => ({ kind: "followup" as const, event: e })),
     ...active
       .filter((e) => eventSignals.get(e.id)?.trend === "up" && (e.severity === "high" || e.severity === "severe"))
       .map((e) => ({ kind: "trending" as const, event: e })),
+    ...trapAlerts.map((a) => ({ kind: "trap" as const, alert: a })),
   ].slice(0, 4);
 
   const orgTreatments = await db
@@ -141,6 +156,7 @@ export default async function HomePage({
 
   let desktopMapSection: React.ReactNode = null;
   let heatmapEvents: { x: number; y: number; severity: "low" | "moderate" | "high" | "severe" }[] = [];
+  let bayLensEntries: BayLensEntry[] = [];
   if (areas.length === 0) {
     desktopMapSection = (
       <div className="card p-6 text-[var(--text-dim)]">
@@ -163,6 +179,14 @@ export default async function HomePage({
     heatmapEvents = areaPestEvents
       .filter((ev) => ev.status === "active" && ev.x != null && ev.y != null)
       .map((ev) => ({ x: ev.x!, y: ev.y!, severity: ev.severity }));
+
+    const bayLensStats = await computeBayLensStats(selectedArea.id);
+    bayLensEntries = [...bayLensStats.entries()].map(([key, s]) => ({
+      key,
+      lastScoutedAt: s.lastScoutedAt ? s.lastScoutedAt.toISOString() : null,
+      avgTempF: s.avgTempF,
+      avgHumidityPct: s.avgHumidityPct,
+    }));
 
     desktopMapSection = (
       <div className="flex flex-col gap-3">
@@ -245,7 +269,7 @@ export default async function HomePage({
       </div>
 
       <div className="sm:hidden">
-        <PressureHeatmapPlaceholder events={heatmapEvents} />
+        <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
       </div>
       <div className="hidden sm:block">{desktopMapSection}</div>
 
@@ -257,18 +281,40 @@ export default async function HomePage({
           <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing needs attention right now.</div>
         ) : (
           <div className="card flex flex-col divide-y divide-[var(--border)]">
-            {attention.map(({ kind, event: e }) => (
-              <Link key={`${kind}-${e.id}`} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="flex items-center gap-3 p-3.5">
+            {attention.map((item) => {
+              if (item.kind === "trap") {
+                const a = item.alert;
+                return (
+                  <Link
+                    key={`trap-${a.trapId}`}
+                    href={`/app/new-event?facility=${a.facilityId}&area=${a.facilityAreaId}`}
+                    className="flex items-center gap-3 p-3.5"
+                  >
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <div className="flex-1">
+                      <div className="text-sm">{a.trapLabel} spike &mdash; confirm {a.pestSpecies}?</div>
+                      <div className="label-mono">
+                        {(trapAreaNameById.get(a.facilityAreaId) ?? "").toUpperCase()} &middot; {a.catchPerDay.toFixed(1)}/DAY
+                      </div>
+                    </div>
+                    <span className="text-[var(--text-faint)]">›</span>
+                  </Link>
+                );
+              }
+              const e = item.event;
+              return (
+              <Link key={`${item.kind}-${e.id}`} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="flex items-center gap-3 p-3.5">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
                 <div className="flex-1">
-                  <div className="text-sm capitalize">{kind === "followup" ? `${e.pestSpecies} recheck overdue` : `${e.pestSpecies} trending up`}</div>
+                  <div className="text-sm capitalize">{item.kind === "followup" ? `${e.pestSpecies} recheck overdue` : `${e.pestSpecies} trending up`}</div>
                   <div className="label-mono">
-                    {(e.areaName ?? e.facilityName).toUpperCase()} &middot; {kind === "followup" ? relativeTime(e.createdAt) : e.severity.toUpperCase()}
+                    {(e.areaName ?? e.facilityName).toUpperCase()} &middot; {item.kind === "followup" ? relativeTime(e.createdAt) : e.severity.toUpperCase()}
                   </div>
                 </div>
                 <span className="text-[var(--text-faint)]">›</span>
               </Link>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

@@ -49,6 +49,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .values({
       organizationId: session.organizationId!,
       facilityAreaId: event.facilityAreaId,
+      // Inherits the parent event's own pin -- the location is already
+      // known, no reason to make a scout re-place it for a follow-up.
+      x: event.x,
+      y: event.y,
       submittedByUserId: session.user!.id!,
       date: new Date().toISOString().slice(0, 10),
       promotedPestEventId: eventId,

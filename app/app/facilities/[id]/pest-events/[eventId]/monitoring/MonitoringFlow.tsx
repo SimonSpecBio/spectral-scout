@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { aggregateLeafGrid, emptyLeafGrid, type LeafState, type PlantLeaves } from "@/lib/density";
+import LocationPlacement from "../../../../../LocationPlacement";
 
 const POSITIONS = ["Top", "Middle", "Bottom"] as const;
 const CYCLE: LeafState[] = ["unchecked", "absent", "low", "medium", "high"];
@@ -29,10 +30,16 @@ export default function MonitoringFlow({
   postUrl,
   redirectHref,
   isPilotTier,
+  capturesLocation,
 }: {
   postUrl: string;
   redirectHref: string;
   isPilotTier: boolean;
+  // Event-scoped monitoring inherits the parent event's own pin server-side
+  // (the location is already known -- see the monitoring POST route), so
+  // only the general/unlinked flow needs to ask. Optional, same as temp/
+  // humidity: a quick walkthrough is never blocked on placing a pin.
+  capturesLocation?: boolean;
 }) {
   const router = useRouter();
   const draftKey = `scout-monitoring-draft:${postUrl}`;
@@ -62,6 +69,7 @@ export default function MonitoringFlow({
   const [notes, setNotes] = useState(typeof draft?.notes === "string" ? draft.notes : "");
   const [satisfaction, setSatisfaction] = useState<number | null>(typeof draft?.satisfaction === "number" ? draft.satisfaction : null);
   const [submitting, setSubmitting] = useState(false);
+  const [placingLocation, setPlacingLocation] = useState(false);
 
   // Autosave -- this write is a side effect on an external system
   // (localStorage), which is exactly what effects are for; no setState here.
@@ -92,8 +100,7 @@ export default function MonitoringFlow({
     setTempUnit(u);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitSession(x: number | null, y: number | null) {
     setSubmitting(true);
     const avgTempF = temp === "" ? null : tempUnit === "F" ? temp : Math.round((temp * 9) / 5 + 32);
     const res = await fetch(postUrl, {
@@ -110,6 +117,8 @@ export default function MonitoringFlow({
         plantHealthFlag: plantHealth,
         notes: notes || null,
         satisfactionRating: isPilotTier ? satisfaction : null,
+        x,
+        y,
       }),
     });
     if (res.ok) {
@@ -117,7 +126,29 @@ export default function MonitoringFlow({
       router.push(redirectHref);
     } else {
       setSubmitting(false);
+      setPlacingLocation(false);
     }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    // Location is optional -- skip straight to submitting if this session
+    // doesn't capture one (event-scoped monitoring inherits the event's own
+    // pin server-side instead).
+    if (capturesLocation) {
+      setPlacingLocation(true);
+    } else {
+      submitSession(null, null);
+    }
+  }
+
+  if (placingLocation) {
+    return (
+      <LocationPlacement
+        onConfirm={(x, y) => submitSession(x, y)}
+        onCancel={() => setPlacingLocation(false)}
+      />
+    );
   }
 
   return (
@@ -308,7 +339,7 @@ export default function MonitoringFlow({
         disabled={submitting}
         className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[#0B1626] disabled:opacity-50"
       >
-        {submitting ? "Submitting…" : "Submit session"}
+        {submitting ? "Submitting…" : capturesLocation ? "Continue to place location" : "Submit session"}
       </button>
       <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
     </form>

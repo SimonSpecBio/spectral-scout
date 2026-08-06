@@ -29,6 +29,20 @@
       "when": 1785973094754,
       "tag": "0003_brainy_the_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785979974296,
+      "tag": "0004_gorgeous_dragon_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786043552802,
+      "tag": "0005_little_meltdown",
+      "breakpoints": true
     }
   ]
 }

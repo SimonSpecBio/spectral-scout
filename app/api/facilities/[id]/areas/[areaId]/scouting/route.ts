@@ -24,7 +24,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .where(and(eq(facilityAreas.id, areaId), eq(facilityAreas.facilityId, id)));
   if (!area) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const parsed = parseMonitoringPayload(await request.json());
+  const body = await request.json();
+  const parsed = parseMonitoringPayload(body);
   if (!parsed) return NextResponse.json({ error: "sampleSize and pestCount are required" }, { status: 400 });
 
   const [row] = await db
@@ -32,6 +33,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .values({
       organizationId: session.organizationId!,
       facilityAreaId: areaId,
+      // Optional, same as temp/humidity -- a quick walkthrough shouldn't be
+      // blocked on placing a pin (see db/schema.ts's comment on x/y).
+      x: typeof body.x === "number" ? body.x : null,
+      y: typeof body.y === "number" ? body.y : null,
       submittedByUserId: session.user!.id!,
       date: new Date().toISOString().slice(0, 10),
       ...parsed,

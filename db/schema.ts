@@ -213,6 +213,15 @@ export const scoutingObservations = pgTable("scout_observation", {
   facilityAreaId: uuid("facility_area_id")
     .notNull()
     .references(() => facilityAreas.id, { onDelete: "cascade" }),
+  // Bay-keyed, same dropped-pin convention as pestEvents.x/y -- this is what
+  // makes the dashboard map's Last scouted/Temp/Humidity lenses possible
+  // (ARCHITECTURE.md ยง7: "samples are bay-keyed"). Nullable: an event-linked
+  // monitoring session inherits its parent event's x/y automatically (the
+  // location is already known -- see the monitoring POST route), and a
+  // general session's location stays optional the same way temp/humidity
+  // already are, so a quick walkthrough is never blocked on placing a pin.
+  x: numeric("x", { mode: "number" }),
+  y: numeric("y", { mode: "number" }),
   submittedByUserId: uuid("submitted_by_user_id").notNull(),
   date: date("date", { mode: "string" }).notNull(),
   assessmentType: assessmentTypeEnum("assessment_type").notNull().default("pest_count"),
@@ -260,4 +269,70 @@ export const treatments = pgTable("scout_treatment", {
   operatorUserId: uuid("operator_user_id"),
   appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
   notes: text("notes"),
+}).enableRLS();
+
+// ---------------------------------------------------------------------------
+// Sticky traps
+// ---------------------------------------------------------------------------
+
+// A trap is a persistent, located object -- unlike a scouting observation
+// (one-off session) or a pest event (an infestation), a trap sits in one
+// spot in the facility indefinitely and accumulates a reading history over
+// time. Location reuses the exact same raw (x, y) canvas-space convention as
+// pestEvents (see that table's comment) for the same reason: a dropped pin,
+// not a hard FK to a drawn bench, so resizing/deleting map objects can't
+// orphan a trap. label is grower-facing ("Trap 1"), auto-numbered per area
+// at creation time but editable.
+export const traps = pgTable("scout_trap", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  facilityId: uuid("facility_id")
+    .notNull()
+    .references(() => facilities.id, { onDelete: "cascade" }),
+  facilityAreaId: uuid("facility_area_id")
+    .notNull()
+    .references(() => facilityAreas.id, { onDelete: "cascade" }),
+  x: numeric("x", { mode: "number" }).notNull(),
+  y: numeric("y", { mode: "number" }).notNull(),
+  label: text("label").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+// One row per trap per check -- count + daysDeployed (since the trap was
+// last reset/checked) is what a grower actually reads off a sticky card;
+// catch-per-day is derived from these two at read time (lib/trap-alerts.ts)
+// rather than stored, so there's no derived column that can drift out of
+// sync with its inputs. pestSpecies is chosen once per reading *session*
+// (a grower checks a whole trap network for one target pest in a pass, per
+// the "Log trap readings" flow), not stored on the trap itself, since the
+// same physical trap can be read for different pests over its life.
+export const trapReadings = pgTable("scout_trap_reading", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  trapId: uuid("trap_id")
+    .notNull()
+    .references(() => traps.id, { onDelete: "cascade" }),
+  pestSpecies: text("pest_species").notNull(),
+  count: integer("count").notNull(),
+  daysDeployed: integer("days_deployed").notNull(),
+  submittedByUserId: uuid("submitted_by_user_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+// Per-pest catch/day threshold, org-configurable -- answers "should
+// over-threshold be a global switch or per-pest": per-pest, keyed by
+// species name (case-insensitive match, see lib/trap-alerts.ts), because
+// some pests are naturally spiky on traps (thrips, fungus gnats swing with
+// weather/vent cycles) where a fixed low threshold would flood Attention
+// Required with noise, while others are rare enough that any catch is a
+// real signal. No UI writes this table yet in v1 (a sensible default
+// constant covers species with no row -- see DEFAULT_CATCH_PER_DAY_THRESHOLD
+// in lib/trap-alerts.ts) but nothing in the model blocks adding a settings
+// screen for it later.
+export const trapThresholds = pgTable("scout_trap_threshold", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  pestSpecies: text("pest_species").notNull(),
+  catchPerDayThreshold: numeric("catch_per_day_threshold", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
