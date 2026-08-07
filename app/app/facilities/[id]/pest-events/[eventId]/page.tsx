@@ -72,7 +72,13 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
           sampleSize: s.sampleSize ?? 0,
           pestCount: s.pestCount ?? 0,
         }))}
-        inventoryItems={items.map((i) => ({ id: i.id, name: i.name, unit: i.unit, quantity: Number(i.quantity) }))}
+        inventoryItems={items.map((i) => ({
+          id: i.id,
+          name: i.name,
+          unit: i.unit,
+          quantity: Number(i.quantity),
+          reorderLevel: i.reorderLevel == null ? null : Number(i.reorderLevel),
+        }))}
       />
     </div>
   );

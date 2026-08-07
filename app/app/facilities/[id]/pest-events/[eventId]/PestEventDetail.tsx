@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { sparkPoints } from "@/lib/density";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import RecommendationsPanel from "./RecommendationsPanel";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
@@ -50,7 +51,7 @@ const SEVERITY_COLOR: Record<Severity, string> = {
   high: "#e0553d",
   severe: "#a3193d",
 };
-const TABS = ["timeline", "treatments", "photos", "monitoring", "notes"] as const;
+const TABS = ["timeline", "recommended", "treatments", "photos", "monitoring", "notes"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function PestEventDetail({
@@ -70,7 +71,7 @@ export default function PestEventDetail({
   initialTreatments: Treatment[];
   initialPhotos: Photo[];
   initialMonitoring: MonitoringSession[];
-  inventoryItems: { id: string; name: string; unit: string; quantity: number }[];
+  inventoryItems: { id: string; name: string; unit: string; quantity: number; reorderLevel: number | null }[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("timeline");
@@ -267,6 +268,15 @@ export default function PestEventDetail({
             </Link>
           )}
         </div>
+      )}
+
+      {tab === "recommended" && (
+        <RecommendationsPanel
+          facilityId={facilityId}
+          eventId={event.id}
+          pestSpecies={event.pestSpecies}
+          inventory={inventoryItems.map((i) => ({ name: i.name, quantity: i.quantity, reorderLevel: i.reorderLevel ?? null }))}
+        />
       )}
 
       {tab === "treatments" && (
