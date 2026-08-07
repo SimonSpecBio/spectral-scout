@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { markEngaged } from "@/lib/pwa-engagement";
 import LocationPlacement from "../LocationPlacement";
+import SpeciesPicker from "../SpeciesPicker";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 const SEVERITIES: Severity[] = ["low", "moderate", "high", "severe"];
@@ -11,6 +12,7 @@ const SEVERITIES: Severity[] = ["low", "moderate", "high", "severe"];
 export default function NewEventForm({ facilityId, areaId }: { facilityId: string; areaId: string }) {
   const router = useRouter();
   const [species, setSpecies] = useState("");
+  const [scientificName, setScientificName] = useState<string | null>(null);
   const [severity, setSeverity] = useState<Severity>("moderate");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -21,7 +23,7 @@ export default function NewEventForm({ facilityId, areaId }: { facilityId: strin
     const res = await fetch(`/api/facilities/${facilityId}/pest-events`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ facilityAreaId: areaId, pestSpecies: species, severity, notes, x, y }),
+      body: JSON.stringify({ facilityAreaId: areaId, pestSpecies: species, scientificName, severity, notes, x, y }),
     });
     if (res.ok) {
       const row = await res.json();
@@ -45,13 +47,14 @@ export default function NewEventForm({ facilityId, areaId }: { facilityId: strin
       }}
       className="card flex flex-col gap-3 p-4"
     >
-      <input
-        autoFocus
+      <SpeciesPicker
+        kind="pest"
         value={species}
-        onChange={(e) => setSpecies(e.target.value)}
+        onChange={(name, latin) => {
+          setSpecies(name);
+          setScientificName(latin);
+        }}
         placeholder="Pest species (e.g. spider mites)"
-        required
-        className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
       />
       <div className="flex gap-2">
         {SEVERITIES.map((s) => (

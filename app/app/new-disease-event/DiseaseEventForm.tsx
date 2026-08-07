@@ -12,6 +12,7 @@ import {
 } from "@/lib/disease";
 import { markEngaged } from "@/lib/pwa-engagement";
 import LocationPlacement from "../LocationPlacement";
+import SpeciesPicker from "../SpeciesPicker";
 
 const POSITIONS = ["Bot", "Mid", "Top"] as const;
 // Same fills as the reference design: transparent/dashed for unassessed,
@@ -113,12 +114,15 @@ export default function DiseaseEventForm({
       <div className="flex flex-col gap-2">
         <span className="label-mono">Species</span>
         <div className="flex flex-col gap-2 rounded-xl border border-[var(--border-soft)] p-3.5" style={{ background: "#111c2e" }}>
-          <input
-            autoFocus
+          <SpeciesPicker
+            kind="pathogen"
             value={commonName}
-            onChange={(e) => setCommonName(e.target.value)}
+            onChange={(name, latin) => {
+              setCommonName(name);
+              if (latin) setScientificName(latin);
+            }}
             placeholder="Powdery mildew"
-            className="bg-transparent text-sm outline-none placeholder:text-[var(--text-faint)]"
+            bare
           />
           <input
             value={scientificName}

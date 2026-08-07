@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import SpeciesPicker from "../SpeciesPicker";
 
 function Stepper({ value, onChange, min = 0 }: { value: number; onChange: (v: number) => void; min?: number }) {
   return (
@@ -79,14 +80,7 @@ export default function LogTrapReadingsForm({
       <div className="card flex flex-col gap-3 p-4">
         <label className="flex flex-col gap-1 text-sm">
           Species
-          <input
-            autoFocus
-            value={species}
-            onChange={(e) => setSpecies(e.target.value)}
-            placeholder="Whitefly"
-            required
-            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2"
-          />
+          <SpeciesPicker kind="pest" value={species} onChange={(name) => setSpecies(name)} placeholder="Whitefly" />
         </label>
 
         <div className="flex flex-col gap-1">
