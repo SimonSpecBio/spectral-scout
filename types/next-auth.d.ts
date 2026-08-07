@@ -8,6 +8,9 @@ declare module "next-auth" {
     role: "staff" | "grower" | null;
     organizationId: string | null;
     accountTier: "general" | "pilot" | null;
+    // "owner" doubles as SCHEDULING.md's "manager" role (team invites/removal,
+    // task assignment); "member" as "scout". See scout_membership's comment.
+    membershipRole: "owner" | "member" | null;
     user: DefaultSession["user"];
   }
 }

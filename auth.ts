@@ -5,7 +5,7 @@ import Google from "next-auth/providers/google";
 import Nodemailer from "next-auth/providers/nodemailer";
 import { db } from "@/db";
 import { accounts, sessions, users, verificationTokens } from "@/db/auth-schema";
-import { memberships, organizations, staff } from "@/db/schema";
+import { invites, memberships, organizations, staff } from "@/db/schema";
 
 // Same static-allowlist pattern as spectral-ops/spectral-rnd/spectral-pilot's
 // staff side -- internal Spectral team only.
@@ -79,6 +79,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.role = "staff";
         session.organizationId = null;
         session.accountTier = null;
+        session.membershipRole = null;
         return session;
       }
 
@@ -87,25 +88,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.role = "staff";
         session.organizationId = null;
         session.accountTier = null;
+        session.membershipRole = null;
         return session;
       }
 
       let [membership] = await db.select().from(memberships).where(eq(memberships.userId, userId));
       if (!membership) {
-        const [org] = await db
-          .insert(organizations)
-          .values({ name: session.user?.name || email, accountTier: "general" })
-          .returning();
-        [membership] = await db
-          .insert(memberships)
-          .values({ userId, organizationId: org.id, role: "owner" })
-          .returning();
+        // A pending invite (see /app/team) takes priority over the normal
+        // self-serve path -- this email was invited to an existing org, so
+        // join that org at the invited role instead of provisioning a
+        // brand-new one. Consumed once: delete the invite so a later
+        // duplicate invite (or re-invite after removal) starts fresh.
+        const [invite] = await db.select().from(invites).where(eq(invites.email, email));
+        if (invite) {
+          [membership] = await db
+            .insert(memberships)
+            .values({ userId, organizationId: invite.organizationId, role: invite.role })
+            .returning();
+          await db.delete(invites).where(eq(invites.id, invite.id));
+        } else {
+          const [org] = await db
+            .insert(organizations)
+            .values({ name: session.user?.name || email, accountTier: "general" })
+            .returning();
+          [membership] = await db
+            .insert(memberships)
+            .values({ userId, organizationId: org.id, role: "owner" })
+            .returning();
+        }
       }
 
       const [org] = await db.select().from(organizations).where(eq(organizations.id, membership.organizationId));
       session.role = "grower";
       session.organizationId = membership.organizationId;
       session.accountTier = org?.accountTier ?? "general";
+      session.membershipRole = membership.role;
       return session;
     },
   },

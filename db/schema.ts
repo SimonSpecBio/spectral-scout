@@ -48,10 +48,12 @@ export const organizations = pgTable("scout_organization", {
 
 export const membershipRoleEnum = pgEnum("scout_membership_role", ["owner", "member"]);
 
-// One row per (user, org). v1 is effectively 1 user = 1 org (nothing in the
-// app UI supports inviting a second member yet), but modeling it as a join
-// table now means adding multi-user orgs later is a UI change, not a schema
-// migration + data backfill.
+// One row per (user, org) -- real multi-user orgs now (team invites below),
+// not just a join table modeled ahead of need. "owner" doubles as
+// SCHEDULING.md's "manager" role (can assign/reassign tasks, invite/remove
+// members) and "member" as "scout" (own tasks + shared read-only schedule) --
+// deliberately not a separate role column, since the two concepts are the
+// same permission split under different names.
 export const memberships = pgTable("scout_membership", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull(),
@@ -59,6 +61,23 @@ export const memberships = pgTable("scout_membership", {
     .notNull()
     .references(() => organizations.id, { onDelete: "cascade" }),
   role: membershipRoleEnum("role").notNull().default("owner"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+// A pending team invite -- an email with no scout_user row yet (they've
+// never signed in). Consumed by auth.ts's session callback on that email's
+// first sign-in: instead of the normal self-serve path (new org, owner
+// role), it joins the inviting org at the invited role and deletes itself.
+// Keyed by email, not userId, since the whole point is the person doesn't
+// have an account yet.
+export const invites = pgTable("scout_invite", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: membershipRoleEnum("role").notNull().default("member"),
+  invitedByUserId: uuid("invited_by_user_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
@@ -139,6 +158,53 @@ export const facilityMapObjects = pgTable("scout_facility_map_object", {
   zIndex: integer("z_index").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+// ---------------------------------------------------------------------------
+// Inventory: beneficials, biopesticides, chemical products
+// ---------------------------------------------------------------------------
+
+export const inventoryCategoryEnum = pgEnum("scout_inventory_category", ["beneficial", "biopesticide", "chemical"]);
+
+// Org-wide, not per-facility -- v1 IPM orgs on this app run effectively one
+// operation (see scout_membership's comment: "1 user = 1 org" today), and a
+// shared stock pool matches how a single grower actually manages product
+// across whatever facilities they have. Revisit if/when the app needs to
+// support an org with genuinely separate stock rooms per site.
+export const inventoryItems = pgTable("scout_inventory_item", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  category: inventoryCategoryEnum("category").notNull(),
+  name: text("name").notNull(),
+  scientificName: text("scientific_name"),
+  unit: text("unit").notNull(), // "units", "L", "kg" -- freeform, set by the catalog entry or a custom add
+  quantity: numeric("quantity", { mode: "number" }).notNull().default(0),
+  reorderLevel: numeric("reorder_level", { mode: "number" }), // null = never flagged low
+  reiHours: integer("rei_hours"), // chemical only
+  phiDays: integer("phi_days"), // chemical only
+  // Safety notes carried over from the catalog entry (e.g. "never combine
+  // with oils within ~2 weeks") -- surfaced when adding/using the item
+  // rather than discarded after the add flow, given how directly
+  // treatments.json ties these to real application-safety risk.
+  cautions: text("cautions"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+// A pending restock -- separate from inventoryItems.quantity so "on order"
+// can show supplier/ETA without touching on-hand stock until it actually
+// arrives (see the orders/[orderId]/receive route, which deletes the row
+// and adds its quantity to the item in one action).
+export const inventoryOrders = pgTable("scout_inventory_order", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  itemId: uuid("item_id")
+    .notNull()
+    .references(() => inventoryItems.id, { onDelete: "cascade" }),
+  quantity: numeric("quantity", { mode: "number" }).notNull(),
+  supplier: text("supplier"),
+  expectedAt: date("expected_at", { mode: "string" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
 // ---------------------------------------------------------------------------
@@ -263,12 +329,30 @@ export const treatments = pgTable("scout_treatment", {
     .notNull()
     .references(() => facilities.id, { onDelete: "cascade" }),
   pestEventId: uuid("pest_event_id").references(() => pestEvents.id, { onDelete: "set null" }),
+  // Dropped pin, same convention as pestEvents/scoutingObservations --
+  // only set for a *standalone* treatment (no pestEventId, e.g. a routine
+  // biocontrol release with no infestation behind it). An event-scoped
+  // treatment inherits its parent event's x/y at read time instead (see
+  // lib/rei-phi.ts) rather than duplicating it here.
+  x: numeric("x", { mode: "number" }),
+  y: numeric("y", { mode: "number" }),
   type: treatmentTypeEnum("type").notNull(),
   product: text("product"),
   targetPest: text("target_pest"),
+  // Links to the real stock record when the product was picked from
+  // Inventory (vs. typed freehand) -- this is what lets applying a
+  // treatment decrement stock and, for a chemical with REI/PHI set on its
+  // item, start the re-entry/harvest countdowns (lib/rei-phi.ts).
+  inventoryItemId: uuid("inventory_item_id").references(() => inventoryItems.id, { onDelete: "set null" }),
+  quantityUsed: numeric("quantity_used", { mode: "number" }),
   operatorUserId: uuid("operator_user_id"),
   appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
   notes: text("notes"),
+  // Labor tracking -- an "Application log" per ARCHITECTURE.md's create
+  // sheet captures time spent same as a completed Task does (see
+  // scout_task.minutesSpent's comment on why this stays operation-owned,
+  // not pooled into any cross-org aggregate).
+  minutesSpent: integer("minutes_spent"),
 }).enableRLS();
 
 // ---------------------------------------------------------------------------
@@ -334,5 +418,64 @@ export const trapThresholds = pgTable("scout_trap_threshold", {
     .references(() => organizations.id, { onDelete: "cascade" }),
   pestSpecies: text("pest_species").notNull(),
   catchPerDayThreshold: numeric("catch_per_day_threshold", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+// ---------------------------------------------------------------------------
+// Scheduling & tasks
+// ---------------------------------------------------------------------------
+
+// scout | monitor | release | treatment | trap_read | sulfur | sanitation |
+// test | other -- per SCHEDULING.md's Task object.
+export const taskTypeEnum = pgEnum("scout_task_type", [
+  "scout",
+  "monitor",
+  "release",
+  "treatment",
+  "trap_read",
+  "sulfur",
+  "sanitation",
+  "test",
+  "other",
+]);
+// manual (a person created it) | auto_program (generated from a treatment
+// program's follow-up cadence) | auto_trigger (e.g. a trap-spike watchdog).
+// Only "manual" is actually produced yet -- the recommendation engine that
+// would apply a program and spawn auto_program tasks is deliberately not
+// built this pass (see lib/inventory-catalog.ts's comment on why), but the
+// column exists now so that doesn't require a migration later.
+export const taskSourceEnum = pgEnum("scout_task_source", ["manual", "auto_program", "auto_trigger"]);
+// "overdue" is deliberately not a stored state -- it's dueAt < now on an
+// "open" task, computed at read time (lib/tasks.ts) so it's never stale.
+export const taskStatusEnum = pgEnum("scout_task_status", ["open", "done", "snoozed"]);
+
+export const tasks = pgTable("scout_task", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  type: taskTypeEnum("type").notNull().default("other"),
+  facilityId: uuid("facility_id").references(() => facilities.id, { onDelete: "cascade" }),
+  facilityAreaId: uuid("facility_area_id").references(() => facilityAreas.id, { onDelete: "set null" }),
+  // Optional -- a routine scout route or trap-read task has no infestation
+  // behind it. When set, the task detail screen can show the linked event
+  // and "complete" can route into that event's monitoring flow.
+  pestEventId: uuid("pest_event_id").references(() => pestEvents.id, { onDelete: "set null" }),
+  // Matched-by-value against scout_user.id, not a real FK -- same
+  // convention as scout_membership.userId and scout_treatment.operatorUserId
+  // (see those tables' comments). Null assignee = unassigned, manager triage.
+  assigneeUserId: uuid("assignee_user_id"),
+  createdByUserId: uuid("created_by_user_id"),
+  source: taskSourceEnum("source").notNull().default("manual"),
+  dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+  repeatEveryDays: integer("repeat_every_days"),
+  status: taskStatusEnum("status").notNull().default("open"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  completedByUserId: uuid("completed_by_user_id"),
+  // Labor tracking (SCHEDULING.md ยง"Time tracking on completion") --
+  // operation-owned data, visible only to that operation's managers, never
+  // shared to any cross-org aggregate at this granularity (DATA_CONSENT.md).
+  minutesSpent: integer("minutes_spent"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();

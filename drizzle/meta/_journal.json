@@ -43,6 +43,20 @@
       "when": 1786043552802,
       "tag": "0005_little_meltdown",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786049589901,
+      "tag": "0006_conscious_blue_shield",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786054466392,
+      "tag": "0008_light_shiva",
+      "breakpoints": true
     }
   ]
 }
