@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
+import CountsFlow from "../CountsFlow";
+import MethodChoice from "../MethodChoice";
 import MonitoringFlow from "../facilities/[id]/pest-events/[eventId]/monitoring/MonitoringFlow";
 
 // Routine scouting, reached from the global "+" -- pick a site and area,
@@ -11,12 +13,12 @@ import MonitoringFlow from "../facilities/[id]/pest-events/[eventId]/monitoring/
 export default async function NewObservationPage({
   searchParams,
 }: {
-  searchParams: Promise<{ facility?: string; area?: string }>;
+  searchParams: Promise<{ facility?: string; area?: string; method?: string }>;
 }) {
   const session = await requireGrowerSession();
   if (!session) return null;
 
-  const { facility: facilityId, area: areaId } = await searchParams;
+  const { facility: facilityId, area: areaId, method } = await searchParams;
 
   const orgFacilities = await db
     .select()
@@ -82,15 +84,23 @@ export default async function NewObservationPage({
     );
   }
 
+  if (!method) {
+    return <MethodChoice baseHref={`/app/new-observation?facility=${facilityId}&area=${areaId}`} />;
+  }
+
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">New observation</h1>
-      <MonitoringFlow
-        postUrl={`/api/facilities/${facilityId}/areas/${areaId}/scouting`}
-        redirectHref="/app"
-        isPilotTier={session.accountTier === "pilot"}
-        capturesLocation
-      />
+      {method === "counts" ? (
+        <CountsFlow postUrl={`/api/facilities/${facilityId}/areas/${areaId}/scouting`} redirectHref="/app" capturesLocation />
+      ) : (
+        <MonitoringFlow
+          postUrl={`/api/facilities/${facilityId}/areas/${areaId}/scouting`}
+          redirectHref="/app"
+          isPilotTier={session.accountTier === "pilot"}
+          capturesLocation
+        />
+      )}
     </div>
   );
 }
