@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { eventKindEnum, pestEvents, severityEnum } from "@/db/schema";
+import { eventKindEnum, facilityAreas, pestEvents, severityEnum } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -37,11 +37,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const severity = severityEnum.enumValues.includes(body.severity) ? body.severity : "moderate";
   const kind = eventKindEnum.enumValues.includes(body.kind) ? body.kind : "pest";
 
+  // Client-supplied and only type-checked below otherwise -- verify it
+  // actually belongs to this facility before trusting it, same reasoning
+  // as every other cross-referenced id fixed this pass (an unowned area id
+  // would otherwise leak another org's area name into this event's views).
+  let facilityAreaId: string | null = null;
+  if (typeof body.facilityAreaId === "string") {
+    const [area] = await db
+      .select()
+      .from(facilityAreas)
+      .where(and(eq(facilityAreas.id, body.facilityAreaId), eq(facilityAreas.facilityId, id)));
+    if (area) facilityAreaId = area.id;
+  }
+
   const [row] = await db
     .insert(pestEvents)
     .values({
       facilityId: id,
-      facilityAreaId: typeof body.facilityAreaId === "string" ? body.facilityAreaId : null,
+      facilityAreaId,
       mapObjectId: typeof body.mapObjectId === "string" ? body.mapObjectId : null,
       x: typeof body.x === "number" ? body.x : null,
       y: typeof body.y === "number" ? body.y : null,
