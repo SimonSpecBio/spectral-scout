@@ -462,6 +462,16 @@ export const tasks = pgTable("scout_task", {
   // behind it. When set, the task detail screen can show the linked event
   // and "complete" can route into that event's monitoring flow.
   pestEventId: uuid("pest_event_id").references(() => pestEvents.id, { onDelete: "set null" }),
+  // Bay-keyed, inherited from pestEventId when linked (same "inherit the
+  // parent event's pin" convention as scout_treatment.x/y) -- what lets
+  // task creation check "is this bay under an active REI restriction right
+  // now" (SCHEDULING.md: chemical treatments "block entry/harvest-type
+  // tasks on that bay until cleared"). A manually created task with no
+  // linked event has no bay, so it isn't blockable this way -- a known,
+  // disclosed gap rather than a half-built location picker bolted onto the
+  // task form for a v1 pass.
+  x: numeric("x", { mode: "number" }),
+  y: numeric("y", { mode: "number" }),
   // Matched-by-value against scout_user.id, not a real FK -- same
   // convention as scout_membership.userId and scout_treatment.operatorUserId
   // (see those tables' comments). Null assignee = unassigned, manager triage.

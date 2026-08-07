@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { taskTypeEnum, tasks } from "@/db/schema";
+import { pestEvents, taskTypeEnum, tasks } from "@/db/schema";
+import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
+import { computeRestrictions } from "@/lib/rei-phi";
 import { requireGrowerSession } from "@/lib/session";
 
 export async function GET() {
@@ -26,6 +28,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "title and dueAt are required" }, { status: 400 });
   }
   const type = taskTypeEnum.enumValues.includes(body.type) ? body.type : "other";
+  const facilityId = typeof body.facilityId === "string" ? body.facilityId : null;
+  const pestEventId = typeof body.pestEventId === "string" ? body.pestEventId : null;
+
+  // Inherits the linked event's own pin, same convention as treatments --
+  // only a linked task can be bay-checked against an active REI
+  // restriction (see db/schema.ts's comment on scout_task.x/y).
+  let x: number | null = null;
+  let y: number | null = null;
+  if (pestEventId) {
+    const [event] = await db.select().from(pestEvents).where(eq(pestEvents.id, pestEventId));
+    if (event) {
+      x = event.x;
+      y = event.y;
+    }
+  }
+
+  if (facilityId && x != null && y != null) {
+    const restrictions = await computeRestrictions(facilityId);
+    const bay = bayLabel(nearestBay(x, y));
+    const blocking = restrictions.find((r) => r.bay === bay && r.reiActive);
+    if (blocking) {
+      return NextResponse.json(
+        { error: `${bay} is under an active REI restriction (${blocking.product}) -- no entry until it clears.` },
+        { status: 409 }
+      );
+    }
+  }
 
   const [row] = await db
     .insert(tasks)
@@ -33,9 +62,11 @@ export async function POST(request: NextRequest) {
       organizationId: session.organizationId!,
       title,
       type,
-      facilityId: typeof body.facilityId === "string" ? body.facilityId : null,
+      facilityId,
       facilityAreaId: typeof body.facilityAreaId === "string" ? body.facilityAreaId : null,
-      pestEventId: typeof body.pestEventId === "string" ? body.pestEventId : null,
+      pestEventId,
+      x,
+      y,
       assigneeUserId: typeof body.assigneeUserId === "string" ? body.assigneeUserId : null,
       createdByUserId: session.user!.id!,
       source: "manual",

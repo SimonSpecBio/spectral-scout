@@ -30,12 +30,14 @@ export default function NewTaskForm({
   const [dueAt, setDueAt] = useState(localDateTimeInputDefault());
   const [repeatEveryDays, setRepeatEveryDays] = useState<number | "">("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const eventsForFacility = events.filter((e) => e.facilityId === facilityId);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
+    setError(null);
     const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -52,6 +54,8 @@ export default function NewTaskForm({
     if (res.ok) {
       router.push("/app/schedule");
     } else {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error ?? "Couldn't assign task.");
       setSubmitting(false);
     }
   }
@@ -178,6 +182,8 @@ export default function NewTaskForm({
           ))}
         </div>
       </div>
+
+      {error && <div className="text-sm text-[var(--accent)]">{error}</div>}
 
       <button
         type="submit"
