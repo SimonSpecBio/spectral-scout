@@ -2,7 +2,7 @@ import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { facilityAreas, observationPhotos, scoutingObservations, treatments } from "@/db/schema";
+import { facilityAreas, inventoryItems, observationPhotos, scoutingObservations, treatments } from "@/db/schema";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
@@ -29,6 +29,7 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
     .from(scoutingObservations)
     .where(eq(scoutingObservations.promotedPestEventId, eventId))
     .orderBy(desc(scoutingObservations.createdAt));
+  const items = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
 
   return (
     <div className="flex flex-col gap-6">
@@ -71,6 +72,7 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
           sampleSize: s.sampleSize ?? 0,
           pestCount: s.pestCount ?? 0,
         }))}
+        inventoryItems={items.map((i) => ({ id: i.id, name: i.name, unit: i.unit, quantity: Number(i.quantity) }))}
       />
     </div>
   );

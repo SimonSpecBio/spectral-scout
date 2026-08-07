@@ -59,6 +59,7 @@ export default function PestEventDetail({
   initialTreatments,
   initialPhotos,
   initialMonitoring,
+  inventoryItems,
 }: {
   facilityId: string;
   event: Event;
@@ -67,6 +68,7 @@ export default function PestEventDetail({
   initialTreatments: Treatment[];
   initialPhotos: Photo[];
   initialMonitoring: MonitoringSession[];
+  inventoryItems: { id: string; name: string; unit: string; quantity: number }[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("timeline");
@@ -77,10 +79,14 @@ export default function PestEventDetail({
   const [savingNotes, setSavingNotes] = useState(false);
 
   const [treatmentType, setTreatmentType] = useState<TreatmentType>("biological");
+  const [inventoryItemId, setInventoryItemId] = useState("");
   const [product, setProduct] = useState("");
+  const [quantityUsed, setQuantityUsed] = useState<number | "">("");
+  const [minutesSpent, setMinutesSpent] = useState<number | "">("");
   const [treatmentNotes, setTreatmentNotes] = useState("");
   const [submittingTreatment, setSubmittingTreatment] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const selectedItem = inventoryItems.find((i) => i.id === inventoryItemId);
 
   const base = `/api/facilities/${facilityId}/pest-events/${event.id}`;
 
@@ -113,13 +119,24 @@ export default function PestEventDetail({
     const res = await fetch(`${base}/treatments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: treatmentType, product, notes: treatmentNotes }),
+      body: JSON.stringify({
+        type: treatmentType,
+        inventoryItemId: inventoryItemId || null,
+        product: selectedItem?.name ?? product,
+        quantityUsed: quantityUsed === "" ? null : quantityUsed,
+        minutesSpent: minutesSpent === "" ? null : minutesSpent,
+        notes: treatmentNotes,
+      }),
     });
     if (res.ok) {
       const row = await res.json();
       setTreatmentsList((prev) => [row, ...prev]);
+      setInventoryItemId("");
       setProduct("");
+      setQuantityUsed("");
+      setMinutesSpent("");
       setTreatmentNotes("");
+      router.refresh();
     }
     setSubmittingTreatment(false);
   }
@@ -258,12 +275,52 @@ export default function PestEventDetail({
                 </button>
               ))}
             </div>
-            <input
-              value={product}
-              onChange={(e) => setProduct(e.target.value)}
-              placeholder="Product (e.g. Beauveria bassiana)"
-              className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-            />
+            {inventoryItems.length > 0 && (
+              <select
+                value={inventoryItemId}
+                onChange={(e) => setInventoryItemId(e.target.value)}
+                className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+              >
+                <option value="" style={{ background: "var(--surface)" }}>
+                  Product (not from inventory)
+                </option>
+                {inventoryItems.map((i) => (
+                  <option key={i.id} value={i.id} style={{ background: "var(--surface)" }}>
+                    {i.name} ({i.quantity} {i.unit} in stock)
+                  </option>
+                ))}
+              </select>
+            )}
+            {!inventoryItemId && (
+              <input
+                value={product}
+                onChange={(e) => setProduct(e.target.value)}
+                placeholder="Product (e.g. Beauveria bassiana)"
+                className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+              />
+            )}
+            <div className="flex gap-2">
+              {inventoryItemId && (
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  value={quantityUsed}
+                  onChange={(e) => setQuantityUsed(e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="Qty used"
+                  className="w-28 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+                />
+              )}
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={minutesSpent}
+                onChange={(e) => setMinutesSpent(e.target.value === "" ? "" : Number(e.target.value))}
+                placeholder="Minutes spent"
+                className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+              />
+            </div>
             <input
               value={treatmentNotes}
               onChange={(e) => setTreatmentNotes(e.target.value)}

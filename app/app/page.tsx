@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { facilities, facilityAreas, facilityMapObjects, pestEvents, tasks, treatments } from "@/db/schema";
+import { facilities, facilityAreas, facilityMapObjects, inventoryItems, pestEvents, tasks, treatments } from "@/db/schema";
 import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
 import { taskUrgency } from "@/lib/tasks";
@@ -122,16 +122,26 @@ export default async function HomePage({
     : [];
   const trapAreaNameById = new Map(trapAlertAreas.map((a) => [a.id, a.name]));
 
+  // "Treatment logged -> decrement InventoryItem; if now below reorderLevel,
+  // raise low-stock notification" (ARCHITECTURE.md's trigger rules) -- no
+  // separate notification feed exists yet, so this surfaces the same way
+  // every other exception does: as an Attention Required card, computed
+  // live from quantity vs reorderLevel rather than a stored alert.
+  const orgInventory = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
+  const lowStockItems = orgInventory.filter((i) => i.reorderLevel != null && Number(i.quantity) <= Number(i.reorderLevel));
+
   // Attention Required: real exceptions, not a generic list -- an overdue
   // follow-up, an active event whose density is trending up (computed from
-  // real monitoring session history, not a guess), or a trap over its
-  // per-pest threshold awaiting a scout's confirmation.
+  // real monitoring session history, not a guess), a trap over its
+  // per-pest threshold awaiting a scout's confirmation, or an inventory
+  // item at/below its reorder level.
   const attention = [
     ...todaysFollowUps.map((e) => ({ kind: "followup" as const, event: e })),
     ...active
       .filter((e) => eventSignals.get(e.id)?.trend === "up" && (e.severity === "high" || e.severity === "severe"))
       .map((e) => ({ kind: "trending" as const, event: e })),
     ...trapAlerts.map((a) => ({ kind: "trap" as const, alert: a })),
+    ...lowStockItems.map((i) => ({ kind: "lowstock" as const, item: i })),
   ].slice(0, 4);
 
   const orgTreatments = await db
@@ -308,6 +318,21 @@ export default async function HomePage({
                       <div className="text-sm">{a.trapLabel} spike &mdash; confirm {a.pestSpecies}?</div>
                       <div className="label-mono">
                         {(trapAreaNameById.get(a.facilityAreaId) ?? "").toUpperCase()} &middot; {a.catchPerDay.toFixed(1)}/DAY
+                      </div>
+                    </div>
+                    <span className="text-[var(--text-faint)]">›</span>
+                  </Link>
+                );
+              }
+              if (item.kind === "lowstock") {
+                const i = item.item;
+                return (
+                  <Link key={`lowstock-${i.id}`} href="/app/inventory" className="flex items-center gap-3 p-3.5">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <div className="flex-1">
+                      <div className="text-sm">{i.name} low stock</div>
+                      <div className="label-mono">
+                        {Number(i.quantity)} {i.unit === "units" ? "" : i.unit} LEFT · REORDER
                       </div>
                     </div>
                     <span className="text-[var(--text-faint)]">›</span>
