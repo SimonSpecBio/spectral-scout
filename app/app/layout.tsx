@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { requireGrowerSession } from "@/lib/session";
 import BottomNav from "./BottomNav";
 import HeaderMenu from "./HeaderMenu";
+import InstallPrompt from "./InstallPrompt";
+import OfflineQueueBadge from "./OfflineQueueBadge";
 import Sidebar from "./Sidebar";
 
 // Same lg breakpoint drives both halves of the responsive nav split
@@ -30,6 +32,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {children}
       </div>
       <BottomNav />
+      <OfflineQueueBadge />
+      <InstallPrompt />
     </div>
   );
 }

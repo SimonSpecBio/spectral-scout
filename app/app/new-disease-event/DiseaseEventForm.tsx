@@ -10,6 +10,7 @@ import {
   type DiseaseClass,
   type DiseaseLeaves,
 } from "@/lib/disease";
+import { markEngaged } from "@/lib/pwa-engagement";
 import LocationPlacement from "../LocationPlacement";
 
 const POSITIONS = ["Bot", "Mid", "Top"] as const;
@@ -91,6 +92,7 @@ export default function DiseaseEventForm({
       });
     }
 
+    markEngaged();
     router.push(`/app/facilities/${facilityId}/pest-events/${event.id}`);
   }
 

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { sparkPoints } from "@/lib/density";
+import { queuedFetch } from "@/lib/offline-queue";
+import { markEngaged } from "@/lib/pwa-engagement";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
@@ -85,6 +87,7 @@ export default function PestEventDetail({
   const [minutesSpent, setMinutesSpent] = useState<number | "">("");
   const [treatmentNotes, setTreatmentNotes] = useState("");
   const [submittingTreatment, setSubmittingTreatment] = useState(false);
+  const [treatmentQueued, setTreatmentQueued] = useState(false);
   const [uploading, setUploading] = useState(false);
   const selectedItem = inventoryItems.find((i) => i.id === inventoryItemId);
 
@@ -116,27 +119,36 @@ export default function PestEventDetail({
   async function applyTreatment(e: React.FormEvent) {
     e.preventDefault();
     setSubmittingTreatment(true);
-    const res = await fetch(`${base}/treatments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    setTreatmentQueued(false);
+    const result = await queuedFetch(
+      `${base}/treatments`,
+      {
         type: treatmentType,
         inventoryItemId: inventoryItemId || null,
         product: selectedItem?.name ?? product,
         quantityUsed: quantityUsed === "" ? null : quantityUsed,
         minutesSpent: minutesSpent === "" ? null : minutesSpent,
         notes: treatmentNotes,
-      }),
-    });
-    if (res.ok) {
-      const row = await res.json();
-      setTreatmentsList((prev) => [row, ...prev]);
+      },
+      "Treatment"
+    );
+    if (result.ok) {
+      markEngaged();
+      // Queued offline: the server hasn't created the row yet, so there's
+      // nothing real to prepend to the list -- it'll show up once the
+      // queue syncs and this page is next loaded. Show a brief confirmation
+      // instead of a fake optimistic row.
+      if (result.queued) {
+        setTreatmentQueued(true);
+      } else if (result.data) {
+        setTreatmentsList((prev) => [result.data as Treatment, ...prev]);
+        router.refresh();
+      }
       setInventoryItemId("");
       setProduct("");
       setQuantityUsed("");
       setMinutesSpent("");
       setTreatmentNotes("");
-      router.refresh();
     }
     setSubmittingTreatment(false);
   }
@@ -327,13 +339,16 @@ export default function PestEventDetail({
               placeholder="Rate, area, notes..."
               className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
             />
-            <button
-              type="submit"
-              disabled={submittingTreatment}
-              className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#0B1626] disabled:opacity-50"
-            >
-              {submittingTreatment ? "Saving…" : "Save"}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={submittingTreatment}
+                className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+              >
+                {submittingTreatment ? "Saving…" : "Save"}
+              </button>
+              {treatmentQueued && <span className="text-xs text-[var(--text-dim)]">Saved offline — will sync</span>}
+            </div>
           </form>
 
           <div className="card flex flex-col divide-y divide-[var(--border)]">

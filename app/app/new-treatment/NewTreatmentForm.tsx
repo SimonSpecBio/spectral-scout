@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { queuedFetch } from "@/lib/offline-queue";
+import { markEngaged } from "@/lib/pwa-engagement";
 import LocationPlacement from "../LocationPlacement";
 
 const TYPES = ["biological", "pesticide", "spectral_light"] as const;
@@ -27,10 +29,9 @@ export default function NewTreatmentForm({
 
   async function submit(x: number, y: number) {
     setSubmitting(true);
-    const res = await fetch(`/api/facilities/${facilityId}/treatments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const result = await queuedFetch(
+      `/api/facilities/${facilityId}/treatments`,
+      {
         type,
         inventoryItemId: inventoryItemId || null,
         product: selectedItem?.name ?? null,
@@ -40,9 +41,11 @@ export default function NewTreatmentForm({
         notes: notes || null,
         x,
         y,
-      }),
-    });
-    if (res.ok) {
+      },
+      "Application log"
+    );
+    if (result.ok) {
+      markEngaged();
       router.push("/app/rei-phi");
     } else {
       setSubmitting(false);

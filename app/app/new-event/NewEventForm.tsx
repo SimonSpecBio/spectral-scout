@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { markEngaged } from "@/lib/pwa-engagement";
 import LocationPlacement from "../LocationPlacement";
 
 type Severity = "low" | "moderate" | "high" | "severe";
@@ -24,6 +25,7 @@ export default function NewEventForm({ facilityId, areaId }: { facilityId: strin
     });
     if (res.ok) {
       const row = await res.json();
+      markEngaged();
       router.push(`/app/facilities/${facilityId}/pest-events/${row.id}`);
     } else {
       setSubmitting(false);

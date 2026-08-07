@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { aggregateLeafGrid, emptyLeafGrid, type LeafState, type PlantLeaves } from "@/lib/density";
+import { queuedFetch } from "@/lib/offline-queue";
+import { markEngaged } from "@/lib/pwa-engagement";
 import LocationPlacement from "../../../../../LocationPlacement";
 
 const POSITIONS = ["Top", "Middle", "Bottom"] as const;
@@ -103,10 +105,9 @@ export default function MonitoringFlow({
   async function submitSession(x: number | null, y: number | null) {
     setSubmitting(true);
     const avgTempF = temp === "" ? null : tempUnit === "F" ? temp : Math.round((temp * 9) / 5 + 32);
-    const res = await fetch(postUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const result = await queuedFetch(
+      postUrl,
+      {
         sampleSize: agg.leavesChecked,
         pestCount: agg.leavesInfested,
         leafGrid: grid,
@@ -119,9 +120,11 @@ export default function MonitoringFlow({
         satisfactionRating: isPilotTier ? satisfaction : null,
         x,
         y,
-      }),
-    });
-    if (res.ok) {
+      },
+      "Scouting log"
+    );
+    if (result.ok) {
+      markEngaged();
       localStorage.removeItem(draftKey);
       router.push(redirectHref);
     } else {

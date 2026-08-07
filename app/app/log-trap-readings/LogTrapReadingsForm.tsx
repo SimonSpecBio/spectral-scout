@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { queuedFetch } from "@/lib/offline-queue";
+import { markEngaged } from "@/lib/pwa-engagement";
 
 function Stepper({ value, onChange, min = 0 }: { value: number; onChange: (v: number) => void; min?: number }) {
   return (
@@ -54,16 +56,17 @@ export default function LogTrapReadingsForm({
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const res = await fetch(`/api/facilities/${facilityId}/areas/${areaId}/traps/readings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const result = await queuedFetch(
+      `/api/facilities/${facilityId}/areas/${areaId}/traps/readings`,
+      {
         pestSpecies: species,
         daysDeployed,
         readings: traps.map((t) => ({ trapId: t.id, count: counts[t.id] ?? 0 })),
-      }),
-    });
-    if (res.ok) {
+      },
+      "Trap reading"
+    );
+    if (result.ok) {
+      markEngaged();
       router.push(`/app/traps?facility=${facilityId}&area=${areaId}`);
     } else {
       setSubmitting(false);
