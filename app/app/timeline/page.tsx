@@ -1,128 +1,101 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { facilities, facilityAreas, pestEvents, treatments } from "@/db/schema";
+import { getOrgLogEntries, KIND_COLOR } from "@/lib/logs";
 import { requireGrowerSession } from "@/lib/session";
 
-// See app/app/page.tsx's identical export for why: without this, the
-// facility=-only navigation here can reuse a cached render instead of
-// re-querying.
 export const dynamic = "force-dynamic";
 
-function relativeTime(date: Date): string {
-  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  return `${days} days ago`;
+const SCOPES = [
+  { value: "all", label: "Whole org" },
+  { value: "events", label: "Events" },
+  { value: "treatments", label: "Treatments" },
+] as const;
+
+function dayLabel(date: Date): string {
+  const now = new Date();
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((startOfDay(now).getTime() - startOfDay(date).getTime()) / 86_400_000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
-interface Entry {
-  label: string;
-  sub: string;
-  facilityId: string;
-  eventId: string;
-  at: Date;
-}
-
-// Chronological, cross-facility by default -- "what happened here this
-// month," not "what do I need to do" (Today) or "scan everything" (Events).
-export default async function TimelinePage({ searchParams }: { searchParams: Promise<{ facility?: string }> }) {
+// Org-wide narrative activity stream (19_timeline.svg) -- distinct from
+// Logs (13), which is the filterable audit/compliance record. Same merged
+// entries (lib/logs.ts), different framing: a scrollable rail, not a
+// filter-heavy table.
+export default async function TimelinePage({ searchParams }: { searchParams: Promise<{ scope?: string }> }) {
   const session = await requireGrowerSession();
   if (!session) return null;
 
-  const { facility: facilityFilter } = await searchParams;
+  const { scope = "all" } = await searchParams;
+  const entries = await getOrgLogEntries(session.organizationId!);
+  const filtered =
+    scope === "events"
+      ? entries.filter((e) => e.kind === "finding" || e.kind === "disease")
+      : scope === "treatments"
+        ? entries.filter((e) => e.kind === "action")
+        : entries;
 
-  const orgFacilities = await db
-    .select()
-    .from(facilities)
-    .where(eq(facilities.organizationId, session.organizationId!));
-
-  const events = await db
-    .select({
-      id: pestEvents.id,
-      pestSpecies: pestEvents.pestSpecies,
-      createdAt: pestEvents.createdAt,
-      resolvedAt: pestEvents.resolvedAt,
-      facilityId: pestEvents.facilityId,
-      facilityName: facilities.name,
-      areaName: facilityAreas.name,
-    })
-    .from(pestEvents)
-    .innerJoin(facilities, eq(pestEvents.facilityId, facilities.id))
-    .leftJoin(facilityAreas, eq(pestEvents.facilityAreaId, facilityAreas.id))
-    .where(eq(facilities.organizationId, session.organizationId!));
-
-  const orgTreatments = await db
-    .select({
-      pestEventId: treatments.pestEventId,
-      type: treatments.type,
-      appliedAt: treatments.appliedAt,
-    })
-    .from(treatments)
-    .innerJoin(facilities, eq(treatments.facilityId, facilities.id))
-    .where(eq(facilities.organizationId, session.organizationId!));
-
-  const treatmentsByEvent = new Map<string, typeof orgTreatments>();
-  for (const t of orgTreatments) {
-    if (!t.pestEventId) continue;
-    treatmentsByEvent.set(t.pestEventId, [...(treatmentsByEvent.get(t.pestEventId) ?? []), t]);
+  const grouped = new Map<string, typeof filtered>();
+  for (const e of filtered) {
+    const key = dayLabel(e.at);
+    grouped.set(key, [...(grouped.get(key) ?? []), e]);
   }
 
-  const locationOf = (e: (typeof events)[number]) =>
-    orgFacilities.length > 1 && e.areaName ? `${e.areaName}, ${e.facilityName}` : (e.areaName ?? e.facilityName);
-
-  let entries: Entry[] = events.flatMap((e) => {
-    const loc = locationOf(e);
-    const list: Entry[] = [{ label: `${e.pestSpecies} detected`, sub: loc, facilityId: e.facilityId, eventId: e.id, at: e.createdAt }];
-    for (const t of treatmentsByEvent.get(e.id) ?? []) {
-      list.push({ label: `${t.type.replace("_", " ")} applied -- ${e.pestSpecies}`, sub: loc, facilityId: e.facilityId, eventId: e.id, at: t.appliedAt });
-    }
-    if (e.resolvedAt) list.push({ label: `${e.pestSpecies} resolved`, sub: loc, facilityId: e.facilityId, eventId: e.id, at: e.resolvedAt });
-    return list;
-  });
-
-  if (facilityFilter) entries = entries.filter((e) => e.facilityId === facilityFilter);
-  entries.sort((a, b) => b.at.getTime() - a.at.getTime());
-
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">Timeline</h1>
 
-      {orgFacilities.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          <Link href="/app/timeline" className={`rounded-full px-3 py-1.5 text-sm ${!facilityFilter ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"}`}>
-            All sites
+      <div className="flex gap-2">
+        {SCOPES.map((s) => (
+          <Link
+            key={s.value}
+            href={`/app/timeline?scope=${s.value}`}
+            className={`rounded-full px-3 py-1.5 text-sm ${
+              scope === s.value ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+            }`}
+          >
+            {s.label}
           </Link>
-          {orgFacilities.map((f) => (
-            <Link
-              key={f.id}
-              href={`/app/timeline?facility=${f.id}`}
-              className={`rounded-full px-3 py-1.5 text-sm ${facilityFilter === f.id ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"}`}
-            >
-              {f.name}
-            </Link>
-          ))}
-        </div>
-      )}
+        ))}
+      </div>
 
-      {entries.length === 0 ? (
+      {grouped.size === 0 ? (
         <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing yet.</div>
       ) : (
-        <div className="card flex flex-col divide-y divide-[var(--border)]">
-          {entries.map((e, i) => (
-            <Link
-              key={i}
-              href={`/app/facilities/${e.facilityId}/pest-events/${e.eventId}`}
-              className="flex items-center justify-between px-4 py-3 text-sm hover:bg-[var(--surface-raised)]"
-            >
-              <span className="capitalize">
-                {e.label}
-                <span className="text-[var(--text-dim)]"> -- {e.sub}</span>
-              </span>
-              <span className="text-[var(--text-dim)]">{relativeTime(e.at)}</span>
-            </Link>
-          ))}
-        </div>
+        [...grouped.entries()].map(([day, dayEntries]) => (
+          <div key={day} className="flex flex-col gap-3">
+            <span className="label-mono">{day.toUpperCase()}</span>
+            <div className="flex flex-col">
+              {dayEntries.map((e, i) => {
+                const content = (
+                  <div className="flex gap-3">
+                    <div className="flex w-3 shrink-0 flex-col items-center">
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: KIND_COLOR[e.kind] }} />
+                      {i < dayEntries.length - 1 && <span className="mt-1 w-px flex-1" style={{ background: "var(--border-soft)" }} />}
+                    </div>
+                    <div className="flex flex-1 items-start justify-between pb-4">
+                      <div>
+                        <div className="text-sm">{e.label}</div>
+                        <div className="label-mono">
+                          {e.at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })} · {e.sub}
+                        </div>
+                      </div>
+                      {e.eventId && <span className="label-mono text-[var(--text-faint)]">PE-{e.eventId.slice(0, 4).toUpperCase()}</span>}
+                    </div>
+                  </div>
+                );
+                return e.facilityId && e.eventId ? (
+                  <Link key={i} href={`/app/facilities/${e.facilityId}/pest-events/${e.eventId}`}>
+                    {content}
+                  </Link>
+                ) : (
+                  <div key={i}>{content}</div>
+                );
+              })}
+            </div>
+          </div>
+        ))
       )}
     </div>
   );
