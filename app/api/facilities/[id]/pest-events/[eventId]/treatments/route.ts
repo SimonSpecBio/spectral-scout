@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "invalid type" }, { status: 400 });
   }
 
-  const row = await insertTreatmentAndDecrementStock({
+  const row = await insertTreatmentAndDecrementStock(session.organizationId!, {
     facilityId: id,
     pestEventId: eventId,
     // Inherits the parent event's own pin -- see db/schema.ts's comment on

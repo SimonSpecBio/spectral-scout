@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const y = typeof body.y === "number" ? body.y : null;
   if (x == null || y == null) return NextResponse.json({ error: "x and y are required" }, { status: 400 });
 
-  const row = await insertTreatmentAndDecrementStock({
+  const row = await insertTreatmentAndDecrementStock(session.organizationId!, {
     facilityId: id,
     pestEventId: null,
     x,
