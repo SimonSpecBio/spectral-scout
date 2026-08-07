@@ -272,22 +272,49 @@ export default async function HomePage({
     );
   }
 
+  // Multi-facility roll-up ("2 houses need attention" -- ARCHITECTURE.md's
+  // cross-cutting rules): a per-facility alert count on top of the
+  // existing switcher rather than a separate screen, since a grower
+  // running several sites needs this at the same glance as picking which
+  // one to look at, not one navigation away from it.
+  const activeCountByFacility = new Map<string, number>();
+  for (const e of active) {
+    activeCountByFacility.set(e.facilityId, (activeCountByFacility.get(e.facilityId) ?? 0) + 1);
+  }
+  const facilitiesNeedingAttention = orgFacilities.filter((f) => (activeCountByFacility.get(f.id) ?? 0) > 0).length;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         {orgFacilities.length > 1 ? (
-          <div className="flex flex-wrap gap-2">
-            {orgFacilities.map((f) => (
-              <Link
-                key={f.id}
-                href={`/app?facility=${f.id}`}
-                className={`rounded-full px-3 py-1.5 text-sm ${
-                  f.id === selectedFacility.id ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
-                }`}
-              >
-                {f.name}
-              </Link>
-            ))}
+          <div className="flex flex-col gap-2">
+            {facilitiesNeedingAttention > 0 && (
+              <span className="label-mono" style={{ color: "var(--accent)" }}>
+                {facilitiesNeedingAttention} of {orgFacilities.length} sites need attention
+              </span>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {orgFacilities.map((f) => {
+                const count = activeCountByFacility.get(f.id) ?? 0;
+                return (
+                  <Link
+                    key={f.id}
+                    href={`/app?facility=${f.id}`}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm ${
+                      f.id === selectedFacility.id ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+                    }`}
+                  >
+                    {count > 0 && (
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: f.id === selectedFacility.id ? "#0B1626" : "var(--accent)" }}
+                      />
+                    )}
+                    {f.name}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <span className="font-medium">{selectedFacility.name}</span>
