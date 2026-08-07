@@ -1,8 +1,10 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { pestEvents, taskTypeEnum, tasks } from "@/db/schema";
+import { facilityAreas, taskTypeEnum, tasks } from "@/db/schema";
+import { getOwnedFacility } from "@/lib/facilities";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
+import { getOwnedPestEvent } from "@/lib/pest-events";
 import { computeRestrictions } from "@/lib/rei-phi";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -28,21 +30,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "title and dueAt are required" }, { status: 400 });
   }
   const type = taskTypeEnum.enumValues.includes(body.type) ? body.type : "other";
-  const facilityId = typeof body.facilityId === "string" ? body.facilityId : null;
-  const pestEventId = typeof body.pestEventId === "string" ? body.pestEventId : null;
+  const rawFacilityId = typeof body.facilityId === "string" ? body.facilityId : null;
+  const rawPestEventId = typeof body.pestEventId === "string" ? body.pestEventId : null;
+  const rawFacilityAreaId = typeof body.facilityAreaId === "string" ? body.facilityAreaId : null;
+
+  // Every id below is client-supplied -- verify each actually belongs to
+  // the caller's org before trusting it for anything (storage, the REI
+  // check, or inheriting a location from it). Same ownership pattern every
+  // other nested route in this app already uses (getOwnedFacility/
+  // getOwnedPestEvent); this route just hadn't been checking it.
+  const facility = rawFacilityId ? await getOwnedFacility(rawFacilityId, session.organizationId!) : null;
+  if (rawFacilityId && !facility) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const facilityId = facility?.id ?? null;
+
+  const event = facilityId && rawPestEventId ? await getOwnedPestEvent(facilityId, rawPestEventId, session.organizationId!) : null;
+  if (rawPestEventId && !event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const pestEventId = event?.id ?? null;
+
+  let facilityAreaId: string | null = null;
+  if (facilityId && rawFacilityAreaId) {
+    const [area] = await db
+      .select()
+      .from(facilityAreas)
+      .where(and(eq(facilityAreas.id, rawFacilityAreaId), eq(facilityAreas.facilityId, facilityId)));
+    if (!area) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    facilityAreaId = area.id;
+  }
 
   // Inherits the linked event's own pin, same convention as treatments --
   // only a linked task can be bay-checked against an active REI
   // restriction (see db/schema.ts's comment on scout_task.x/y).
-  let x: number | null = null;
-  let y: number | null = null;
-  if (pestEventId) {
-    const [event] = await db.select().from(pestEvents).where(eq(pestEvents.id, pestEventId));
-    if (event) {
-      x = event.x;
-      y = event.y;
-    }
-  }
+  const x = event?.x ?? null;
+  const y = event?.y ?? null;
 
   if (facilityId && x != null && y != null) {
     const restrictions = await computeRestrictions(facilityId);
@@ -63,7 +82,7 @@ export async function POST(request: NextRequest) {
       title,
       type,
       facilityId,
-      facilityAreaId: typeof body.facilityAreaId === "string" ? body.facilityAreaId : null,
+      facilityAreaId,
       pestEventId,
       x,
       y,

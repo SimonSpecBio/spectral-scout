@@ -43,6 +43,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         facilityId: task.facilityId,
         facilityAreaId: task.facilityAreaId,
         pestEventId: task.pestEventId,
+        x: task.x,
+        y: task.y,
         assigneeUserId: task.assigneeUserId,
         createdByUserId: task.createdByUserId,
         source: task.source,

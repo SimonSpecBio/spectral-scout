@@ -115,9 +115,21 @@ export async function flushQueue(): Promise<void> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item.body),
       });
-      if (!res.ok) break; // still failing -- likely still offline, or a real error; stop rather than hammer the rest
+      if (res.ok) {
+        await removePending(item.id);
+        continue;
+      }
+      // A real HTTP error response (the server is reachable) means retrying
+      // this exact item later won't help -- same reasoning queuedFetch uses
+      // to not queue these in the first place. Drop it and keep going,
+      // rather than letting one permanently-broken item (e.g. a since-
+      // deleted area it referenced) block every item queued after it on
+      // every future flush.
       await removePending(item.id);
     } catch {
+      // A thrown fetch error means the network itself is the problem --
+      // stop here and retry the whole remaining queue on the next flush,
+      // in original order.
       break;
     }
   }
