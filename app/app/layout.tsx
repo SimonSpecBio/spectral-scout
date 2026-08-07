@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireGrowerSession } from "@/lib/session";
 import BottomNav from "./BottomNav";
@@ -26,6 +27,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Pilot program
               </span>
             )}
+            <Link href="/app/notifications" aria-label="Notifications" className="flex h-8 w-8 items-center justify-center text-[var(--text-faint)]">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+                <path
+                  d="M8.5 1.5c-2 0-3.5 1.6-3.5 3.6v2.4l-1 2.5h9l-1-2.5V5.1c0-2-1.5-3.6-3.5-3.6z"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinejoin="round"
+                />
+                <path d="M7 12.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </Link>
             <HeaderMenu email={session.user?.email} />
           </div>
         </header>
