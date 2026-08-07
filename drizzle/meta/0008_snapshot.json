@@ -1,6 +1,6 @@
 {
-  "id": "afea78dd-c4cd-4095-b40b-58bee0f1d9d7",
-  "prevId": "4cc2c8e2-97a7-40e8-aa94-8509f5dc6a72",
+  "id": "67b92ed5-5730-4929-84c9-82cf6902633a",
+  "prevId": "afea78dd-c4cd-4095-b40b-58bee0f1d9d7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -520,6 +520,65 @@
         "scout_membership_organization_id_scout_organization_id_fk": {
           "name": "scout_membership_organization_id_scout_organization_id_fk",
           "tableFrom": "scout_membership",
+          "tableTo": "scout_organization",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.scout_monitoring_threshold": {
+      "name": "scout_monitoring_threshold",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pest_species": {
+          "name": "pest_species",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "infested_pct_threshold": {
+          "name": "infested_pct_threshold",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "scout_monitoring_threshold_organization_id_scout_organization_id_fk": {
+          "name": "scout_monitoring_threshold_organization_id_scout_organization_id_fk",
+          "tableFrom": "scout_monitoring_threshold",
           "tableTo": "scout_organization",
           "columnsFrom": [
             "organization_id"

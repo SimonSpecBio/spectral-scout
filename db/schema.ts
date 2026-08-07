@@ -479,3 +479,22 @@ export const tasks = pgTable("scout_task", {
   minutesSpent: integer("minutes_spent"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
+
+// Per-pest infested/incidence % threshold -- the ThresholdEngine's
+// non-trap counterpart to scout_trap_threshold (see that table's comment
+// for why per-pest, org-configurable, not a single global switch). Plant
+// sampling, Counts, and disease assessment all converge on the same
+// sampleSize/pestCount shape (ARCHITECTURE.md ยง3's "convergence rule"),
+// so one metric (infested % = pestCount/sampleSize) covers all three --
+// no separate metric-type column needed. No UI writes this table yet;
+// DEFAULT_INFESTED_PCT_THRESHOLD in lib/threshold-engine.ts covers any
+// species with no row.
+export const monitoringThresholds = pgTable("scout_monitoring_threshold", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  pestSpecies: text("pest_species").notNull(),
+  infestedPctThreshold: numeric("infested_pct_threshold", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();

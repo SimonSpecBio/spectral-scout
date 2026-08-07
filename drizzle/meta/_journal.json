@@ -57,6 +57,13 @@
       "when": 1786054466392,
       "tag": "0008_light_shiva",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786068616978,
+      "tag": "0008_outstanding_yellow_claw",
+      "breakpoints": true
     }
   ]
 }

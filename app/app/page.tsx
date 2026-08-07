@@ -5,6 +5,7 @@ import { facilities, facilityAreas, facilityMapObjects, inventoryItems, pestEven
 import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
 import { taskUrgency } from "@/lib/tasks";
+import { computeMonitoringAlerts } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { requireGrowerSession } from "@/lib/session";
 import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
@@ -130,16 +131,26 @@ export default async function HomePage({
   const orgInventory = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
   const lowStockItems = orgInventory.filter((i) => i.reorderLevel != null && Number(i.quantity) <= Number(i.reorderLevel));
 
+  // ThresholdEngine (ARCHITECTURE.md ยง3): a real configured infested-%
+  // comparison, not the trend heuristic below -- excludes events the trend
+  // heuristic already surfaced so the same event doesn't show twice.
+  const trendingEventIds = new Set(
+    active.filter((e) => eventSignals.get(e.id)?.trend === "up" && (e.severity === "high" || e.severity === "severe")).map((e) => e.id)
+  );
+  const monitoringAlerts = (await computeMonitoringAlerts(session.organizationId!)).filter((a) => !trendingEventIds.has(a.eventId));
+
   // Attention Required: real exceptions, not a generic list -- an overdue
   // follow-up, an active event whose density is trending up (computed from
-  // real monitoring session history, not a guess), a trap over its
-  // per-pest threshold awaiting a scout's confirmation, or an inventory
-  // item at/below its reorder level.
+  // real monitoring session history, not a guess), an event over its
+  // configured per-pest threshold, a trap over its per-pest threshold
+  // awaiting a scout's confirmation, or an inventory item at/below its
+  // reorder level.
   const attention = [
     ...todaysFollowUps.map((e) => ({ kind: "followup" as const, event: e })),
     ...active
       .filter((e) => eventSignals.get(e.id)?.trend === "up" && (e.severity === "high" || e.severity === "severe"))
       .map((e) => ({ kind: "trending" as const, event: e })),
+    ...monitoringAlerts.map((a) => ({ kind: "threshold" as const, alert: a })),
     ...trapAlerts.map((a) => ({ kind: "trap" as const, alert: a })),
     ...lowStockItems.map((i) => ({ kind: "lowstock" as const, item: i })),
   ].slice(0, 4);
@@ -318,6 +329,25 @@ export default async function HomePage({
                       <div className="text-sm">{a.trapLabel} spike &mdash; confirm {a.pestSpecies}?</div>
                       <div className="label-mono">
                         {(trapAreaNameById.get(a.facilityAreaId) ?? "").toUpperCase()} &middot; {a.catchPerDay.toFixed(1)}/DAY
+                      </div>
+                    </div>
+                    <span className="text-[var(--text-faint)]">›</span>
+                  </Link>
+                );
+              }
+              if (item.kind === "threshold") {
+                const a = item.alert;
+                return (
+                  <Link
+                    key={`threshold-${a.eventId}`}
+                    href={`/app/facilities/${a.facilityId}/pest-events/${a.eventId}`}
+                    className="flex items-center gap-3 p-3.5"
+                  >
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <div className="flex-1">
+                      <div className="text-sm">{a.pestSpecies} over threshold</div>
+                      <div className="label-mono">
+                        {a.infestedPct}% INFESTED &middot; THRESHOLD {a.threshold}%
                       </div>
                     </div>
                     <span className="text-[var(--text-faint)]">›</span>
