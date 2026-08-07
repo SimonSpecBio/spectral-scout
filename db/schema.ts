@@ -281,7 +281,7 @@ export const scoutingObservations = pgTable("scout_observation", {
     .references(() => facilityAreas.id, { onDelete: "cascade" }),
   // Bay-keyed, same dropped-pin convention as pestEvents.x/y -- this is what
   // makes the dashboard map's Last scouted/Temp/Humidity lenses possible
-  // (ARCHITECTURE.md ยง7: "samples are bay-keyed"). Nullable: an event-linked
+  // (ARCHITECTURE.md section 7: "samples are bay-keyed"). Nullable: an event-linked
   // monitoring session inherits its parent event's x/y automatically (the
   // location is already known -- see the monitoring POST route), and a
   // general session's location stays optional the same way temp/humidity
@@ -473,7 +473,7 @@ export const tasks = pgTable("scout_task", {
   status: taskStatusEnum("status").notNull().default("open"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   completedByUserId: uuid("completed_by_user_id"),
-  // Labor tracking (SCHEDULING.md ยง"Time tracking on completion") --
+  // Labor tracking (SCHEDULING.md, section "Time tracking on completion") --
   // operation-owned data, visible only to that operation's managers, never
   // shared to any cross-org aggregate at this granularity (DATA_CONSENT.md).
   minutesSpent: integer("minutes_spent"),

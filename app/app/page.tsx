@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { facilities, facilityAreas, facilityMapObjects, pestEvents, treatments } from "@/db/schema";
+import { facilities, facilityAreas, facilityMapObjects, pestEvents, tasks, treatments } from "@/db/schema";
 import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
+import { taskUrgency } from "@/lib/tasks";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { requireGrowerSession } from "@/lib/session";
 import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
@@ -96,6 +97,18 @@ export default async function HomePage({
 
   const todaysFollowUps = active.filter((e) => needsFollowUp(e.createdAt));
   const resolvedToday = events.filter((e) => e.status === "resolved" && e.resolvedAt && isToday(e.resolvedAt));
+
+  // "Dashboard Today's Tasks is this same Task list filtered to assignee =
+  // me, due = today -- not a separate store" (SCHEDULING.md). Overdue tasks
+  // assigned to me surface here too, not just tasks due exactly today,
+  // since those are exactly what needs attention first.
+  const myOpenTasks = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.organizationId, session.organizationId!), eq(tasks.assigneeUserId, session.user!.id!), eq(tasks.status, "open")));
+  const myTasksToday = myOpenTasks
+    .filter((t) => isToday(t.dueAt) || taskUrgency(t) === "overdue")
+    .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
 
   const eventSignals = await computeEventSignals(active.map((e) => e.id));
 
@@ -320,11 +333,27 @@ export default async function HomePage({
       </section>
 
       <section className="flex flex-col gap-3">
-        <span className="label-mono">Today&apos;s tasks</span>
-        {todaysFollowUps.length === 0 && resolvedToday.length === 0 ? (
+        <div className="flex items-center justify-between">
+          <span className="label-mono">Today&apos;s tasks</span>
+          <Link href="/app/schedule" className="text-xs text-[var(--accent)]">
+            Schedule →
+          </Link>
+        </div>
+        {myTasksToday.length === 0 && todaysFollowUps.length === 0 && resolvedToday.length === 0 ? (
           <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing on the list today.</div>
         ) : (
           <div className="card flex flex-col gap-3 p-4">
+            {myTasksToday.map((t) => (
+              <Link key={t.id} href={`/app/schedule/${t.id}`} className="flex items-center gap-3">
+                <span
+                  className="h-4 w-4 shrink-0 rounded border"
+                  style={{ borderColor: taskUrgency(t) === "overdue" ? "var(--accent)" : "var(--text-faint)" }}
+                />
+                <span className="text-sm" style={taskUrgency(t) === "overdue" ? { color: "var(--accent)" } : undefined}>
+                  {t.title}
+                </span>
+              </Link>
+            ))}
             {todaysFollowUps.map((e) => (
               <Link key={e.id} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="flex items-center gap-3">
                 <span className="h-4 w-4 shrink-0 rounded border border-[var(--text-faint)]" />
