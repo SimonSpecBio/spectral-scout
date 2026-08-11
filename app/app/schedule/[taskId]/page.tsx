@@ -46,13 +46,22 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tas
         </div>
       </div>
 
+      {task.pestEventId && pestSpecies && task.type === "monitor" && task.status === "open" && (
+        <Link
+          href={`/app/facilities/${task.facilityId}/pest-events/${task.pestEventId}/monitoring?taskId=${task.id}`}
+          className="rounded-md bg-[var(--accent)] px-4 py-3 text-center text-sm font-medium text-[#0B1626]"
+        >
+          Start recheck
+        </Link>
+      )}
+
       {task.pestEventId && pestSpecies && (
         <Link
           href={`/app/facilities/${task.facilityId}/pest-events/${task.pestEventId}`}
           className="card flex items-center justify-between p-4"
         >
           <div>
-            <div className="text-sm">{pestSpecies}</div>
+            <div className="text-sm">View {pestSpecies} event</div>
             <div className="label-mono">{(pestEventStatus ?? "").toUpperCase()}</div>
           </div>
           <span className="text-[var(--text-faint)]">›</span>

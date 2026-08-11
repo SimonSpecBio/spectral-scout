@@ -33,6 +33,7 @@ export default function MonitoringFlow({
   redirectHref,
   isPilotTier,
   capturesLocation,
+  taskId,
 }: {
   postUrl: string;
   redirectHref: string;
@@ -42,6 +43,9 @@ export default function MonitoringFlow({
   // only the general/unlinked flow needs to ask. Optional, same as temp/
   // humidity: a quick walkthrough is never blocked on placing a pin.
   capturesLocation?: boolean;
+  // Set when fulfilling a specific scheduled task (see CountsFlow's
+  // comment) -- logging the session also completes that task.
+  taskId?: string;
 }) {
   const router = useRouter();
   const draftKey = `scout-monitoring-draft:${postUrl}`;
@@ -126,6 +130,13 @@ export default function MonitoringFlow({
     if (result.ok) {
       markEngaged();
       localStorage.removeItem(draftKey);
+      if (taskId) {
+        await fetch(`/api/tasks/${taskId}/complete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ minutesSpent: null }),
+        }).catch(() => {});
+      }
       router.push(redirectHref);
     } else {
       setSubmitting(false);

@@ -12,13 +12,13 @@ export default async function MonitoringPage({
   searchParams,
 }: {
   params: Promise<{ id: string; eventId: string }>;
-  searchParams: Promise<{ method?: string }>;
+  searchParams: Promise<{ method?: string; taskId?: string }>;
 }) {
   const session = await requireGrowerSession();
   if (!session) return null;
 
   const { id, eventId } = await params;
-  const { method } = await searchParams;
+  const { method, taskId } = await searchParams;
   const facility = await getOwnedFacility(id, session.organizationId!);
   if (!facility) notFound();
 
@@ -34,7 +34,9 @@ export default async function MonitoringPage({
         <Link href={redirectHref} className="text-sm text-[var(--text-dim)]">
           ← {event.pestSpecies}
         </Link>
-        <MethodChoice baseHref={`/app/facilities/${id}/pest-events/${eventId}/monitoring`} />
+        <MethodChoice
+          baseHref={`/app/facilities/${id}/pest-events/${eventId}/monitoring${taskId ? `?taskId=${taskId}` : ""}`}
+        />
       </div>
     );
   }
@@ -45,9 +47,9 @@ export default async function MonitoringPage({
         ← {event.pestSpecies}
       </Link>
       {method === "counts" ? (
-        <CountsFlow postUrl={postUrl} redirectHref={redirectHref} />
+        <CountsFlow postUrl={postUrl} redirectHref={redirectHref} taskId={taskId} />
       ) : (
-        <MonitoringFlow postUrl={postUrl} redirectHref={redirectHref} isPilotTier={session.accountTier === "pilot"} />
+        <MonitoringFlow postUrl={postUrl} redirectHref={redirectHref} isPilotTier={session.accountTier === "pilot"} taskId={taskId} />
       )}
     </div>
   );

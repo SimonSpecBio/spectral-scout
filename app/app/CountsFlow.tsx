@@ -16,10 +16,16 @@ export default function CountsFlow({
   postUrl,
   redirectHref,
   capturesLocation,
+  taskId,
 }: {
   postUrl: string;
   redirectHref: string;
   capturesLocation?: boolean;
+  // Set when this session is fulfilling a specific scheduled task (a
+  // "Recheck X -- Bay Y" task from the recommendation engine's follow-up
+  // cadence) -- logging the session also completes that task instead of
+  // leaving it dangling open for the grower to separately go mark done.
+  taskId?: string;
 }) {
   const router = useRouter();
   const [counts, setCounts] = useState<number[]>([0, 0, 0, 0, 0]);
@@ -43,6 +49,13 @@ export default function CountsFlow({
     );
     if (result.ok) {
       markEngaged();
+      if (taskId) {
+        await fetch(`/api/tasks/${taskId}/complete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ minutesSpent: null }),
+        }).catch(() => {});
+      }
       router.push(redirectHref);
     } else {
       setSubmitting(false);

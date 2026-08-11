@@ -187,7 +187,7 @@ export default function PestEventDetail({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-y-2">
         <div className="flex items-center gap-3">
           <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[event.severity] }} />
           <div>
@@ -217,7 +217,7 @@ export default function PestEventDetail({
       </div>
 
       {densities.length > 0 && (
-        <div className="card flex items-center gap-6 p-4">
+        <div className="card flex flex-col items-start gap-4 overflow-x-auto p-4 sm:flex-row sm:items-center sm:gap-6">
           <svg width={220} height={52} className="shrink-0">
             {(() => {
               const scaled = scaledPoints(densities, threshold, 220, 52);
@@ -240,7 +240,7 @@ export default function PestEventDetail({
               );
             })()}
           </svg>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap gap-6">
             <div>
               <div className="text-2xl font-semibold">{Math.round(latestDensity)}%</div>
               <div className="text-xs text-[var(--text-dim)]">latest infested</div>
@@ -261,12 +261,12 @@ export default function PestEventDetail({
         </div>
       )}
 
-      <div className="flex gap-4 border-b border-[var(--border)]">
+      <div className="flex gap-4 overflow-x-auto border-b border-[var(--border)]">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`border-b-2 px-1 pb-2 text-sm capitalize ${
+            className={`shrink-0 border-b-2 px-1 pb-2 text-sm capitalize ${
               tab === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text-dim)]"
             }`}
           >
