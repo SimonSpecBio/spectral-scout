@@ -11,7 +11,7 @@ import {
   type DiseaseLeaves,
 } from "@/lib/disease";
 import { markEngaged } from "@/lib/pwa-engagement";
-import LocationPlacement from "../LocationPlacement";
+import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import SpeciesPicker from "../SpeciesPicker";
 
 const POSITIONS = ["Bot", "Mid", "Top"] as const;
@@ -25,17 +25,7 @@ function cycle(cell: DiseaseClass | null): DiseaseClass | null {
   return (cell + 1) as DiseaseClass;
 }
 
-export default function DiseaseEventForm({
-  facilityId,
-  areaId,
-  facilityName,
-  areaName,
-}: {
-  facilityId: string;
-  areaId: string;
-  facilityName: string;
-  areaName: string;
-}) {
+export default function DiseaseEventForm({ facilities }: { facilities: PickerFacility[] }) {
   const router = useRouter();
   const [commonName, setCommonName] = useState("");
   const [scientificName, setScientificName] = useState("");
@@ -57,7 +47,7 @@ export default function DiseaseEventForm({
   // "Create disease event" opens the location placement screen instead of
   // submitting directly -- this is what actually finishes the submission,
   // once a real pin position exists.
-  async function handleConfirmLocation(x: number, y: number) {
+  async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
     const eventRes = await fetch(`/api/facilities/${facilityId}/pest-events`, {
       method: "POST",
@@ -98,7 +88,7 @@ export default function DiseaseEventForm({
   }
 
   if (placingLocation) {
-    return <LocationPlacement onConfirm={handleConfirmLocation} onCancel={() => setPlacingLocation(false)} />;
+    return <LocationPicker facilities={facilities} onConfirm={handleConfirmLocation} onCancel={() => setPlacingLocation(false)} />;
   }
 
   return (
@@ -130,17 +120,6 @@ export default function DiseaseEventForm({
             placeholder="Scientific name (optional)"
             className="bg-transparent text-xs italic text-[var(--text-dim)] outline-none placeholder:text-[var(--text-faint)] placeholder:not-italic"
           />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="label-mono">Location</span>
-        <div className="flex items-center gap-3 rounded-xl border border-[var(--border-soft)] p-3.5" style={{ background: "#111c2e" }}>
-          <span style={{ color: "var(--accent)" }}>&#128205;</span>
-          <div>
-            <div className="text-sm">{areaName}</div>
-            <div className="label-mono">{facilityName.toUpperCase()}</div>
-          </div>
         </div>
       </div>
 
@@ -217,7 +196,7 @@ export default function DiseaseEventForm({
       <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-5xl border-t border-[var(--border)] p-4" style={{ background: "var(--surface)" }}>
         <button
           onClick={() => setPlacingLocation(true)}
-          disabled={submitting || !commonName.trim()}
+          disabled={submitting || !commonName.trim() || facilities.length === 0}
           className="w-full rounded-xl py-3.5 text-sm font-medium disabled:opacity-50"
           style={{ background: "#25385a", border: "0.5px solid #37507a", color: "var(--text)" }}
         >

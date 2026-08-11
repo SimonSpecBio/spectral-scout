@@ -5,15 +5,9 @@ import { facilities, facilityAreas } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
 import NewEventForm from "./NewEventForm";
 
-export default async function NewEventPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ facility?: string; area?: string }>;
-}) {
+export default async function NewEventPage() {
   const session = await requireGrowerSession();
   if (!session) return null;
-
-  const { facility: facilityId, area: areaId } = await searchParams;
 
   const orgFacilities = await db
     .select()
@@ -35,54 +29,17 @@ export default async function NewEventPage({
     );
   }
 
-  if (!facilityId) {
-    return (
-      <div className="mx-auto flex max-w-md flex-col gap-4">
-        <h1 className="text-2xl font-semibold">New pest event</h1>
-        <div className="text-sm text-[var(--text-dim)]">Which site?</div>
-        {orgFacilities.map((f) => (
-          <Link key={f.id} href={`/app/new-event?facility=${f.id}`} className="card card-interactive p-4">
-            {f.name}
-          </Link>
-        ))}
-      </div>
-    );
-  }
-
-  const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, facilityId));
-
-  if (!areaId) {
-    if (areas.length === 0) {
-      return (
-        <div className="mx-auto flex max-w-md flex-col gap-4">
-          <h1 className="text-2xl font-semibold">New pest event</h1>
-          <div className="card p-6 text-sm text-[var(--text-dim)]">
-            This site has no areas yet.{" "}
-            <Link href={`/app/facilities/${facilityId}`} className="text-[var(--accent)]">
-              Add a room or greenhouse
-            </Link>{" "}
-            first.
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className="mx-auto flex max-w-md flex-col gap-4">
-        <h1 className="text-2xl font-semibold">New pest event</h1>
-        <div className="text-sm text-[var(--text-dim)]">Which area?</div>
-        {areas.map((a) => (
-          <Link key={a.id} href={`/app/new-event?facility=${facilityId}&area=${a.id}`} className="card card-interactive p-4">
-            {a.name}
-          </Link>
-        ))}
-      </div>
-    );
-  }
+  const allAreas = await db.select().from(facilityAreas);
+  const pickerFacilities = orgFacilities.map((f) => ({
+    id: f.id,
+    name: f.name,
+    areas: allAreas.filter((a) => a.facilityId === f.id).map((a) => ({ id: a.id, name: a.name })),
+  }));
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">New pest event</h1>
-      <NewEventForm facilityId={facilityId} areaId={areaId} />
+      <NewEventForm facilities={pickerFacilities} />
     </div>
   );
 }

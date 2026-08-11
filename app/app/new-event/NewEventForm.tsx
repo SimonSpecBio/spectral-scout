@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { markEngaged } from "@/lib/pwa-engagement";
-import LocationPlacement from "../LocationPlacement";
+import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import SpeciesPicker from "../SpeciesPicker";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 const SEVERITIES: Severity[] = ["low", "moderate", "high", "severe"];
 
-export default function NewEventForm({ facilityId, areaId }: { facilityId: string; areaId: string }) {
+export default function NewEventForm({ facilities }: { facilities: PickerFacility[] }) {
   const router = useRouter();
   const [species, setSpecies] = useState("");
   const [scientificName, setScientificName] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export default function NewEventForm({ facilityId, areaId }: { facilityId: strin
   const [submitting, setSubmitting] = useState(false);
   const [placingLocation, setPlacingLocation] = useState(false);
 
-  async function handleConfirmLocation(x: number, y: number) {
+  async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
     const res = await fetch(`/api/facilities/${facilityId}/pest-events`, {
       method: "POST",
@@ -36,7 +36,7 @@ export default function NewEventForm({ facilityId, areaId }: { facilityId: strin
   }
 
   if (placingLocation) {
-    return <LocationPlacement onConfirm={handleConfirmLocation} onCancel={() => setPlacingLocation(false)} />;
+    return <LocationPicker facilities={facilities} onConfirm={handleConfirmLocation} onCancel={() => setPlacingLocation(false)} />;
   }
 
   return (
@@ -78,7 +78,7 @@ export default function NewEventForm({ facilityId, areaId }: { facilityId: strin
       />
       <button
         type="submit"
-        disabled={submitting || !species.trim()}
+        disabled={submitting || !species.trim() || facilities.length === 0}
         className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#0B1626] disabled:opacity-50"
       >
         {submitting ? "Creating…" : "Continue to place location"}
