@@ -35,13 +35,25 @@ export default function LocationPicker({
   facilities,
   onConfirm,
   onCancel,
+  initialFacilityId,
+  initialAreaId,
 }: {
   facilities: PickerFacility[];
   onConfirm: (facilityId: string, areaId: string, x: number, y: number) => void;
   onCancel: () => void;
+  // Lets an entry point that already knows the site/area (a trap-spike
+  // alert's "confirm this pest event?" deep link, e.g.) skip straight past
+  // the swipe step instead of always starting at facilities[0] -- still
+  // just a starting point, not a lock: the picker is fully swipeable/
+  // reassignable from there same as any other visit.
+  initialFacilityId?: string;
+  initialAreaId?: string;
 }) {
-  const [facilityIdx, setFacilityIdx] = useState(0);
-  const [areaId, setAreaId] = useState<string | null>(facilities[0]?.areas[0]?.id ?? null);
+  const initialIdx = initialFacilityId ? facilities.findIndex((f) => f.id === initialFacilityId) : -1;
+  const [facilityIdx, setFacilityIdx] = useState(initialIdx >= 0 ? initialIdx : 0);
+  const [areaId, setAreaId] = useState<string | null>(
+    (initialIdx >= 0 && initialAreaId) || facilities[initialIdx >= 0 ? initialIdx : 0]?.areas[0]?.id || null
+  );
   const [selected, setSelected] = useState<Bay | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);

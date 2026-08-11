@@ -5,9 +5,15 @@ import { facilities, facilityAreas } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
 import NewEventForm from "./NewEventForm";
 
-export default async function NewEventPage() {
+export default async function NewEventPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ facility?: string; area?: string }>;
+}) {
   const session = await requireGrowerSession();
   if (!session) return null;
+
+  const { facility: presetFacilityId, area: presetAreaId } = await searchParams;
 
   const orgFacilities = await db
     .select()
@@ -39,7 +45,7 @@ export default async function NewEventPage() {
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">New pest event</h1>
-      <NewEventForm facilities={pickerFacilities} />
+      <NewEventForm facilities={pickerFacilities} presetFacilityId={presetFacilityId} presetAreaId={presetAreaId} />
     </div>
   );
 }

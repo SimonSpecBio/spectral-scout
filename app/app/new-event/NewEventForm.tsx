@@ -9,7 +9,15 @@ import SpeciesPicker from "../SpeciesPicker";
 type Severity = "low" | "moderate" | "high" | "severe";
 const SEVERITIES: Severity[] = ["low", "moderate", "high", "severe"];
 
-export default function NewEventForm({ facilities }: { facilities: PickerFacility[] }) {
+export default function NewEventForm({
+  facilities,
+  presetFacilityId,
+  presetAreaId,
+}: {
+  facilities: PickerFacility[];
+  presetFacilityId?: string;
+  presetAreaId?: string;
+}) {
   const router = useRouter();
   const [species, setSpecies] = useState("");
   const [scientificName, setScientificName] = useState<string | null>(null);
@@ -36,7 +44,15 @@ export default function NewEventForm({ facilities }: { facilities: PickerFacilit
   }
 
   if (placingLocation) {
-    return <LocationPicker facilities={facilities} onConfirm={handleConfirmLocation} onCancel={() => setPlacingLocation(false)} />;
+    return (
+      <LocationPicker
+        facilities={facilities}
+        initialFacilityId={presetFacilityId}
+        initialAreaId={presetAreaId}
+        onConfirm={handleConfirmLocation}
+        onCancel={() => setPlacingLocation(false)}
+      />
+    );
   }
 
   return (
