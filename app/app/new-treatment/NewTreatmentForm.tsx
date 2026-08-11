@@ -63,7 +63,7 @@ export default function NewTreatmentForm({
         e.preventDefault();
         setPlacingLocation(true);
       }}
-      className="flex flex-col gap-4"
+      className="flex flex-col gap-4 pb-24"
     >
       <div className="card flex flex-col gap-3 p-4">
         <div className="flex gap-2">
@@ -138,9 +138,10 @@ export default function NewTreatmentForm({
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+        className="fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
+        style={{ background: "#25385a", border: "0.5px solid #37507a", color: "var(--text)" }}
       >
-        {submitting ? "Saving…" : "Continue to place location"}
+        {submitting ? "Logging…" : "Log location"}
       </button>
     </form>
   );

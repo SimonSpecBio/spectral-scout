@@ -61,7 +61,7 @@ export default function CountsFlow({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 pb-24">
       <div className="card flex flex-col gap-3 p-4">
         <div className="text-sm font-medium">Counts</div>
         <p className="text-xs text-[var(--text-dim)]">Pick 5 leaves at random. Count pests on each.</p>
@@ -115,9 +115,10 @@ export default function CountsFlow({
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+        className="fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
+        style={{ background: "#25385a", border: "0.5px solid #37507a", color: "var(--text)" }}
       >
-        {submitting ? "Submitting…" : capturesLocation ? "Continue to place location" : "Submit session"}
+        {submitting ? (capturesLocation ? "Logging…" : "Submitting…") : capturesLocation ? "Log location" : "Submit session"}
       </button>
     </form>
   );
