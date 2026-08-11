@@ -9,6 +9,15 @@ import { facilities, monitoringThresholds, pestEvents, scoutingObservations } fr
 // number invented from nothing.
 export const DEFAULT_INFESTED_PCT_THRESHOLD = 15;
 
+// Single-species lookup for a spot that already knows which event/species
+// it cares about (the pest-event detail page's pressure chart) instead of
+// computeMonitoringAlerts' batch pass over every active event.
+export async function getSpeciesThreshold(organizationId: string, pestSpecies: string): Promise<number> {
+  const rows = await db.select().from(monitoringThresholds).where(eq(monitoringThresholds.organizationId, organizationId));
+  const match = rows.find((t) => t.pestSpecies.toLowerCase() === pestSpecies.toLowerCase());
+  return match?.infestedPctThreshold ?? DEFAULT_INFESTED_PCT_THRESHOLD;
+}
+
 export interface MonitoringAlert {
   eventId: string;
   facilityId: string;

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { sparkPoints } from "@/lib/density";
+import { scaledPoints } from "@/lib/density";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import RecommendationsPanel from "./RecommendationsPanel";
@@ -63,6 +63,7 @@ export default function PestEventDetail({
   initialPhotos,
   initialMonitoring,
   inventoryItems,
+  threshold,
 }: {
   facilityId: string;
   event: Event;
@@ -72,6 +73,7 @@ export default function PestEventDetail({
   initialPhotos: Photo[];
   initialMonitoring: MonitoringSession[];
   inventoryItems: { id: string; name: string; unit: string; quantity: number; reorderLevel: number | null }[];
+  threshold: number;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("timeline");
@@ -217,7 +219,26 @@ export default function PestEventDetail({
       {densities.length > 0 && (
         <div className="card flex items-center gap-6 p-4">
           <svg width={220} height={52} className="shrink-0">
-            <polyline points={sparkPoints(densities, 220, 52)} fill="none" stroke="var(--accent)" strokeWidth={2} />
+            {(() => {
+              const scaled = scaledPoints(densities, threshold, 220, 52);
+              return (
+                <>
+                  <line
+                    x1={0}
+                    y1={scaled.refY}
+                    x2={220}
+                    y2={scaled.refY}
+                    stroke="var(--text-faint)"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                  />
+                  <text x={2} y={scaled.refY - 3} className="font-mono" fontSize={8} fill="var(--text-faint)">
+                    {threshold}% threshold
+                  </text>
+                  <polyline points={scaled.points} fill="none" stroke="var(--accent)" strokeWidth={2} />
+                </>
+              );
+            })()}
           </svg>
           <div className="flex gap-6">
             <div>

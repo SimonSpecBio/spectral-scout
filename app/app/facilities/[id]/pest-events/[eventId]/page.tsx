@@ -6,6 +6,7 @@ import { facilityAreas, inventoryItems, observationPhotos, scoutingObservations,
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
+import { getSpeciesThreshold } from "@/lib/threshold-engine";
 import PestEventDetail from "./PestEventDetail";
 
 export default async function PestEventPage({ params }: { params: Promise<{ id: string; eventId: string }> }) {
@@ -30,6 +31,7 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
     .where(eq(scoutingObservations.promotedPestEventId, eventId))
     .orderBy(desc(scoutingObservations.createdAt));
   const items = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
+  const threshold = await getSpeciesThreshold(session.organizationId!, event.pestSpecies);
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,6 +81,7 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
           quantity: Number(i.quantity),
           reorderLevel: i.reorderLevel == null ? null : Number(i.reorderLevel),
         }))}
+        threshold={threshold}
       />
     </div>
   );

@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { pestEventStatusEnum, pestEvents, severityEnum } from "@/db/schema";
+import { pestEventStatusEnum, pestEvents, severityEnum, tasks } from "@/db/schema";
 import { getOwnedPestEvent as ownedEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -34,6 +34,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const [row] = await db.update(pestEvents).set(updates).where(eq(pestEvents.id, eventId)).returning();
+
+  // Resolving an event moots its auto-scheduled follow-ups (SCHEDULING.md:
+  // "resolving an event cancels its outstanding recurring release/monitor
+  // tasks"). Only source="auto_program" -- a manually created task linked
+  // to this event is a person's own work item and stays untouched even
+  // after the event closes.
+  if (updates.status === "resolved") {
+    await db
+      .delete(tasks)
+      .where(and(eq(tasks.pestEventId, eventId), eq(tasks.source, "auto_program"), eq(tasks.status, "open")));
+  }
+
   return NextResponse.json(row);
 }
 

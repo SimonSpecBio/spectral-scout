@@ -48,6 +48,35 @@ export function sparkPoints(values: number[], w = 300, h = 44, pad = 4): string 
     .join(" ");
 }
 
+// Same idea as sparkPoints, but the min/max span is computed across the
+// series AND a reference value (a threshold line) together, so the
+// reference renders at its true relative height instead of sparkPoints'
+// per-series auto-scale putting it off-chart or at a misleading spot. A
+// separate function rather than changing sparkPoints itself, since
+// sparkPoints' other callers (PressureGraph, traps) have no reference
+// value and shouldn't have their scale affected by one.
+export function scaledPoints(
+  values: number[],
+  refValue: number,
+  w = 300,
+  h = 44,
+  pad = 4
+): { points: string; refY: number } {
+  if (!values.length) return { points: "", refY: h - pad };
+  const all = [...values, refValue];
+  const max = Math.max(...all);
+  const min = Math.min(...all);
+  const span = max - min || 1;
+  const toY = (v: number) => h - pad - ((v - min) / span) * (h - 2 * pad);
+  const points = values
+    .map((v, i) => {
+      const x = values.length === 1 ? w / 2 : pad + (i * (w - 2 * pad)) / (values.length - 1);
+      return `${x.toFixed(1)},${toY(v).toFixed(1)}`;
+    })
+    .join(" ");
+  return { points, refY: toY(refValue) };
+}
+
 // Server-authoritative: recompute aggregates from the raw grid rather than
 // trusting numbers the client sent.
 export function aggregateLeafGrid(grid: PlantLeaves[]): ScoutAggregate {
