@@ -193,7 +193,7 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
         />
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-5xl border-t border-[var(--border)] p-4" style={{ background: "var(--surface)" }}>
+      <div className="fixed inset-x-0 bottom-24 z-40 mx-auto max-w-5xl border-t border-[var(--border)] p-4 lg:bottom-0" style={{ background: "var(--surface)" }}>
         <button
           onClick={() => setPlacingLocation(true)}
           disabled={submitting || !commonName.trim() || facilities.length === 0}
