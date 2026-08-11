@@ -193,16 +193,14 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
         />
       </div>
 
-      <div className="fixed inset-x-0 bottom-24 z-40 mx-auto max-w-5xl border-t border-[var(--border)] p-4 lg:bottom-0" style={{ background: "var(--surface)" }}>
-        <button
-          onClick={() => setPlacingLocation(true)}
-          disabled={submitting || !commonName.trim() || facilities.length === 0}
-          className="w-full rounded-xl py-3.5 text-sm font-medium disabled:opacity-50"
-          style={{ background: "#25385a", border: "0.5px solid #37507a", color: "var(--text)" }}
-        >
-          {submitting ? "Creating…" : "Create disease event"}
-        </button>
-      </div>
+      <button
+        onClick={() => setPlacingLocation(true)}
+        disabled={submitting || !commonName.trim() || facilities.length === 0}
+        className="fixed inset-x-4 bottom-16 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
+        style={{ background: "#25385a", border: "0.5px solid #37507a", color: "var(--text)" }}
+      >
+        {submitting ? "Working…" : "Continue to place location"}
+      </button>
     </div>
   );
 }

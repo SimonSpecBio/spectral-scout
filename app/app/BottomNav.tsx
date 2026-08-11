@@ -69,7 +69,7 @@ export default function BottomNav() {
         <NavItem item={c} active={pathname === c.href} divider />
         <NavItem item={d} active={pathname === d.href} />
         <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center">
-          <div className="pointer-events-auto -translate-y-5">
+          <div className="pointer-events-auto -translate-y-3">
             <QuickActionsMenu variant="center" />
           </div>
         </div>
