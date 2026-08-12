@@ -71,6 +71,13 @@
       "when": 1786069122291,
       "tag": "0009_brown_victor_mancha",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786501578489,
+      "tag": "0010_brief_warstar",
+      "breakpoints": true
     }
   ]
 }

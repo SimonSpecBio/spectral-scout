@@ -1,5 +1,6 @@
 import {
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -54,15 +55,19 @@ export const membershipRoleEnum = pgEnum("scout_membership_role", ["owner", "mem
 // members) and "member" as "scout" (own tasks + shared read-only schedule) --
 // deliberately not a separate role column, since the two concepts are the
 // same permission split under different names.
-export const memberships = pgTable("scout_membership", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull(),
-  organizationId: uuid("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-  role: membershipRoleEnum("role").notNull().default("owner"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const memberships = pgTable(
+  "scout_membership",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    role: membershipRoleEnum("role").notNull().default("owner"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_membership_user_id_idx").on(table.userId), index("scout_membership_organization_id_idx").on(table.organizationId)]
+).enableRLS();
 
 // A pending team invite -- an email with no scout_user row yet (they've
 // never signed in). Consumed by auth.ts's session callback on that email's
@@ -70,16 +75,20 @@ export const memberships = pgTable("scout_membership", {
 // role), it joins the inviting org at the invited role and deletes itself.
 // Keyed by email, not userId, since the whole point is the person doesn't
 // have an account yet.
-export const invites = pgTable("scout_invite", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  organizationId: uuid("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-  email: text("email").notNull(),
-  role: membershipRoleEnum("role").notNull().default("member"),
-  invitedByUserId: uuid("invited_by_user_id").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const invites = pgTable(
+  "scout_invite",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: membershipRoleEnum("role").notNull().default("member"),
+    invitedByUserId: uuid("invited_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_invite_organization_id_idx").on(table.organizationId), index("scout_invite_email_idx").on(table.email)]
+).enableRLS();
 
 // Internal Spectral staff (Google-login, allowlist-gated same as
 // spectral-ops/spectral-rnd) -- separate from organizations/memberships,
@@ -97,14 +106,18 @@ export const staff = pgTable("scout_staff", {
 // Facilities
 // ---------------------------------------------------------------------------
 
-export const facilities = pgTable("scout_facility", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  organizationId: uuid("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const facilities = pgTable(
+  "scout_facility",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_facility_organization_id_idx").on(table.organizationId)]
+).enableRLS();
 
 export const areaKindEnum = pgEnum("scout_area_kind", [
   "building",
@@ -123,20 +136,24 @@ export const areaKindEnum = pgEnum("scout_area_kind", [
 // real-world scale after growers have already drawn layouts in arbitrary
 // pixel space is painful, so this is captured from day one even before any
 // feature (e.g. fixture-coverage overlays) actually uses it.
-export const facilityAreas = pgTable("scout_facility_area", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  facilityId: uuid("facility_id")
-    .notNull()
-    .references(() => facilities.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  kind: areaKindEnum("kind").notNull().default("other"),
-  cropType: text("crop_type"),
-  notes: text("notes"),
-  backgroundImageUrl: text("background_image_url"),
-  backgroundScale: numeric("background_scale", { mode: "number" }), // feet per canvas unit
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const facilityAreas = pgTable(
+  "scout_facility_area",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    facilityId: uuid("facility_id")
+      .notNull()
+      .references(() => facilities.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    kind: areaKindEnum("kind").notNull().default("other"),
+    cropType: text("crop_type"),
+    notes: text("notes"),
+    backgroundImageUrl: text("background_image_url"),
+    backgroundScale: numeric("background_scale", { mode: "number" }), // feet per canvas unit
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_facility_area_facility_id_idx").on(table.facilityId)]
+).enableRLS();
 
 // Generic canvas object -- deliberately NOT one table per shape type
 // (bench/row/table/room). geometry/style/metadata are jsonb so a grower can
@@ -145,20 +162,24 @@ export const facilityAreas = pgTable("scout_facility_area", {
 // shape. Same pattern Figma/tldraw/Miro use for canvas objects.
 export const shapeTypeEnum = pgEnum("scout_shape_type", ["rect", "polygon", "circle", "line", "label"]);
 
-export const facilityMapObjects = pgTable("scout_facility_map_object", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  facilityAreaId: uuid("facility_area_id")
-    .notNull()
-    .references(() => facilityAreas.id, { onDelete: "cascade" }),
-  shapeType: shapeTypeEnum("shape_type").notNull(),
-  geometry: jsonb("geometry").notNull(), // { x, y, width, height, rotation } | { points: [...] } | etc, shape-dependent
-  style: jsonb("style"), // { fill, stroke, strokeWidth, opacity }
-  label: text("label"),
-  metadata: jsonb("metadata"), // grower-defined freeform key/values (capacity, notes, whatever)
-  zIndex: integer("z_index").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const facilityMapObjects = pgTable(
+  "scout_facility_map_object",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    facilityAreaId: uuid("facility_area_id")
+      .notNull()
+      .references(() => facilityAreas.id, { onDelete: "cascade" }),
+    shapeType: shapeTypeEnum("shape_type").notNull(),
+    geometry: jsonb("geometry").notNull(), // { x, y, width, height, rotation } | { points: [...] } | etc, shape-dependent
+    style: jsonb("style"), // { fill, stroke, strokeWidth, opacity }
+    label: text("label"),
+    metadata: jsonb("metadata"), // grower-defined freeform key/values (capacity, notes, whatever)
+    zIndex: integer("z_index").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_facility_map_object_facility_area_id_idx").on(table.facilityAreaId)]
+).enableRLS();
 
 // ---------------------------------------------------------------------------
 // Inventory: beneficials, biopesticides, chemical products
@@ -171,7 +192,9 @@ export const inventoryCategoryEnum = pgEnum("scout_inventory_category", ["benefi
 // shared stock pool matches how a single grower actually manages product
 // across whatever facilities they have. Revisit if/when the app needs to
 // support an org with genuinely separate stock rooms per site.
-export const inventoryItems = pgTable("scout_inventory_item", {
+export const inventoryItems = pgTable(
+  "scout_inventory_item",
+  {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
     .notNull()
@@ -190,22 +213,28 @@ export const inventoryItems = pgTable("scout_inventory_item", {
   // treatments.json ties these to real application-safety risk.
   cautions: text("cautions"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+  },
+  (table) => [index("scout_inventory_item_organization_id_idx").on(table.organizationId)]
+).enableRLS();
 
 // A pending restock -- separate from inventoryItems.quantity so "on order"
 // can show supplier/ETA without touching on-hand stock until it actually
 // arrives (see the orders/[orderId]/receive route, which deletes the row
 // and adds its quantity to the item in one action).
-export const inventoryOrders = pgTable("scout_inventory_order", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  itemId: uuid("item_id")
-    .notNull()
-    .references(() => inventoryItems.id, { onDelete: "cascade" }),
-  quantity: numeric("quantity", { mode: "number" }).notNull(),
-  supplier: text("supplier"),
-  expectedAt: date("expected_at", { mode: "string" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const inventoryOrders = pgTable(
+  "scout_inventory_order",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: "cascade" }),
+    quantity: numeric("quantity", { mode: "number" }).notNull(),
+    supplier: text("supplier"),
+    expectedAt: date("expected_at", { mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_inventory_order_item_id_idx").on(table.itemId)]
+).enableRLS();
 
 // ---------------------------------------------------------------------------
 // Pest events, scouting, treatments
@@ -230,24 +259,32 @@ export const eventKindEnum = pgEnum("scout_event_kind", ["pest", "pathogen"]);
 // or deletes that bench, the pest event shouldn't become orphaned or
 // invalid. mapObjectId is an optional convenience reference (e.g. "this pin
 // was dropped on Bench 4") for label/snapping purposes only.
-export const pestEvents = pgTable("scout_pest_event", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  facilityId: uuid("facility_id")
-    .notNull()
-    .references(() => facilities.id, { onDelete: "cascade" }),
-  facilityAreaId: uuid("facility_area_id").references(() => facilityAreas.id, { onDelete: "set null" }),
-  mapObjectId: uuid("map_object_id").references(() => facilityMapObjects.id, { onDelete: "set null" }),
-  x: numeric("x", { mode: "number" }),
-  y: numeric("y", { mode: "number" }),
-  kind: eventKindEnum("kind").notNull().default("pest"),
-  pestSpecies: text("pest_species").notNull(), // common name either way -- insect species name, or disease/pathogen name
-  scientificName: text("scientific_name"), // optional Latin binomial, either kind
-  severity: severityEnum("severity").notNull().default("moderate"),
-  status: pestEventStatusEnum("status").notNull().default("active"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
-}).enableRLS();
+export const pestEvents = pgTable(
+  "scout_pest_event",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    facilityId: uuid("facility_id")
+      .notNull()
+      .references(() => facilities.id, { onDelete: "cascade" }),
+    facilityAreaId: uuid("facility_area_id").references(() => facilityAreas.id, { onDelete: "set null" }),
+    mapObjectId: uuid("map_object_id").references(() => facilityMapObjects.id, { onDelete: "set null" }),
+    x: numeric("x", { mode: "number" }),
+    y: numeric("y", { mode: "number" }),
+    kind: eventKindEnum("kind").notNull().default("pest"),
+    pestSpecies: text("pest_species").notNull(), // common name either way -- insect species name, or disease/pathogen name
+    scientificName: text("scientific_name"), // optional Latin binomial, either kind
+    severity: severityEnum("severity").notNull().default("moderate"),
+    status: pestEventStatusEnum("status").notNull().default("active"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("scout_pest_event_facility_id_idx").on(table.facilityId),
+    index("scout_pest_event_facility_area_id_idx").on(table.facilityAreaId),
+    index("scout_pest_event_status_idx").on(table.status),
+  ]
+).enableRLS();
 
 export const deviceStatusEnum = pgEnum("scout_device_status", ["working", "needs_attention", "down"]);
 export const plantHealthEnum = pgEnum("scout_plant_health", ["normal", "phytotoxicity_observed", "other_concern"]);
@@ -271,7 +308,9 @@ export const plantHealthEnum = pgEnum("scout_plant_health", ["normal", "phytotox
 // (or vice versa) since leafGrid itself is untyped jsonb.
 export const assessmentTypeEnum = pgEnum("scout_assessment_type", ["pest_count", "disease_severity"]);
 
-export const scoutingObservations = pgTable("scout_observation", {
+export const scoutingObservations = pgTable(
+  "scout_observation",
+  {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
     .notNull()
@@ -305,16 +344,29 @@ export const scoutingObservations = pgTable("scout_observation", {
   satisfactionRating: integer("satisfaction_rating"), // 1-5, pilot-tier only
   promotedPestEventId: uuid("promoted_pest_event_id").references(() => pestEvents.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+  },
+  (table) => [
+    index("scout_observation_organization_id_idx").on(table.organizationId),
+    index("scout_observation_facility_area_id_idx").on(table.facilityAreaId),
+    index("scout_observation_promoted_pest_event_id_idx").on(table.promotedPestEventId),
+  ]
+).enableRLS();
 
-export const observationPhotos = pgTable("scout_observation_photo", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  observationId: uuid("observation_id").references(() => scoutingObservations.id, { onDelete: "set null" }),
-  pestEventId: uuid("pest_event_id").references(() => pestEvents.id, { onDelete: "set null" }),
-  blobUrl: text("blob_url").notNull(),
-  caption: text("caption"),
-  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const observationPhotos = pgTable(
+  "scout_observation_photo",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    observationId: uuid("observation_id").references(() => scoutingObservations.id, { onDelete: "set null" }),
+    pestEventId: uuid("pest_event_id").references(() => pestEvents.id, { onDelete: "set null" }),
+    blobUrl: text("blob_url").notNull(),
+    caption: text("caption"),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("scout_observation_photo_observation_id_idx").on(table.observationId),
+    index("scout_observation_photo_pest_event_id_idx").on(table.pestEventId),
+  ]
+).enableRLS();
 
 // Chemical pesticide applications, biological releases, and (eventually)
 // Spectral light treatments all share this one model per the product brief
@@ -323,7 +375,9 @@ export const observationPhotos = pgTable("scout_observation_photo", {
 // rows later, not just human-entered ones, hence operatorUserId is nullable.
 export const treatmentTypeEnum = pgEnum("scout_treatment_type", ["pesticide", "biological", "spectral_light"]);
 
-export const treatments = pgTable("scout_treatment", {
+export const treatments = pgTable(
+  "scout_treatment",
+  {
   id: uuid("id").primaryKey().defaultRandom(),
   facilityId: uuid("facility_id")
     .notNull()
@@ -353,7 +407,13 @@ export const treatments = pgTable("scout_treatment", {
   // scout_task.minutesSpent's comment on why this stays operation-owned,
   // not pooled into any cross-org aggregate).
   minutesSpent: integer("minutes_spent"),
-}).enableRLS();
+  },
+  (table) => [
+    index("scout_treatment_facility_id_idx").on(table.facilityId),
+    index("scout_treatment_pest_event_id_idx").on(table.pestEventId),
+    index("scout_treatment_inventory_item_id_idx").on(table.inventoryItemId),
+  ]
+).enableRLS();
 
 // ---------------------------------------------------------------------------
 // Sticky traps
@@ -367,19 +427,23 @@ export const treatments = pgTable("scout_treatment", {
 // not a hard FK to a drawn bench, so resizing/deleting map objects can't
 // orphan a trap. label is grower-facing ("Trap 1"), auto-numbered per area
 // at creation time but editable.
-export const traps = pgTable("scout_trap", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  facilityId: uuid("facility_id")
-    .notNull()
-    .references(() => facilities.id, { onDelete: "cascade" }),
-  facilityAreaId: uuid("facility_area_id")
-    .notNull()
-    .references(() => facilityAreas.id, { onDelete: "cascade" }),
-  x: numeric("x", { mode: "number" }).notNull(),
-  y: numeric("y", { mode: "number" }).notNull(),
-  label: text("label").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const traps = pgTable(
+  "scout_trap",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    facilityId: uuid("facility_id")
+      .notNull()
+      .references(() => facilities.id, { onDelete: "cascade" }),
+    facilityAreaId: uuid("facility_area_id")
+      .notNull()
+      .references(() => facilityAreas.id, { onDelete: "cascade" }),
+    x: numeric("x", { mode: "number" }).notNull(),
+    y: numeric("y", { mode: "number" }).notNull(),
+    label: text("label").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_trap_facility_id_idx").on(table.facilityId), index("scout_trap_facility_area_id_idx").on(table.facilityAreaId)]
+).enableRLS();
 
 // One row per trap per check -- count + daysDeployed (since the trap was
 // last reset/checked) is what a grower actually reads off a sticky card;
@@ -389,17 +453,21 @@ export const traps = pgTable("scout_trap", {
 // (a grower checks a whole trap network for one target pest in a pass, per
 // the "Log trap readings" flow), not stored on the trap itself, since the
 // same physical trap can be read for different pests over its life.
-export const trapReadings = pgTable("scout_trap_reading", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  trapId: uuid("trap_id")
-    .notNull()
-    .references(() => traps.id, { onDelete: "cascade" }),
-  pestSpecies: text("pest_species").notNull(),
-  count: integer("count").notNull(),
-  daysDeployed: integer("days_deployed").notNull(),
-  submittedByUserId: uuid("submitted_by_user_id").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const trapReadings = pgTable(
+  "scout_trap_reading",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    trapId: uuid("trap_id")
+      .notNull()
+      .references(() => traps.id, { onDelete: "cascade" }),
+    pestSpecies: text("pest_species").notNull(),
+    count: integer("count").notNull(),
+    daysDeployed: integer("days_deployed").notNull(),
+    submittedByUserId: uuid("submitted_by_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_trap_reading_trap_id_idx").on(table.trapId)]
+).enableRLS();
 
 // Per-pest catch/day threshold, org-configurable -- answers "should
 // over-threshold be a global switch or per-pest": per-pest, keyed by
@@ -411,15 +479,19 @@ export const trapReadings = pgTable("scout_trap_reading", {
 // constant covers species with no row -- see DEFAULT_CATCH_PER_DAY_THRESHOLD
 // in lib/trap-alerts.ts) but nothing in the model blocks adding a settings
 // screen for it later.
-export const trapThresholds = pgTable("scout_trap_threshold", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  organizationId: uuid("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-  pestSpecies: text("pest_species").notNull(),
-  catchPerDayThreshold: numeric("catch_per_day_threshold", { mode: "number" }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const trapThresholds = pgTable(
+  "scout_trap_threshold",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    pestSpecies: text("pest_species").notNull(),
+    catchPerDayThreshold: numeric("catch_per_day_threshold", { mode: "number" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_trap_threshold_organization_id_idx").on(table.organizationId)]
+).enableRLS();
 
 // ---------------------------------------------------------------------------
 // Scheduling & tasks
@@ -449,7 +521,9 @@ export const taskSourceEnum = pgEnum("scout_task_source", ["manual", "auto_progr
 // "open" task, computed at read time (lib/tasks.ts) so it's never stale.
 export const taskStatusEnum = pgEnum("scout_task_status", ["open", "done", "snoozed"]);
 
-export const tasks = pgTable("scout_task", {
+export const tasks = pgTable(
+  "scout_task",
+  {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id")
     .notNull()
@@ -488,7 +562,16 @@ export const tasks = pgTable("scout_task", {
   // shared to any cross-org aggregate at this granularity (DATA_CONSENT.md).
   minutesSpent: integer("minutes_spent"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+  },
+  (table) => [
+    index("scout_task_organization_id_idx").on(table.organizationId),
+    index("scout_task_facility_id_idx").on(table.facilityId),
+    index("scout_task_facility_area_id_idx").on(table.facilityAreaId),
+    index("scout_task_pest_event_id_idx").on(table.pestEventId),
+    index("scout_task_assignee_user_id_idx").on(table.assigneeUserId),
+    index("scout_task_status_idx").on(table.status),
+  ]
+).enableRLS();
 
 // Per-pest infested/incidence % threshold -- the ThresholdEngine's
 // non-trap counterpart to scout_trap_threshold (see that table's comment
@@ -499,12 +582,16 @@ export const tasks = pgTable("scout_task", {
 // no separate metric-type column needed. No UI writes this table yet;
 // DEFAULT_INFESTED_PCT_THRESHOLD in lib/threshold-engine.ts covers any
 // species with no row.
-export const monitoringThresholds = pgTable("scout_monitoring_threshold", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  organizationId: uuid("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-  pestSpecies: text("pest_species").notNull(),
-  infestedPctThreshold: numeric("infested_pct_threshold", { mode: "number" }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}).enableRLS();
+export const monitoringThresholds = pgTable(
+  "scout_monitoring_threshold",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    pestSpecies: text("pest_species").notNull(),
+    infestedPctThreshold: numeric("infested_pct_threshold", { mode: "number" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_monitoring_threshold_organization_id_idx").on(table.organizationId)]
+).enableRLS();
