@@ -63,7 +63,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
             <Link
               key={f.id}
               href={`/app/rei-phi?facility=${f.id}`}
-              className={`rounded-full px-3 py-1.5 text-sm ${f.id === selectedFacility.id ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"}`}
+              className={`rounded-full px-3 py-1.5 text-sm ${f.id === selectedFacility.id ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"}`}
             >
               {f.name}
             </Link>
@@ -155,7 +155,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
 
       <Link
         href={`/app/new-treatment?facility=${selectedFacility.id}`}
-        className="rounded-md bg-[var(--accent)] px-4 py-3 text-center text-sm font-medium text-[#0B1626]"
+        className="rounded-md bg-[var(--accent)] px-4 py-3 text-center text-sm font-medium text-[var(--on-accent)]"
       >
         Log a treatment
       </Link>

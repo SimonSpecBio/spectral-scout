@@ -88,7 +88,7 @@ export default function LogTrapReadingsForm({
           <div className="flex overflow-hidden rounded-md border border-[var(--border)] text-sm">
             <span className="flex-1 px-3 py-2 text-center text-[var(--text-faint)] opacity-50">Sampling</span>
             <span className="flex-1 px-3 py-2 text-center text-[var(--text-faint)] opacity-50">Counts</span>
-            <span className="flex-1 bg-[var(--accent)] px-3 py-2 text-center font-medium text-[#0B1626]">Traps</span>
+            <span className="flex-1 bg-[var(--accent)] px-3 py-2 text-center font-medium text-[var(--on-accent)]">Traps</span>
           </div>
         </div>
 
@@ -129,7 +129,7 @@ export default function LogTrapReadingsForm({
       <button
         type="submit"
         disabled={submitting || !species.trim()}
-        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
       >
         {submitting ? "Logging…" : "Log readings"}
       </button>

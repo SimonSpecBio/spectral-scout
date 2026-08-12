@@ -233,7 +233,7 @@ export default async function HomePage({
                 key={a.id}
                 href={`/app?facility=${selectedFacility.id}&area=${a.id}`}
                 className={`rounded-full px-3 py-1.5 text-sm ${
-                  a.id === selectedArea.id ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+                  a.id === selectedArea.id ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
                 }`}
               >
                 {a.name}
@@ -303,13 +303,13 @@ export default async function HomePage({
                     key={f.id}
                     href={`/app?facility=${f.id}`}
                     className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm ${
-                      f.id === selectedFacility.id ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+                      f.id === selectedFacility.id ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
                     }`}
                   >
                     {count > 0 && (
                       <span
                         className="h-1.5 w-1.5 rounded-full"
-                        style={{ background: f.id === selectedFacility.id ? "#0B1626" : "var(--accent)" }}
+                        style={{ background: f.id === selectedFacility.id ? "var(--on-accent)" : "var(--accent)" }}
                       />
                     )}
                     {f.name}

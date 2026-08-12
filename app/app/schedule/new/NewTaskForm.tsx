@@ -188,7 +188,7 @@ export default function NewTaskForm({
       <button
         type="submit"
         disabled={submitting || !title.trim()}
-        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
       >
         {submitting ? "Assigning…" : "Assign task"}
       </button>

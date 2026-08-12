@@ -14,6 +14,11 @@
   --text-faint: #4a5a75;
   --accent: #ce5d40;
   --accent-soft: #c79a3a;
+  /* Text color on top of a solid --accent fill (buttons, badges) -- was
+     hardcoded as "#0B1626" in ~25 places and "#0D1524" in one (the bottom
+     nav's + button), two near-identical rust-adjacent darks that had
+     quietly drifted apart. One token now. */
+  --on-accent: #0b1626;
   --map-blue: #7ec4f0;
   --map-blue-soft: #bfe3fa;
   --map-grid-line: rgba(126, 196, 240, 0.09);
@@ -58,6 +63,16 @@ body {
   border-radius: 999px;
   padding: 0.3rem 0.7rem;
   font-size: 0.75rem;
+}
+
+/* The dark-navy floating pill used by every "continue to place location"
+   / "log location" action across the event, treatment, trap, and scouting
+   creation flows -- was six copies of the same inline style object before
+   this, drifting being one edit away at any time. */
+.btn-location {
+  background: #25385a;
+  border: 0.5px solid #37507a;
+  color: var(--text);
 }
 
 /* Blueprint-style frame for the facility map canvas -- a light blue edge

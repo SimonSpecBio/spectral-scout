@@ -99,7 +99,7 @@ export default function TaskDetailClient({
         <div className="flex gap-2">
           <button
             onClick={() => router.push(`/app/schedule/${taskId}/complete`)}
-            className="flex-1 rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[#0B1626]"
+            className="flex-1 rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--on-accent)]"
           >
             Mark done
           </button>

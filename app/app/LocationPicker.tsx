@@ -219,8 +219,7 @@ export default function LocationPicker({
         <button
           onClick={confirm}
           disabled={!selected || !currentAreaId || confirming}
-          className="w-full rounded-xl py-3.5 text-sm font-medium disabled:opacity-40"
-          style={{ background: "#25385a", border: "0.5px solid #37507a", color: "var(--text)" }}
+          className="btn-location w-full rounded-xl py-3.5 text-sm font-medium disabled:opacity-40"
         >
           {confirming ? "Setting…" : "Set location"}
         </button>

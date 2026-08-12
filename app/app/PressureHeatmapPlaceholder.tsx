@@ -1,14 +1,8 @@
+import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { BAYS, nearestBay } from "@/lib/floorplan-bays";
 import BayBarMap from "./BayBarMap";
 
-type Severity = "low" | "moderate" | "high" | "severe";
 const SEVERITY_RANK: Record<Severity, number> = { low: 0, moderate: 1, high: 2, severe: 3 };
-const SEVERITY_COLOR: Record<Severity, string> = {
-  low: "#e0d24b",
-  moderate: "#e0913d",
-  high: "#e0553d",
-  severe: "#a3193d",
-};
 
 interface EventInput {
   x: number;

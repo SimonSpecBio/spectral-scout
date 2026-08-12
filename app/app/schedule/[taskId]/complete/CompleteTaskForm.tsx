@@ -67,7 +67,7 @@ export default function CompleteTaskForm({
               key={p}
               onClick={() => setMinutes(p)}
               className={`flex-1 rounded-full px-3 py-1.5 text-xs ${
-                minutes === p ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+                minutes === p ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
               }`}
             >
               {p < 60 ? `${p} min` : "1 hr"}
@@ -106,7 +106,7 @@ export default function CompleteTaskForm({
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
       >
         {submitting ? "Logging…" : "Log & complete"}
       </button>

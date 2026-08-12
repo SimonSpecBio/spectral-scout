@@ -86,7 +86,7 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
           <button
             key={t.value}
             onClick={() => setTab(t.value)}
-            className={`rounded-full px-3 py-1.5 text-sm ${tab === t.value ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"}`}
+            className={`rounded-full px-3 py-1.5 text-sm ${tab === t.value ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"}`}
           >
             {t.label}
           </button>
@@ -161,7 +161,7 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
       {adding ? (
         <AddFromCatalog onAdded={onItemAdded} onCancel={() => setAdding(false)} />
       ) : (
-        <button onClick={() => setAdding(true)} className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[#0B1626]">
+        <button onClick={() => setAdding(true)} className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--on-accent)]">
           + Add from catalog
         </button>
       )}
@@ -212,7 +212,7 @@ function RestockRow({ item, onRestock }: { item: Item; onRestock: (qty: number) 
             placeholder="Supplier (optional)"
             className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs"
           />
-          <button onClick={placeOrder} className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[#0B1626]">
+          <button onClick={placeOrder} className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)]">
             Save
           </button>
         </div>
@@ -383,7 +383,7 @@ function AddFromCatalog({ onAdded, onCancel }: { onAdded: (item: Item) => void; 
       <button
         type="submit"
         disabled={submitting || !name.trim()}
-        className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+        className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
       >
         {submitting ? "Adding…" : "Add to inventory"}
       </button>

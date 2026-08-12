@@ -72,7 +72,7 @@ export default async function TrapsPage({
               key={f.id}
               href={`/app/traps?facility=${f.id}`}
               className={`rounded-full px-3 py-1.5 text-sm ${
-                f.id === selectedFacility.id ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+                f.id === selectedFacility.id ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
               }`}
             >
               {f.name}
@@ -84,7 +84,7 @@ export default async function TrapsPage({
         <div className="flex flex-wrap gap-2">
           <Link
             href={`/app/traps?facility=${selectedFacility.id}`}
-            className={`rounded-full px-3 py-1.5 text-sm ${!selectedArea ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"}`}
+            className={`rounded-full px-3 py-1.5 text-sm ${!selectedArea ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"}`}
           >
             All areas
           </Link>
@@ -93,7 +93,7 @@ export default async function TrapsPage({
               key={a.id}
               href={`/app/traps?facility=${selectedFacility.id}&area=${a.id}`}
               className={`rounded-full px-3 py-1.5 text-sm ${
-                a.id === selectedArea?.id ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+                a.id === selectedArea?.id ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
               }`}
             >
               {a.name}
@@ -184,7 +184,7 @@ export default async function TrapsPage({
 
       <Link
         href={`/app/log-trap-readings?facility=${selectedFacility.id}${selectedArea ? `&area=${selectedArea.id}` : ""}`}
-        className="rounded-md bg-[var(--accent)] px-4 py-3 text-center text-sm font-medium text-[#0B1626]"
+        className="rounded-md bg-[var(--accent)] px-4 py-3 text-center text-sm font-medium text-[var(--on-accent)]"
       >
         Log readings
       </Link>

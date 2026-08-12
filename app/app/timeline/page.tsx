@@ -52,7 +52,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
             key={s.value}
             href={`/app/timeline?scope=${s.value}`}
             className={`rounded-full px-3 py-1.5 text-sm ${
-              scope === s.value ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+              scope === s.value ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
             }`}
           >
             {s.label}

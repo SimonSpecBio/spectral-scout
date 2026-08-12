@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { scaledPoints } from "@/lib/density";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import RecommendationsPanel from "./RecommendationsPanel";
 
-type Severity = "low" | "moderate" | "high" | "severe";
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
 
 interface Treatment {
@@ -45,12 +45,6 @@ interface Event {
   resolvedAt: string | null;
 }
 
-const SEVERITY_COLOR: Record<Severity, string> = {
-  low: "#e0d24b",
-  moderate: "#e0913d",
-  high: "#e0553d",
-  severe: "#a3193d",
-};
 const TABS = ["timeline", "recommended", "treatments", "photos", "monitoring", "notes"] as const;
 type Tab = (typeof TABS)[number];
 
@@ -374,7 +368,7 @@ export default function PestEventDetail({
               <button
                 type="submit"
                 disabled={submittingTreatment}
-                className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+                className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
               >
                 {submittingTreatment ? "Saving…" : "Save"}
               </button>
@@ -421,7 +415,7 @@ export default function PestEventDetail({
         <div className="flex flex-col gap-4">
           <Link
             href={`/app/facilities/${facilityId}/pest-events/${event.id}/monitoring`}
-            className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#0B1626]"
+            className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)]"
           >
             Start monitoring
           </Link>
@@ -466,7 +460,7 @@ export default function PestEventDetail({
           <button
             onClick={saveNotes}
             disabled={savingNotes}
-            className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+            className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
           >
             {savingNotes ? "Saving…" : "Save notes"}
           </button>

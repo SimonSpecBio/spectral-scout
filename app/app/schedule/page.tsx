@@ -1,12 +1,11 @@
 import Link from "next/link";
+import { initialsFor } from "@/lib/avatar";
+import { URGENCY_COLOR } from "@/lib/colors";
 import { getOrgTasks, taskUrgency } from "@/lib/tasks";
 import { getTeam } from "@/lib/team";
-import { initialsFor } from "@/lib/avatar";
 import { requireGrowerSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
-
-const URGENCY_COLOR = { overdue: "#CE5D40", due_soon: "#C79A3A", scheduled: "#4E6280", done: "#4E9E86", snoozed: "#4E6280" } as const;
 
 function dayLabel(date: Date): string {
   const now = new Date();
@@ -61,7 +60,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             key={w}
             href={`/app/schedule?who=${w}`}
             className={`rounded-full px-3 py-1.5 text-sm capitalize ${
-              who === w ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+              who === w ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
             }`}
           >
             {w}

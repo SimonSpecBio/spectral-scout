@@ -48,7 +48,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
             key={k.value}
             href={`/app/logs?type=${k.value}`}
             className={`rounded-full px-3 py-1.5 text-xs ${
-              type === k.value ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+              type === k.value ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
             }`}
           >
             {k.label}

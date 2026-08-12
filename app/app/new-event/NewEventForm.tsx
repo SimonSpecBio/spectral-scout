@@ -95,8 +95,7 @@ export default function NewEventForm({
       <button
         type="submit"
         disabled={submitting || !species.trim() || facilities.length === 0}
-        className="fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
-        style={{ background: "#25385a", border: "0.5px solid #37507a", color: "var(--text)" }}
+        className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
       >
         {submitting ? "Logging…" : "Log location"}
       </button>

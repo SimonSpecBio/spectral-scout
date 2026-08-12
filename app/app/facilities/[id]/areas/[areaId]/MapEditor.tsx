@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from "react-konva";
 import type Konva from "konva";
+import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 
 // "line" is part of the schema's shape vocabulary (for rows/benches drawn
 // as a simple segment) but has no drawing tool yet -- only rendered if a
@@ -37,7 +38,6 @@ interface Area {
   backgroundScale: number | null;
 }
 
-type Severity = "low" | "moderate" | "high" | "severe";
 
 interface PestEvent {
   id: string;
@@ -73,12 +73,6 @@ const CANVAS_HEIGHT = 600;
 // -- these have to match --map-blue/--map-blue-soft in globals.css literally.
 const MAP_BLUE = "#7ec4f0";
 const MAP_BLUE_FILL = "#bfe3fa";
-const SEVERITY_COLORS: Record<Severity, string> = {
-  low: "#e0d24b",
-  moderate: "#e0913d",
-  high: "#e0553d",
-  severe: "#a3193d",
-};
 const SEVERITY_RANK: Record<Severity, number> = { low: 0, moderate: 1, high: 2, severe: 3 };
 
 // Every drawn zone is the same calm light blue by default -- color is a
@@ -462,8 +456,8 @@ export default function MapEditor({
               // over the dark canvas, not a solid bright block -- that
               // solid fill was exactly what made "Zone 1"/"Zone 2" labels
               // unreadable (light text on a bright light-blue fill).
-              const zoneFill = hotspot ? `${SEVERITY_COLORS[hotspot]}55` : `${MAP_BLUE_FILL}2e`;
-              const zoneStroke = selectedId === obj.id ? "#ffffff" : hotspot ? SEVERITY_COLORS[hotspot] : MAP_BLUE;
+              const zoneFill = hotspot ? `${SEVERITY_COLOR[hotspot]}55` : `${MAP_BLUE_FILL}2e`;
+              const zoneStroke = selectedId === obj.id ? "#ffffff" : hotspot ? SEVERITY_COLOR[hotspot] : MAP_BLUE;
               const zoneStrokeWidth = selectedId === obj.id ? 3 : hotspot ? 2.5 : 1.5;
 
               // A zone's name isn't visible unless it's rendered as its own
@@ -632,7 +626,7 @@ export default function MapEditor({
                     x={ev.x!}
                     y={ev.y!}
                     radius={r}
-                    fill={SEVERITY_COLORS[ev.severity]}
+                    fill={SEVERITY_COLOR[ev.severity]}
                     stroke="#fff"
                     strokeWidth={1.5}
                     onClick={onActivate}
@@ -690,7 +684,7 @@ export default function MapEditor({
               <button
                 onClick={submitPestEvent}
                 disabled={!pestSpecies.trim()}
-                className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[#0B1626] disabled:opacity-50"
+                className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
               >
                 Drop pin
               </button>
@@ -716,7 +710,7 @@ export default function MapEditor({
             }}
           >
             <div className="text-sm font-medium capitalize">{selectedEvent.pestSpecies}</div>
-            <div className="text-xs" style={{ color: SEVERITY_COLORS[selectedEvent.severity] }}>
+            <div className="text-xs" style={{ color: SEVERITY_COLOR[selectedEvent.severity] }}>
               {selectedEvent.severity} severity
             </div>
             {selectedEvent.notes && <div className="text-xs text-[var(--text-dim)]">{selectedEvent.notes}</div>}
@@ -726,7 +720,7 @@ export default function MapEditor({
             <div className="flex gap-2">
               <button
                 onClick={resolveSelectedEvent}
-                className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[#0B1626]"
+                className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]"
               >
                 Mark resolved
               </button>

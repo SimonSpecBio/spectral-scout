@@ -2,6 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents } from "@/db/schema";
+import { SEVERITY_COLOR } from "@/lib/colors";
 import { requireGrowerSession } from "@/lib/session";
 
 // See app/app/page.tsx's identical export for why: without this, the
@@ -10,12 +11,6 @@ import { requireGrowerSession } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 const SEVERITY_RANK = { low: 0, moderate: 1, high: 2, severe: 3 } as const;
-const SEVERITY_COLOR: Record<string, string> = {
-  low: "#e0d24b",
-  moderate: "#e0913d",
-  high: "#e0553d",
-  severe: "#a3193d",
-};
 const FOLLOW_UP_AFTER_DAYS = 3;
 const DAY_MS = 86_400_000;
 
@@ -80,7 +75,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
             key={f}
             href={f === "all" ? "/app/events" : `/app/events?filter=${f}`}
             className={`rounded-full px-3 py-1.5 text-sm capitalize ${
-              filter === f ? "bg-[var(--accent)] text-[#0B1626]" : "card text-[var(--text-dim)]"
+              filter === f ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
             }`}
           >
             {f === "follow-up" ? "Needs follow-up" : f}

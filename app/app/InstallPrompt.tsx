@@ -87,7 +87,7 @@ export default function InstallPrompt() {
         <div className="flex-1 text-sm">Install Spectral for offline access and a home-screen icon.</div>
       )}
       {!showIosTip && (
-        <button onClick={install} className="shrink-0 rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[#0B1626]">
+        <button onClick={install} className="shrink-0 rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]">
           Install
         </button>
       )}

@@ -28,7 +28,7 @@ export default function QuickActionsMenu({ variant }: { variant: "corner" | "cen
       <div className="relative">
         <button
           onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[#0B1626]"
+          className="flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--on-accent)]"
         >
           + New
         </button>
@@ -88,7 +88,7 @@ export default function QuickActionsMenu({ variant }: { variant: "corner" | "cen
         style={
           isCorner
             ? { background: "var(--surface-raised)", border: "0.5px solid var(--border-soft)", color: "var(--text-dim)" }
-            : { background: "var(--accent)", border: "3px solid var(--surface)", color: "#0D1524" }
+            : { background: "var(--accent)", border: "3px solid var(--surface)", color: "var(--on-accent)" }
         }
       >
         {open ? "×" : "+"}

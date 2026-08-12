@@ -283,7 +283,7 @@ export default function MonitoringFlow({
                   type="button"
                   key={u}
                   onClick={() => toggleUnit(u)}
-                  className={`px-3 text-sm ${tempUnit === u ? "bg-[var(--accent)] text-[#0B1626]" : "text-[var(--text-dim)]"}`}
+                  className={`px-3 text-sm ${tempUnit === u ? "bg-[var(--accent)] text-[var(--on-accent)]" : "text-[var(--text-dim)]"}`}
                 >
                   °{u}
                 </button>
@@ -336,7 +336,7 @@ export default function MonitoringFlow({
                   className="flex-1 rounded-md border px-3 py-1.5 text-sm"
                   style={
                     satisfaction === n
-                      ? { background: "var(--accent)", color: "#0B1626", borderColor: "var(--accent)" }
+                      ? { background: "var(--accent)", color: "var(--on-accent)", borderColor: "var(--accent)" }
                       : { borderColor: "var(--border)" }
                   }
                 >
@@ -351,8 +351,7 @@ export default function MonitoringFlow({
       <button
         type="submit"
         disabled={submitting}
-        className="fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
-        style={{ background: "#25385a", border: "0.5px solid #37507a", color: "var(--text)" }}
+        className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
       >
         {submitting ? (capturesLocation ? "Logging…" : "Submitting…") : capturesLocation ? "Log location" : "Submit session"}
       </button>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { URGENCY_COLOR } from "@/lib/colors";
 import { getTask, taskUrgency } from "@/lib/tasks";
 import { getTeam } from "@/lib/team";
 import { requireGrowerSession } from "@/lib/session";
@@ -7,7 +8,6 @@ import TaskDetailClient from "./TaskDetailClient";
 export const dynamic = "force-dynamic";
 
 const URGENCY_LABEL = { overdue: "Overdue", due_soon: "Due soon", scheduled: "Scheduled", done: "Done", snoozed: "Snoozed" } as const;
-const URGENCY_COLOR = { overdue: "#CE5D40", due_soon: "#C79A3A", scheduled: "#4E6280", done: "#4E9E86", snoozed: "#4E6280" } as const;
 
 export default async function TaskDetailPage({ params }: { params: Promise<{ taskId: string }> }) {
   const session = await requireGrowerSession();
@@ -49,7 +49,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tas
       {task.pestEventId && pestSpecies && task.type === "monitor" && task.status === "open" && (
         <Link
           href={`/app/facilities/${task.facilityId}/pest-events/${task.pestEventId}/monitoring?taskId=${task.id}`}
-          className="rounded-md bg-[var(--accent)] px-4 py-3 text-center text-sm font-medium text-[#0B1626]"
+          className="rounded-md bg-[var(--accent)] px-4 py-3 text-center text-sm font-medium text-[var(--on-accent)]"
         >
           Start recheck
         </Link>
