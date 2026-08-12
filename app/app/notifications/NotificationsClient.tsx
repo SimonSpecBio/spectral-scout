@@ -16,6 +16,7 @@ interface Notification {
 const KIND_COLOR: Record<NotificationKind, string> = {
   threshold: "#CE5D40",
   trap: "#CE5D40",
+  scouting: "#CE5D40",
   lowstock: "#CE5D40",
   task_overdue: "#CE5D40",
   task_assigned: "#8FA2BD",

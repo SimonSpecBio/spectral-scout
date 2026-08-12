@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { facilities, facilityAreas, facilityMapObjects, inventoryItems, pestEvents, tasks, treatments } from "@/db/schema";
 import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
+import { computeScoutingAlerts } from "@/lib/scouting-alerts";
 import { taskUrgency } from "@/lib/tasks";
 import { computeMonitoringAlerts } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
@@ -119,11 +120,13 @@ export default async function HomePage({
   // already tracks this pest+zone) don't get a second, competing card here;
   // they're still visible from the trap's own row on the Traps screen.
   const trapAlerts = (await computeTrapAlerts(session.organizationId!)).filter((a) => !a.dedupedIntoEventId);
-  const trapAlertAreaIds = [...new Set(trapAlerts.map((a) => a.facilityAreaId))];
-  const trapAlertAreas = trapAlertAreaIds.length
-    ? await db.select().from(facilityAreas).where(inArray(facilityAreas.id, trapAlertAreaIds))
-    : [];
-  const trapAreaNameById = new Map(trapAlertAreas.map((a) => [a.id, a.name]));
+  // General scouting sessions that crossed threshold with no linked event
+  // yet -- same "suggestion, needs a human to confirm" rule as trap alerts
+  // (lib/scouting-alerts.ts), just with no species known to dedupe against.
+  const scoutingAlerts = await computeScoutingAlerts(session.organizationId!);
+  const alertAreaIds = [...new Set([...trapAlerts.map((a) => a.facilityAreaId), ...scoutingAlerts.map((a) => a.facilityAreaId)])];
+  const alertAreas = alertAreaIds.length ? await db.select().from(facilityAreas).where(inArray(facilityAreas.id, alertAreaIds)) : [];
+  const trapAreaNameById = new Map(alertAreas.map((a) => [a.id, a.name]));
 
   // "Treatment logged -> decrement InventoryItem; if now below reorderLevel,
   // raise low-stock notification" (ARCHITECTURE.md's trigger rules) -- no
@@ -154,6 +157,7 @@ export default async function HomePage({
       .map((e) => ({ kind: "trending" as const, event: e })),
     ...monitoringAlerts.map((a) => ({ kind: "threshold" as const, alert: a })),
     ...trapAlerts.map((a) => ({ kind: "trap" as const, alert: a })),
+    ...scoutingAlerts.map((a) => ({ kind: "scouting" as const, alert: a })),
     ...lowStockItems.map((i) => ({ kind: "lowstock" as const, item: i })),
   ].slice(0, 4);
 
@@ -358,6 +362,25 @@ export default async function HomePage({
                       <div className="text-sm">{a.trapLabel} spike &mdash; confirm {a.pestSpecies}?</div>
                       <div className="label-mono">
                         {(trapAreaNameById.get(a.facilityAreaId) ?? "").toUpperCase()} &middot; {a.catchPerDay.toFixed(1)}/DAY
+                      </div>
+                    </div>
+                    <span className="text-[var(--text-faint)]">›</span>
+                  </Link>
+                );
+              }
+              if (item.kind === "scouting") {
+                const a = item.alert;
+                return (
+                  <Link
+                    key={`scouting-${a.observationId}`}
+                    href={`/app/new-event?facility=${a.facilityId}&area=${a.facilityAreaId}`}
+                    className="flex items-center gap-3 p-3.5"
+                  >
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <div className="flex-1">
+                      <div className="text-sm">Scouting log over threshold — confirm?</div>
+                      <div className="label-mono">
+                        {(trapAreaNameById.get(a.facilityAreaId) ?? "").toUpperCase()} &middot; {a.infestedPct}% INFESTED
                       </div>
                     </div>
                     <span className="text-[var(--text-faint)]">›</span>

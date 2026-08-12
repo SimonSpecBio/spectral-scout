@@ -2,11 +2,20 @@ import { and, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, inventoryItems, inventoryOrders, tasks, treatments } from "@/db/schema";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
+import { computeScoutingAlerts } from "@/lib/scouting-alerts";
 import { computeMonitoringAlerts } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { taskUrgency } from "@/lib/tasks";
 
-export type NotificationKind = "threshold" | "trap" | "lowstock" | "task_assigned" | "task_overdue" | "rei_cleared" | "order_placed";
+export type NotificationKind =
+  | "threshold"
+  | "trap"
+  | "scouting"
+  | "lowstock"
+  | "task_assigned"
+  | "task_overdue"
+  | "rei_cleared"
+  | "order_placed";
 
 export interface Notification {
   id: string; // stable across renders -- localStorage read-state keys off this, not array index
@@ -52,6 +61,18 @@ export async function computeNotifications(organizationId: string, userId: strin
       sub: `${a.catchPerDay.toFixed(1)}/day ${a.pestSpecies}`,
       at: a.readingAt,
       href: `/app/traps?facility=${a.facilityId}`,
+    });
+  }
+
+  const scoutingAlerts = await computeScoutingAlerts(organizationId);
+  for (const a of scoutingAlerts) {
+    notifications.push({
+      id: `scouting-${a.observationId}`,
+      kind: "scouting",
+      title: `Scouting log over threshold — confirm?`,
+      sub: `${a.infestedPct}% infested`,
+      at: a.at,
+      href: `/app/new-event?facility=${a.facilityId}&area=${a.facilityAreaId}`,
     });
   }
 

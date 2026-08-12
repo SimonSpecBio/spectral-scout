@@ -6,6 +6,7 @@ import { insertTreatmentAndDecrementStock } from "@/lib/apply-treatment";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
+import { assignLeastLoadedWorker } from "@/lib/tasks";
 import { findPestProgram } from "@/lib/treatments-catalog";
 
 const DAY_MS = 86_400_000;
@@ -60,6 +61,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const createdTasks = [];
 
   if (program?.followUp) {
+    // Auto-assigned to a real worker (least open-task load) rather than
+    // left unassigned -- see assignLeastLoadedWorker's comment. Computed
+    // once and reused for both tasks below so a recheck+release pair from
+    // the same apply-program call lands on the same person, not split.
+    const assigneeUserId = await assignLeastLoadedWorker(session.organizationId!);
+
     const [recheckTask] = await db
       .insert(tasks)
       .values({
@@ -71,6 +78,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         pestEventId: eventId,
         x: event.x,
         y: event.y,
+        assigneeUserId,
         createdByUserId: session.user!.id!,
         source: "auto_program",
         dueAt: new Date(Date.now() + program.followUp.recheckDays * DAY_MS),
@@ -90,6 +98,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           pestEventId: eventId,
           x: event.x,
           y: event.y,
+          assigneeUserId,
           createdByUserId: session.user!.id!,
           source: "auto_program",
           dueAt: new Date(Date.now() + program.followUp.releaseIntervalDays * DAY_MS),

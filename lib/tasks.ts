@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents, tasks } from "@/db/schema";
+import { getTeam } from "@/lib/team";
 
 export type TaskUrgency = "overdue" | "due_soon" | "scheduled" | "done" | "snoozed";
 const DUE_SOON_MS = 24 * 60 * 60 * 1000;
@@ -64,4 +65,36 @@ export async function getTaskLoadByUser(organizationId: string, userIds: string[
     load.set(t.assigneeUserId, (load.get(t.assigneeUserId) ?? 0) + 1);
   }
   return load;
+}
+
+// Auto-assigns an auto-generated task (recheck/release from the
+// recommendation engine, apply-program/route.ts) to a real person instead
+// of leaving it unassigned. An unassigned task has nothing pointing anyone
+// at it -- both of notifications.ts's task_assigned/task_overdue kinds are
+// keyed off assigneeUserId -- so it was effectively invisible until a
+// manager happened to check the Schedule "everyone" tab. Picks the member
+// (role="member", i.e. a worker/scout, not the owner/manager who applied
+// the treatment) with the fewest currently-open tasks, the same load
+// figure the manual assign picker already shows. Falls back to null
+// (unassigned, today's behavior) if the org has no workers yet -- a solo
+// owner shouldn't get auto-assigned their own follow-ups.
+export async function assignLeastLoadedWorker(organizationId: string): Promise<string | null> {
+  const { members } = await getTeam(organizationId);
+  const workers = members.filter((m) => m.role === "member");
+  if (workers.length === 0) return null;
+
+  const load = await getTaskLoadByUser(
+    organizationId,
+    workers.map((w) => w.userId)
+  );
+  let best = workers[0].userId;
+  let bestLoad = load.get(best) ?? 0;
+  for (const w of workers.slice(1)) {
+    const l = load.get(w.userId) ?? 0;
+    if (l < bestLoad) {
+      best = w.userId;
+      bestLoad = l;
+    }
+  }
+  return best;
 }
