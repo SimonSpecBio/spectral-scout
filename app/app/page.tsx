@@ -38,11 +38,13 @@ function relativeTime(date: Date): string {
 }
 
 // The whole app in one screen, per the "mission control, not a drawing
-// tool" direction. Mobile shows a placeholder pressure heatmap where the
-// real interactive map would go (dragging precise shapes doesn't work on a
-// phone screen, and the real row/bay data model doesn't exist yet -- see
-// PressureHeatmapPlaceholder); desktop keeps the real interactive Konva map.
-// Everything else (pressure graph, attention required, today's tasks,
+// tool" direction. The lens-switching pressure heatmap (MapLensSwitcher --
+// dragging precise shapes doesn't work on a phone screen, and the real
+// row/bay data model doesn't exist yet, see PressureHeatmapPlaceholder)
+// now shows on every screen size, side by side with the real interactive
+// Konva map once there's room (lg:) rather than being mobile-only; the
+// editable map still needs desktop-grade precision, so it stays desktop-
+// only. Everything else (pressure graph, attention required, today's tasks,
 // recent activity) is real data on both.
 export default async function HomePage({
   searchParams,
@@ -329,10 +331,10 @@ export default async function HomePage({
         )}
       </div>
 
-      <div className="sm:hidden">
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
         <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
+        <div className="hidden sm:block">{desktopMapSection}</div>
       </div>
-      <div className="hidden sm:block">{desktopMapSection}</div>
 
       <PressureGraph events={events.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
 
