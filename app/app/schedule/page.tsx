@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { initialsFor } from "@/lib/avatar";
 import { URGENCY_COLOR } from "@/lib/colors";
-import { getOrgTasks, taskUrgency } from "@/lib/tasks";
+import { getOrgTasks, taskActionHref, taskUrgency } from "@/lib/tasks";
 import { getTeam } from "@/lib/team";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -81,7 +81,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
                 return (
                   <Link
                     key={task.id}
-                    href={`/app/schedule/${task.id}`}
+                    href={taskActionHref(task)}
                     className="card flex items-center gap-3 p-3.5"
                     style={{ borderLeft: `3px solid ${URGENCY_COLOR[urgency]}` }}
                   >

@@ -9,6 +9,21 @@ const DUE_SOON_MS = 24 * 60 * 60 * 1000;
 // "overdue" is deliberately not a stored status (see scout_task's schema
 // comment) -- derived here from dueAt vs now so it's never stale, same
 // spirit as the REI/PHI countdowns being live-computed rather than cached.
+// A monitor-type task backed by a real pest event has one obvious next
+// action -- log the recheck -- so tapping it should land directly on the
+// plant-sampling grid (10 plants x top/mid/bottom leaf) instead of a task
+// detail page that just links onward to a Method Choice screen the answer
+// to which is already known. Other task types (release, treatment,
+// trap_read, ...) have no dedicated capture screen yet, so those still
+// land on task detail. Shared by the dashboard's Today's tasks, the
+// Schedule list, and Notifications so all three behave the same way.
+export function taskActionHref(task: { id: string; type: string; facilityId: string | null; pestEventId: string | null }): string {
+  if (task.type === "monitor" && task.facilityId && task.pestEventId) {
+    return `/app/facilities/${task.facilityId}/pest-events/${task.pestEventId}/monitoring?taskId=${task.id}&method=plant_sampling`;
+  }
+  return `/app/schedule/${task.id}`;
+}
+
 export function taskUrgency(task: { status: "open" | "done" | "snoozed"; dueAt: Date }): TaskUrgency {
   if (task.status !== "open") return task.status;
   const now = Date.now();

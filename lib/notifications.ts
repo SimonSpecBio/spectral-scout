@@ -5,7 +5,7 @@ import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { computeScoutingAlerts } from "@/lib/scouting-alerts";
 import { computeMonitoringAlerts } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
-import { taskUrgency } from "@/lib/tasks";
+import { taskActionHref, taskUrgency } from "@/lib/tasks";
 
 export type NotificationKind =
   | "threshold"
@@ -141,7 +141,7 @@ export async function computeNotifications(organizationId: string, userId: strin
         title: `${t.title} overdue`,
         sub: "Assigned to you",
         at: t.dueAt,
-        href: `/app/schedule/${t.id}`,
+        href: taskActionHref(t),
       });
     } else {
       notifications.push({
@@ -150,7 +150,7 @@ export async function computeNotifications(organizationId: string, userId: strin
         title: t.title,
         sub: "Assigned to you",
         at: t.createdAt,
-        href: `/app/schedule/${t.id}`,
+        href: taskActionHref(t),
       });
     }
   }

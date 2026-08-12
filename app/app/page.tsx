@@ -5,7 +5,7 @@ import { facilities, facilityAreas, facilityMapObjects, inventoryItems, pestEven
 import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
 import { computeScoutingAlerts } from "@/lib/scouting-alerts";
-import { taskUrgency } from "@/lib/tasks";
+import { taskActionHref, taskUrgency } from "@/lib/tasks";
 import { computeMonitoringAlerts } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { requireGrowerSession } from "@/lib/session";
@@ -77,23 +77,61 @@ export default async function HomePage({
     );
   }
 
-  const events = await db
-    .select({
-      id: pestEvents.id,
-      pestSpecies: pestEvents.pestSpecies,
-      severity: pestEvents.severity,
-      status: pestEvents.status,
-      createdAt: pestEvents.createdAt,
-      resolvedAt: pestEvents.resolvedAt,
-      facilityId: pestEvents.facilityId,
-      facilityAreaId: pestEvents.facilityAreaId,
-      facilityName: facilities.name,
-      areaName: facilityAreas.name,
-    })
-    .from(pestEvents)
-    .innerJoin(facilities, eq(pestEvents.facilityId, facilities.id))
-    .leftJoin(facilityAreas, eq(pestEvents.facilityAreaId, facilityAreas.id))
-    .where(eq(facilities.organizationId, session.organizationId!));
+  // All seven of these only need session.organizationId/user.id, which are
+  // already known -- none depends on another's result, so they were pure
+  // added latency run one after another. Batched into one round trip
+  // instead of seven.
+  const [events, myOpenTasks, trapAlertsRaw, scoutingAlerts, orgInventory, monitoringAlertsRaw, orgTreatments] = await Promise.all([
+    db
+      .select({
+        id: pestEvents.id,
+        pestSpecies: pestEvents.pestSpecies,
+        severity: pestEvents.severity,
+        status: pestEvents.status,
+        createdAt: pestEvents.createdAt,
+        resolvedAt: pestEvents.resolvedAt,
+        facilityId: pestEvents.facilityId,
+        facilityAreaId: pestEvents.facilityAreaId,
+        facilityName: facilities.name,
+        areaName: facilityAreas.name,
+      })
+      .from(pestEvents)
+      .innerJoin(facilities, eq(pestEvents.facilityId, facilities.id))
+      .leftJoin(facilityAreas, eq(pestEvents.facilityAreaId, facilityAreas.id))
+      .where(eq(facilities.organizationId, session.organizationId!)),
+    // "Dashboard Today's Tasks is this same Task list filtered to assignee =
+    // me, due = today -- not a separate store" (SCHEDULING.md). Overdue tasks
+    // assigned to me surface here too, not just tasks due exactly today,
+    // since those are exactly what needs attention first.
+    db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.organizationId, session.organizationId!), eq(tasks.assigneeUserId, session.user!.id!), eq(tasks.status, "open"))),
+    // Trap spikes needing confirmation -- deduped alerts (an open event
+    // already tracks this pest+zone) don't get a second, competing card
+    // here; they're still visible from the trap's own row on the Traps screen.
+    computeTrapAlerts(session.organizationId!),
+    // General scouting sessions that crossed threshold with no linked event
+    // yet -- same "suggestion, needs a human to confirm" rule as trap alerts
+    // (lib/scouting-alerts.ts), just with no species known to dedupe against.
+    computeScoutingAlerts(session.organizationId!),
+    // "Treatment logged -> decrement InventoryItem; if now below
+    // reorderLevel, raise low-stock notification" (ARCHITECTURE.md's
+    // trigger rules) -- no separate notification feed exists yet, so this
+    // surfaces the same way every other exception does: as an Attention
+    // Required card, computed live from quantity vs reorderLevel rather
+    // than a stored alert.
+    db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!)),
+    // ThresholdEngine (ARCHITECTURE.md ยง3): a real configured infested-%
+    // comparison, not the trend heuristic below.
+    computeMonitoringAlerts(session.organizationId!),
+    db
+      .select({ pestEventId: treatments.pestEventId, type: treatments.type, appliedAt: treatments.appliedAt })
+      .from(treatments)
+      .innerJoin(facilities, eq(treatments.facilityId, facilities.id))
+      .where(eq(facilities.organizationId, session.organizationId!)),
+  ]);
+  const trapAlerts = trapAlertsRaw.filter((a) => !a.dedupedIntoEventId);
 
   const active = events
     .filter((e) => e.status === "active")
@@ -101,48 +139,28 @@ export default async function HomePage({
 
   const todaysFollowUps = active.filter((e) => needsFollowUp(e.createdAt));
   const resolvedToday = events.filter((e) => e.status === "resolved" && e.resolvedAt && isToday(e.resolvedAt));
-
-  // "Dashboard Today's Tasks is this same Task list filtered to assignee =
-  // me, due = today -- not a separate store" (SCHEDULING.md). Overdue tasks
-  // assigned to me surface here too, not just tasks due exactly today,
-  // since those are exactly what needs attention first.
-  const myOpenTasks = await db
-    .select()
-    .from(tasks)
-    .where(and(eq(tasks.organizationId, session.organizationId!), eq(tasks.assigneeUserId, session.user!.id!), eq(tasks.status, "open")));
   const myTasksToday = myOpenTasks
     .filter((t) => isToday(t.dueAt) || taskUrgency(t) === "overdue")
     .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
 
-  const eventSignals = await computeEventSignals(active.map((e) => e.id));
-
-  // Trap spikes needing confirmation -- deduped alerts (an open event
-  // already tracks this pest+zone) don't get a second, competing card here;
-  // they're still visible from the trap's own row on the Traps screen.
-  const trapAlerts = (await computeTrapAlerts(session.organizationId!)).filter((a) => !a.dedupedIntoEventId);
-  // General scouting sessions that crossed threshold with no linked event
-  // yet -- same "suggestion, needs a human to confirm" rule as trap alerts
-  // (lib/scouting-alerts.ts), just with no species known to dedupe against.
-  const scoutingAlerts = await computeScoutingAlerts(session.organizationId!);
+  // Both depend on results from the batch above (active, trapAlerts,
+  // scoutingAlerts) but not on each other -- still worth one more
+  // Promise.all rather than two sequential awaits.
   const alertAreaIds = [...new Set([...trapAlerts.map((a) => a.facilityAreaId), ...scoutingAlerts.map((a) => a.facilityAreaId)])];
-  const alertAreas = alertAreaIds.length ? await db.select().from(facilityAreas).where(inArray(facilityAreas.id, alertAreaIds)) : [];
+  const [eventSignals, alertAreas] = await Promise.all([
+    computeEventSignals(active.map((e) => e.id)),
+    alertAreaIds.length ? db.select().from(facilityAreas).where(inArray(facilityAreas.id, alertAreaIds)) : Promise.resolve([]),
+  ]);
   const trapAreaNameById = new Map(alertAreas.map((a) => [a.id, a.name]));
 
-  // "Treatment logged -> decrement InventoryItem; if now below reorderLevel,
-  // raise low-stock notification" (ARCHITECTURE.md's trigger rules) -- no
-  // separate notification feed exists yet, so this surfaces the same way
-  // every other exception does: as an Attention Required card, computed
-  // live from quantity vs reorderLevel rather than a stored alert.
-  const orgInventory = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
   const lowStockItems = orgInventory.filter((i) => i.reorderLevel != null && Number(i.quantity) <= Number(i.reorderLevel));
 
-  // ThresholdEngine (ARCHITECTURE.md ยง3): a real configured infested-%
-  // comparison, not the trend heuristic below -- excludes events the trend
-  // heuristic already surfaced so the same event doesn't show twice.
+  // Excludes events the trend heuristic below already surfaced so the same
+  // event doesn't show twice.
   const trendingEventIds = new Set(
     active.filter((e) => eventSignals.get(e.id)?.trend === "up" && (e.severity === "high" || e.severity === "severe")).map((e) => e.id)
   );
-  const monitoringAlerts = (await computeMonitoringAlerts(session.organizationId!)).filter((a) => !trendingEventIds.has(a.eventId));
+  const monitoringAlerts = monitoringAlertsRaw.filter((a) => !trendingEventIds.has(a.eventId));
 
   // Attention Required: real exceptions, not a generic list -- an overdue
   // follow-up, an active event whose density is trending up (computed from
@@ -161,11 +179,6 @@ export default async function HomePage({
     ...lowStockItems.map((i) => ({ kind: "lowstock" as const, item: i })),
   ].slice(0, 4);
 
-  const orgTreatments = await db
-    .select({ pestEventId: treatments.pestEventId, type: treatments.type, appliedAt: treatments.appliedAt })
-    .from(treatments)
-    .innerJoin(facilities, eq(treatments.facilityId, facilities.id))
-    .where(eq(facilities.organizationId, session.organizationId!));
   const treatmentsByEvent = new Map<string, typeof orgTreatments>();
   for (const t of orgTreatments) {
     if (!t.pestEventId) continue;
@@ -212,15 +225,20 @@ export default async function HomePage({
     const selectedAreaId = areaParam ?? hottestAreaEvent?.facilityAreaId ?? areas[0].id;
     const selectedArea = areas.find((a) => a.id === selectedAreaId) ?? areas[0];
 
-    const objects = await db.select().from(facilityMapObjects).where(eq(facilityMapObjects.facilityAreaId, selectedArea.id));
-    const areaPestEvents = await db.select().from(pestEvents).where(and(eq(pestEvents.facilityAreaId, selectedArea.id)));
+    // objects/areaPestEvents/bayLensStats each only need selectedArea.id --
+    // one round trip instead of three. signals depends on areaPestEvents'
+    // resolved rows, so it stays a separate await after.
+    const [objects, areaPestEvents, bayLensStats] = await Promise.all([
+      db.select().from(facilityMapObjects).where(eq(facilityMapObjects.facilityAreaId, selectedArea.id)),
+      db.select().from(pestEvents).where(and(eq(pestEvents.facilityAreaId, selectedArea.id))),
+      computeBayLensStats(selectedArea.id),
+    ]);
     const signals = await computeEventSignals(areaPestEvents.map((e) => e.id));
 
     heatmapEvents = areaPestEvents
       .filter((ev) => ev.status === "active" && ev.x != null && ev.y != null)
       .map((ev) => ({ x: ev.x!, y: ev.y!, severity: ev.severity }));
 
-    const bayLensStats = await computeBayLensStats(selectedArea.id);
     bayLensEntries = [...bayLensStats.entries()].map(([key, s]) => ({
       key,
       lastScoutedAt: s.lastScoutedAt ? s.lastScoutedAt.toISOString() : null,
@@ -451,7 +469,7 @@ export default async function HomePage({
         ) : (
           <div className="card flex flex-col gap-3 p-4">
             {myTasksToday.map((t) => (
-              <Link key={t.id} href={`/app/schedule/${t.id}`} className="flex items-center gap-3">
+              <Link key={t.id} href={taskActionHref(t)} className="flex items-center gap-3">
                 <span
                   className="h-4 w-4 shrink-0 rounded border"
                   style={{ borderColor: taskUrgency(t) === "overdue" ? "var(--accent)" : "var(--text-faint)" }}
