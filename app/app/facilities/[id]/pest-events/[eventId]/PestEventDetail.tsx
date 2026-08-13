@@ -63,6 +63,7 @@ export default function PestEventDetail({
   inventoryItems,
   threshold,
   followUpSuggestions,
+  initialTab,
 }: {
   facilityId: string;
   event: Event;
@@ -75,9 +76,10 @@ export default function PestEventDetail({
   inventoryItems: { id: string; name: string; unit: string; quantity: number; reorderLevel: number | null }[];
   threshold: number;
   followUpSuggestions: FollowUpSuggestion[];
+  initialTab?: string;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("timeline");
+  const [tab, setTab] = useState<Tab>(initialTab && (TABS as readonly string[]).includes(initialTab) ? (initialTab as Tab) : "timeline");
   const [status, setStatus] = useState(event.status);
   const [treatmentsList, setTreatmentsList] = useState(initialTreatments);
   const [photos, setPhotos] = useState(initialPhotos);

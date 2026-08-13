@@ -6,7 +6,7 @@ import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
 import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-alerts";
 import { taskActionHref, taskUrgency } from "@/lib/tasks";
-import { computeMonitoringAlerts } from "@/lib/threshold-engine";
+import { computeEscalationAlerts, computeMonitoringAlerts } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { requireGrowerSession } from "@/lib/session";
 import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
@@ -81,7 +81,7 @@ export default async function HomePage({
   // already known -- none depends on another's result, so they were pure
   // added latency run one after another. Batched into one round trip
   // instead of seven.
-  const [events, myOpenTasks, trapAlertsRaw, scoutingAlerts, orgInventory, monitoringAlertsRaw, orgTreatments] = await Promise.all([
+  const [events, myOpenTasks, trapAlertsRaw, scoutingAlerts, orgInventory, monitoringAlertsRaw, orgTreatments, escalationAlerts] = await Promise.all([
     db
       .select({
         id: pestEvents.id,
@@ -130,6 +130,9 @@ export default async function HomePage({
       .from(treatments)
       .innerJoin(facilities, eq(treatments.facilityId, facilities.id))
       .where(eq(facilities.organizationId, session.organizationId!)),
+    // Treated but not improving -- the mirror of monitoringAlerts, see
+    // lib/threshold-engine.ts's comment on computeEscalationAlerts.
+    computeEscalationAlerts(session.organizationId!),
   ]);
   const trapAlerts = trapAlertsRaw.filter((a) => !a.dedupedIntoEventId);
 
@@ -174,6 +177,7 @@ export default async function HomePage({
       .filter((e) => eventSignals.get(e.id)?.trend === "up" && (e.severity === "high" || e.severity === "severe"))
       .map((e) => ({ kind: "trending" as const, event: e })),
     ...monitoringAlerts.map((a) => ({ kind: "threshold" as const, alert: a })),
+    ...escalationAlerts.map((a) => ({ kind: "escalation" as const, alert: a })),
     ...trapAlerts.map((a) => ({ kind: "trap" as const, alert: a })),
     ...scoutingAlerts.map((a) => ({ kind: "scouting" as const, alert: a })),
     ...lowStockItems.map((i) => ({ kind: "lowstock" as const, item: i })),
@@ -418,6 +422,25 @@ export default async function HomePage({
                       <div className="text-sm">{a.pestSpecies} over threshold</div>
                       <div className="label-mono">
                         {a.infestedPct}% INFESTED &middot; THRESHOLD {a.threshold}%
+                      </div>
+                    </div>
+                    <span className="text-[var(--text-faint)]">›</span>
+                  </Link>
+                );
+              }
+              if (item.kind === "escalation") {
+                const a = item.alert;
+                return (
+                  <Link
+                    key={`escalation-${a.eventId}`}
+                    href={`/app/facilities/${a.facilityId}/pest-events/${a.eventId}?tab=recommended`}
+                    className="flex items-center gap-3 p-3.5"
+                  >
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <div className="flex-1">
+                      <div className="text-sm">{a.pestSpecies} not improving — try a different tier?</div>
+                      <div className="label-mono">
+                        {a.baselinePct}% → {a.latestPct}% AFTER {a.daysSinceTreatment}D
                       </div>
                     </div>
                     <span className="text-[var(--text-faint)]">›</span>

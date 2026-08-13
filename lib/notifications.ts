@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { facilities, inventoryItems, inventoryOrders, pestEvents, tasks, treatments } from "@/db/schema";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-alerts";
-import { computeMonitoringAlerts } from "@/lib/threshold-engine";
+import { computeEscalationAlerts, computeMonitoringAlerts } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { taskActionHref, taskUrgency } from "@/lib/tasks";
 
@@ -16,7 +16,8 @@ export type NotificationKind =
   | "task_overdue"
   | "rei_cleared"
   | "order_placed"
-  | "event_auto_resolved";
+  | "event_auto_resolved"
+  | "escalation";
 
 export interface Notification {
   id: string; // stable across renders -- localStorage read-state keys off this, not array index
@@ -74,6 +75,18 @@ export async function computeNotifications(organizationId: string, userId: strin
       sub: `${a.infestedPct}% infested`,
       at: a.at,
       href: scoutingAlertConfirmHref(a),
+    });
+  }
+
+  const escalationAlerts = await computeEscalationAlerts(organizationId);
+  for (const a of escalationAlerts) {
+    notifications.push({
+      id: `escalation-${a.eventId}`,
+      kind: "escalation",
+      title: `${a.pestSpecies} not improving — try a different tier?`,
+      sub: `${a.baselinePct}% → ${a.latestPct}% after ${a.daysSinceTreatment}d`,
+      at: a.at,
+      href: `/app/facilities/${a.facilityId}/pest-events/${a.eventId}?tab=recommended`,
     });
   }
 

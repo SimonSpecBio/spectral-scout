@@ -10,11 +10,18 @@ import { requireGrowerSession } from "@/lib/session";
 import { getSpeciesThreshold } from "@/lib/threshold-engine";
 import PestEventDetail from "./PestEventDetail";
 
-export default async function PestEventPage({ params }: { params: Promise<{ id: string; eventId: string }> }) {
+export default async function PestEventPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string; eventId: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const session = await requireGrowerSession();
   if (!session) return null;
 
   const { id, eventId } = await params;
+  const { tab: initialTab } = await searchParams;
   const facility = await getOwnedFacility(id, session.organizationId!);
   if (!facility) notFound();
 
@@ -78,6 +85,7 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
         }}
         locationLabel={locationLabel}
         mapHref={area ? `/app/facilities/${id}/areas/${area.id}` : null}
+        initialTab={initialTab}
         facilityAreaId={area?.id ?? null}
         followUpSuggestions={followUpSuggestions}
         initialTreatments={eventTreatments.map((t) => ({
