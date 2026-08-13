@@ -1,3 +1,5 @@
+import { findAgent, findPestProgram } from "@/lib/treatments-catalog";
+
 export type StockStatus = "in_stock" | "low" | "out" | "unknown";
 
 // Cross-checks a recommended agent/product name against the org's actual
@@ -17,4 +19,76 @@ export function matchInventoryStock(
   if (item.quantity <= 0) return "out";
   if (item.reorderLevel != null && item.quantity <= item.reorderLevel) return "low";
   return "in_stock";
+}
+
+export interface FollowUpSuggestion {
+  id: string;
+  label: string;
+  sub: string;
+  task: {
+    title: string;
+    type: "release" | "scout" | "other";
+    dueInDays: number;
+    repeatEveryDays: number | null;
+  };
+}
+
+// "After an event auto-resolves, don't just go quiet" -- 1-3 preventive
+// follow-ups relevant to the species and area, never auto-created (see
+// PestEventDetail's Accept button, the only thing that actually creates a
+// task from these). Area-scoped, not tied back to the now-closed event
+// (pestEventId stays null on the created tasks) -- these are about
+// keeping the area clean going forward, not the resolved incident itself.
+export function computeFollowUpSuggestions(params: {
+  pestSpecies: string;
+  locationLabel: string;
+  usedInventoryItems: { id: string; name: string; quantity: number; reorderLevel: number | null }[];
+}): FollowUpSuggestion[] {
+  const suggestions: FollowUpSuggestion[] = [];
+  const program = findPestProgram(params.pestSpecies);
+
+  const agentId = program?.primaryBiocontrol[0];
+  const agent = agentId ? findAgent(agentId) : undefined;
+  if (agent) {
+    suggestions.push({
+      id: "release",
+      label: `Preventive ${agent.name} release`,
+      sub: `Recurring every ${agent.reintroDays} days`,
+      task: {
+        title: `Preventive release: ${agent.name} — ${params.locationLabel}`,
+        type: "release",
+        dueInDays: agent.reintroDays,
+        repeatEveryDays: agent.reintroDays,
+      },
+    });
+  }
+
+  suggestions.push({
+    id: "scout",
+    label: "Weekly scouting cadence",
+    sub: `Keep an eye on ${params.locationLabel} going forward`,
+    task: {
+      title: `Scout — ${params.locationLabel}`,
+      type: "scout",
+      dueInDays: 7,
+      repeatEveryDays: 7,
+    },
+  });
+
+  for (const item of params.usedInventoryItems) {
+    if (item.reorderLevel == null || item.quantity > item.reorderLevel) continue;
+    suggestions.push({
+      id: `restock-${item.id}`,
+      label: `Restock ${item.name}`,
+      sub: `${item.quantity} left, at or below reorder level`,
+      task: {
+        title: `Restock ${item.name}`,
+        type: "other",
+        dueInDays: 3,
+        repeatEveryDays: null,
+      },
+    });
+  }
+
+  return suggestions.slice(0, 3);
 }

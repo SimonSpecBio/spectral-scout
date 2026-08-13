@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { facilityAreas, inventoryItems, observationPhotos, scoutingObservations, treatments } from "@/db/schema";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { getOwnedFacility } from "@/lib/facilities";
+import { computeFollowUpSuggestions } from "@/lib/recommendations";
 import { requireGrowerSession } from "@/lib/session";
 import { getSpeciesThreshold } from "@/lib/threshold-engine";
 import PestEventDetail from "./PestEventDetail";
@@ -32,6 +33,23 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
     .orderBy(desc(scoutingObservations.createdAt));
   const items = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
   const threshold = await getSpeciesThreshold(session.organizationId!, event.pestSpecies);
+  const locationLabel = area ? `${area.name}, ${facility.name}` : facility.name;
+
+  // "After an event auto-resolves, don't just go quiet" -- only computed
+  // for the auto-resolve case (manual resolve means the grower already
+  // knows and closed it deliberately, same distinction the notification
+  // makes). usedInventoryItems is whatever this event's treatments drew
+  // from, so the restock suggestion is grounded in what was actually used.
+  const followUpSuggestions =
+    event.status === "resolved" && event.autoResolved
+      ? computeFollowUpSuggestions({
+          pestSpecies: event.pestSpecies,
+          locationLabel,
+          usedInventoryItems: items
+            .filter((i) => eventTreatments.some((t) => t.inventoryItemId === i.id))
+            .map((i) => ({ id: i.id, name: i.name, quantity: Number(i.quantity), reorderLevel: i.reorderLevel == null ? null : Number(i.reorderLevel) })),
+        })
+      : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -58,8 +76,10 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
           resolvedAt: event.resolvedAt ? event.resolvedAt.toISOString() : null,
           autoResolved: event.autoResolved,
         }}
-        locationLabel={area ? `${area.name}, ${facility.name}` : facility.name}
+        locationLabel={locationLabel}
         mapHref={area ? `/app/facilities/${id}/areas/${area.id}` : null}
+        facilityAreaId={area?.id ?? null}
+        followUpSuggestions={followUpSuggestions}
         initialTreatments={eventTreatments.map((t) => ({
           id: t.id,
           type: t.type,

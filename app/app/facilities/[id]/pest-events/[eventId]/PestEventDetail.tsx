@@ -7,6 +7,7 @@ import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { scaledPoints } from "@/lib/density";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import type { FollowUpSuggestion } from "@/lib/recommendations";
 import { findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
 import RecommendationsPanel from "./RecommendationsPanel";
 
@@ -55,21 +56,25 @@ export default function PestEventDetail({
   event,
   locationLabel,
   mapHref,
+  facilityAreaId,
   initialTreatments,
   initialPhotos,
   initialMonitoring,
   inventoryItems,
   threshold,
+  followUpSuggestions,
 }: {
   facilityId: string;
   event: Event;
   locationLabel: string;
   mapHref: string | null;
+  facilityAreaId: string | null;
   initialTreatments: Treatment[];
   initialPhotos: Photo[];
   initialMonitoring: MonitoringSession[];
   inventoryItems: { id: string; name: string; unit: string; quantity: number; reorderLevel: number | null }[];
   threshold: number;
+  followUpSuggestions: FollowUpSuggestion[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("timeline");
@@ -90,6 +95,8 @@ export default function PestEventDetail({
   const [uploading, setUploading] = useState(false);
   const [quickLogging, setQuickLogging] = useState(false);
   const [quickLogged, setQuickLogged] = useState(false);
+  const [acceptingSuggestion, setAcceptingSuggestion] = useState<string | null>(null);
+  const [acceptedSuggestions, setAcceptedSuggestions] = useState<Set<string>>(new Set());
   const selectedItem = inventoryItems.find((i) => i.id === inventoryItemId);
 
   const base = `/api/facilities/${facilityId}/pest-events/${event.id}`;
@@ -137,6 +144,33 @@ export default function PestEventDetail({
       }
     }
     setQuickLogging(false);
+  }
+
+  // "Nothing is auto-created without the grower accepting" -- these tasks
+  // only ever get created from this explicit tap, never automatically
+  // alongside the auto-resolve itself. Area-scoped (facilityAreaId, no
+  // pestEventId) since they're about keeping the area clean going
+  // forward, not the now-closed incident.
+  async function acceptSuggestion(s: FollowUpSuggestion) {
+    setAcceptingSuggestion(s.id);
+    const dueAt = new Date(Date.now() + s.task.dueInDays * 86_400_000).toISOString();
+    const res = await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: s.task.title,
+        type: s.task.type,
+        facilityId,
+        facilityAreaId,
+        dueAt,
+        repeatEveryDays: s.task.repeatEveryDays,
+      }),
+    });
+    if (res.ok) {
+      markEngaged();
+      setAcceptedSuggestions((prev) => new Set(prev).add(s.id));
+    }
+    setAcceptingSuggestion(null);
   }
 
   async function toggleStatus() {
@@ -284,6 +318,32 @@ export default function PestEventDetail({
           <button onClick={toggleStatus} className="shrink-0 text-xs text-[var(--text-dim)] underline">
             Not resolved? Reopen
           </button>
+        </div>
+      )}
+
+      {status === "resolved" && event.autoResolved && followUpSuggestions.length > 0 && (
+        <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
+          <div className="pb-2 label-mono">Keep it from coming back</div>
+          {followUpSuggestions.map((s) => {
+            const accepted = acceptedSuggestions.has(s.id);
+            return (
+              <div key={s.id} className="flex items-center justify-between gap-3 py-3">
+                <div>
+                  <div className="text-sm">{s.label}</div>
+                  <div className="label-mono">{s.sub}</div>
+                </div>
+                <button
+                  onClick={() => acceptSuggestion(s)}
+                  disabled={accepted || acceptingSuggestion === s.id}
+                  className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-70 ${
+                    accepted ? "text-[#4E9E86]" : "bg-[var(--accent)] text-[var(--on-accent)]"
+                  }`}
+                >
+                  {accepted ? "Scheduled ✓" : acceptingSuggestion === s.id ? "Scheduling…" : "Accept"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
