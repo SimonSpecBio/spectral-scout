@@ -19,10 +19,18 @@ export default async function Home() {
       </p>
       <Link
         href="/api/auth/signin"
-        className="rounded-md bg-[var(--accent)] px-5 py-2.5 font-medium text-[#0B1626]"
+        className="rounded-md bg-[var(--accent)] px-5 py-2.5 font-medium text-[var(--on-accent)]"
       >
         Sign in
       </Link>
+      <p className="max-w-md text-sm text-[var(--text-faint)]">
+        Scout is built by{" "}
+        <a href="https://spectralbiocontrol.com" className="text-[var(--text-dim)] underline">
+          Spectral Biocontrol
+        </a>
+        . Find and confirm a pest here, then treat it chemical-free with Spectral&apos;s light-based hardware when
+        you&apos;re ready.
+      </p>
     </main>
   );
 }
