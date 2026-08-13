@@ -16,6 +16,49 @@ const staffEmails = new Set(
     .filter(Boolean)
 );
 
+// Two concurrent first-sign-in requests for the same brand-new email (two
+// tabs, a prefetch racing the real load) used to both see no membership
+// row and both provision a fresh org, leaving a silent duplicate. memberships
+// .userId is now a unique constraint (db/schema.ts), and the whole
+// provision runs in one transaction: if a concurrent request's insert wins
+// the race first, this one's insert hits a 23505 unique-violation, the
+// transaction (including its own org insert) rolls back atomically -- no
+// orphaned org left behind either -- and a re-select picks up the winning
+// row. Loops at most once more since the second select is guaranteed to
+// find it.
+async function provisionMembership(userId: string, email: string, name: string | null) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await db.transaction(async (tx) => {
+        // A pending invite (see /app/team) takes priority over the normal
+        // self-serve path -- this email was invited to an existing org, so
+        // join that org at the invited role instead of provisioning a
+        // brand-new one. Consumed once: delete the invite so a later
+        // duplicate invite (or re-invite after removal) starts fresh.
+        const [invite] = await tx.select().from(invites).where(eq(invites.email, email));
+        let organizationId: string;
+        let role: (typeof memberships.$inferInsert)["role"];
+        if (invite) {
+          organizationId = invite.organizationId;
+          role = invite.role;
+        } else {
+          const [org] = await tx.insert(organizations).values({ name: name || email, accountTier: "general" }).returning();
+          organizationId = org.id;
+          role = "owner";
+        }
+        const [row] = await tx.insert(memberships).values({ userId, organizationId, role }).returning();
+        if (invite) await tx.delete(invites).where(eq(invites.id, invite.id));
+        return row;
+      });
+    } catch (err) {
+      if ((err as { code?: string }).code === "23505") continue;
+      throw err;
+    }
+  }
+  const [row] = await db.select().from(memberships).where(eq(memberships.userId, userId));
+  return row;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   // @auth/drizzle-adapter's types want the literal PgTableWithColumns shape;
   // .enableRLS() (db/auth-schema.ts) deliberately returns that type minus
@@ -84,28 +127,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       let [membership] = await db.select().from(memberships).where(eq(memberships.userId, userId));
       if (!membership) {
-        // A pending invite (see /app/team) takes priority over the normal
-        // self-serve path -- this email was invited to an existing org, so
-        // join that org at the invited role instead of provisioning a
-        // brand-new one. Consumed once: delete the invite so a later
-        // duplicate invite (or re-invite after removal) starts fresh.
-        const [invite] = await db.select().from(invites).where(eq(invites.email, email));
-        if (invite) {
-          [membership] = await db
-            .insert(memberships)
-            .values({ userId, organizationId: invite.organizationId, role: invite.role })
-            .returning();
-          await db.delete(invites).where(eq(invites.id, invite.id));
-        } else {
-          const [org] = await db
-            .insert(organizations)
-            .values({ name: session.user?.name || email, accountTier: "general" })
-            .returning();
-          [membership] = await db
-            .insert(memberships)
-            .values({ userId, organizationId: org.id, role: "owner" })
-            .returning();
-        }
+        membership = await provisionMembership(userId, email, session.user?.name ?? null);
       }
 
       const [org] = await db.select().from(organizations).where(eq(organizations.id, membership.organizationId));

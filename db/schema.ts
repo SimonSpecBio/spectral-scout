@@ -59,14 +59,21 @@ export const memberships = pgTable(
   "scout_membership",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").notNull(),
+    // Unique, not just indexed: "1 user = 1 org" today (see comment above),
+    // and the constraint is what makes provisioning race-safe -- auth.ts's
+    // session callback used to select-then-insert, which two concurrent
+    // first-sign-in requests could both pass (both see no row, both insert)
+    // and end up with two orgs for one person. Now backed by
+    // .onConflictDoNothing() targeting this constraint, so only one insert
+    // can ever win regardless of timing.
+    userId: uuid("user_id").notNull().unique(),
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     role: membershipRoleEnum("role").notNull().default("owner"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("scout_membership_user_id_idx").on(table.userId), index("scout_membership_organization_id_idx").on(table.organizationId)]
+  (table) => [index("scout_membership_organization_id_idx").on(table.organizationId)]
 ).enableRLS();
 
 // A pending team invite -- an email with no scout_user row yet (they've
