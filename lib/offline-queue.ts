@@ -106,34 +106,48 @@ export async function queuedFetch(
   return { ok: true, queued: true };
 }
 
+// Guards against two overlapping flush runs -- a flaky connection flapping
+// online/offline/online in quick succession can fire the "online" listener
+// twice before the first flush's async work finishes; without this, both
+// runs would read the same pending items and could both successfully POST
+// the same one, creating a duplicate row server-side. Module-level state is
+// fine here (this file is a singleton per page, same as `initialized` below).
+let flushing = false;
+
 export async function flushQueue(): Promise<void> {
-  const pending = await getPending();
-  for (const item of pending) {
-    try {
-      const res = await fetch(item.url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(item.body),
-      });
-      if (res.ok) {
+  if (flushing) return;
+  flushing = true;
+  try {
+    const pending = await getPending();
+    for (const item of pending) {
+      try {
+        const res = await fetch(item.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item.body),
+        });
+        if (res.ok) {
+          await removePending(item.id);
+          continue;
+        }
+        // A real HTTP error response (the server is reachable) means retrying
+        // this exact item later won't help -- same reasoning queuedFetch uses
+        // to not queue these in the first place. Drop it and keep going,
+        // rather than letting one permanently-broken item (e.g. a since-
+        // deleted area it referenced) block every item queued after it on
+        // every future flush.
         await removePending(item.id);
-        continue;
+      } catch {
+        // A thrown fetch error means the network itself is the problem --
+        // stop here and retry the whole remaining queue on the next flush,
+        // in original order.
+        break;
       }
-      // A real HTTP error response (the server is reachable) means retrying
-      // this exact item later won't help -- same reasoning queuedFetch uses
-      // to not queue these in the first place. Drop it and keep going,
-      // rather than letting one permanently-broken item (e.g. a since-
-      // deleted area it referenced) block every item queued after it on
-      // every future flush.
-      await removePending(item.id);
-    } catch {
-      // A thrown fetch error means the network itself is the problem --
-      // stop here and retry the whole remaining queue on the next flush,
-      // in original order.
-      break;
     }
+    notifyChanged();
+  } finally {
+    flushing = false;
   }
-  notifyChanged();
 }
 
 let initialized = false;
