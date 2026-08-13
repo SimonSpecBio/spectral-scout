@@ -1,4 +1,5 @@
 import {
+  boolean,
   date,
   index,
   integer,
@@ -285,6 +286,11 @@ export const pestEvents = pgTable(
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    // Set only when maybeAutoResolve (lib/threshold-engine.ts) closed this
+    // event itself -- distinguishes "the grower resolved this, they
+    // already know" from "the system resolved this while they weren't
+    // looking," which is the case that actually needs a notification.
+    autoResolved: boolean("auto_resolved").notNull().default(false),
   },
   (table) => [
     index("scout_pest_event_facility_id_idx").on(table.facilityId),

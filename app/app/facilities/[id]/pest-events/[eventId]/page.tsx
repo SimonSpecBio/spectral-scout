@@ -56,6 +56,7 @@ export default async function PestEventPage({ params }: { params: Promise<{ id: 
           notes: event.notes,
           createdAt: event.createdAt.toISOString(),
           resolvedAt: event.resolvedAt ? event.resolvedAt.toISOString() : null,
+          autoResolved: event.autoResolved,
         }}
         locationLabel={area ? `${area.name}, ${facility.name}` : facility.name}
         mapHref={area ? `/app/facilities/${id}/areas/${area.id}` : null}

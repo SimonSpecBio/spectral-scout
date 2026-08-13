@@ -5,6 +5,7 @@ import { scoutingObservations } from "@/db/schema";
 import { parseMonitoringPayload } from "@/lib/monitoring";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
+import { maybeAutoResolve } from "@/lib/threshold-engine";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string; eventId: string }> }) {
   const session = await requireGrowerSession();
@@ -59,5 +60,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ...parsed,
     })
     .returning();
-  return NextResponse.json(row);
+
+  // "Once an infestation is under control, the event closes itself" --
+  // checked right after the session that could make it true. autoResolved
+  // is included so the client can show an immediate confirmation instead
+  // of the grower only finding out later via Notifications.
+  const resolved = await maybeAutoResolve(eventId, session.organizationId!);
+
+  return NextResponse.json({ ...row, autoResolvedEvent: resolved });
 }

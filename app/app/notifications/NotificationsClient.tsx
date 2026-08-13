@@ -22,6 +22,7 @@ const KIND_COLOR: Record<NotificationKind, string> = {
   task_assigned: "#8FA2BD",
   rei_cleared: "#4E9E86",
   order_placed: "#8FA2BD",
+  event_auto_resolved: "#4E9E86",
 };
 
 const READ_KEY = "spectral-notifications-read";

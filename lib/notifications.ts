@@ -1,6 +1,6 @@
 import { and, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { facilities, inventoryItems, inventoryOrders, tasks, treatments } from "@/db/schema";
+import { facilities, inventoryItems, inventoryOrders, pestEvents, tasks, treatments } from "@/db/schema";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { computeScoutingAlerts } from "@/lib/scouting-alerts";
 import { computeMonitoringAlerts } from "@/lib/threshold-engine";
@@ -15,7 +15,8 @@ export type NotificationKind =
   | "task_assigned"
   | "task_overdue"
   | "rei_cleared"
-  | "order_placed";
+  | "order_placed"
+  | "event_auto_resolved";
 
 export interface Notification {
   id: string; // stable across renders -- localStorage read-state keys off this, not array index
@@ -91,6 +92,37 @@ export async function computeNotifications(organizationId: string, userId: strin
 
   const orgFacilities = await db.select().from(facilities).where(eq(facilities.organizationId, organizationId));
   const facilityIds = orgFacilities.map((f) => f.id);
+
+  // "Notify the grower with a confirmation" when maybeAutoResolve
+  // (lib/threshold-engine.ts) closes an event on its own -- a grower who
+  // manually resolves an event already knows, so this is scoped to
+  // autoResolved=true specifically. 3-day window, same spirit as
+  // rei_cleared's `since` below: recent enough to matter, not a
+  // forever-lingering notification for something long since handled.
+  if (facilityIds.length > 0) {
+    const recentAutoResolved = await db
+      .select()
+      .from(pestEvents)
+      .where(
+        and(
+          inArray(pestEvents.facilityId, facilityIds),
+          eq(pestEvents.status, "resolved"),
+          eq(pestEvents.autoResolved, true),
+          gte(pestEvents.resolvedAt, new Date(Date.now() - 3 * DAY_MS))
+        )
+      );
+    for (const e of recentAutoResolved) {
+      notifications.push({
+        id: `auto-resolved-${e.id}`,
+        kind: "event_auto_resolved",
+        title: `${e.pestSpecies} auto-resolved`,
+        sub: "Under threshold for 2 consecutive sessions",
+        at: e.resolvedAt!,
+        href: `/app/facilities/${e.facilityId}/pest-events/${e.id}`,
+      });
+    }
+  }
+
   if (facilityIds.length > 0) {
     const since = new Date(Date.now() - DAY_MS);
     const recentTreatments = await db

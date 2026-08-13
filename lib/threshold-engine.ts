@@ -1,6 +1,7 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, monitoringThresholds, pestEvents, scoutingObservations } from "@/db/schema";
+import { resolvePestEvent } from "@/lib/pest-events";
 
 // Falls back to this whenever an org hasn't set a custom threshold for a
 // species -- lands near the middle of the real figures in
@@ -84,4 +85,37 @@ export async function computeMonitoringAlerts(organizationId: string): Promise<M
     });
   }
   return alerts;
+}
+
+// "Once an infestation is under control, the event closes itself." Checked
+// after each new monitoring session is logged (the monitoring POST route),
+// not on a schedule -- same "computed as a side effect of the write that
+// could change the answer" spirit as the rest of this app rather than a
+// cron job. Requires the last AUTO_RESOLVE_CONSECUTIVE_SESSIONS sessions
+// (not just the latest one) to all be under threshold, so a single noisy
+// low count can't flip an event closed. Returns the resolved row, or null
+// if the event didn't qualify (still active, wrong status, not enough
+// sessions yet, or not all of them under threshold).
+const AUTO_RESOLVE_CONSECUTIVE_SESSIONS = 2;
+
+export async function maybeAutoResolve(eventId: string, organizationId: string) {
+  const [event] = await db.select().from(pestEvents).where(eq(pestEvents.id, eventId));
+  if (!event || event.status !== "active") return null;
+
+  const sessions = await db
+    .select()
+    .from(scoutingObservations)
+    .where(eq(scoutingObservations.promotedPestEventId, eventId))
+    .orderBy(desc(scoutingObservations.createdAt))
+    .limit(AUTO_RESOLVE_CONSECUTIVE_SESSIONS);
+  if (sessions.length < AUTO_RESOLVE_CONSECUTIVE_SESSIONS) return null;
+
+  const threshold = await getSpeciesThreshold(organizationId, event.pestSpecies);
+  const allBelowThreshold = sessions.every((s) => {
+    if (!s.sampleSize) return false;
+    return ((s.pestCount ?? 0) / s.sampleSize) * 100 < threshold;
+  });
+  if (!allBelowThreshold) return null;
+
+  return resolvePestEvent(eventId, { auto: true });
 }

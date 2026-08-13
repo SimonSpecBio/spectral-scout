@@ -43,6 +43,7 @@ interface Event {
   notes: string | null;
   createdAt: string;
   resolvedAt: string | null;
+  autoResolved: boolean;
 }
 
 const TABS = ["timeline", "recommended", "treatments", "photos", "monitoring", "notes"] as const;
@@ -209,6 +210,18 @@ export default function PestEventDetail({
           </button>
         </div>
       </div>
+
+      {status === "resolved" && event.autoResolved && (
+        <div className="card flex items-center gap-3 p-4" style={{ background: "#14231d", border: "0.5px solid #245942" }}>
+          <span style={{ color: "#4E9E86" }}>✓</span>
+          <div className="flex-1 text-sm">
+            Auto-resolved — the last two monitoring sessions came back under threshold, no infestation left to track.
+          </div>
+          <button onClick={toggleStatus} className="shrink-0 text-xs text-[var(--text-dim)] underline">
+            Not resolved? Reopen
+          </button>
+        </div>
+      )}
 
       {densities.length > 0 && (
         <div className="card flex flex-col items-start gap-4 overflow-x-auto p-4 sm:flex-row sm:items-center sm:gap-6">

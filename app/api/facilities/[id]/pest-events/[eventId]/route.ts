@@ -1,8 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { pestEventStatusEnum, pestEvents, severityEnum, tasks } from "@/db/schema";
-import { getOwnedPestEvent as ownedEvent } from "@/lib/pest-events";
+import { pestEventStatusEnum, pestEvents, severityEnum } from "@/db/schema";
+import { getOwnedPestEvent as ownedEvent, resolvePestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string; eventId: string }> }) {
@@ -28,22 +28,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const updates: Partial<typeof pestEvents.$inferInsert> = {};
   if (severityEnum.enumValues.includes(body.severity)) updates.severity = body.severity;
   if (typeof body.notes === "string") updates.notes = body.notes || null;
-  if (pestEventStatusEnum.enumValues.includes(body.status)) {
-    updates.status = body.status;
-    updates.resolvedAt = body.status === "resolved" ? new Date() : null;
+  // Reopening is a plain field reset -- resolving goes through the shared
+  // helper below instead, since only resolving has a task side effect.
+  if (body.status === "active") {
+    updates.status = "active";
+    updates.resolvedAt = null;
+    updates.autoResolved = false;
   }
 
-  const [row] = await db.update(pestEvents).set(updates).where(eq(pestEvents.id, eventId)).returning();
+  let row = Object.keys(updates).length > 0 ? (await db.update(pestEvents).set(updates).where(eq(pestEvents.id, eventId)).returning())[0] : event;
 
-  // Resolving an event moots its auto-scheduled follow-ups (SCHEDULING.md:
-  // "resolving an event cancels its outstanding recurring release/monitor
-  // tasks"). Only source="auto_program" -- a manually created task linked
-  // to this event is a person's own work item and stays untouched even
-  // after the event closes.
-  if (updates.status === "resolved") {
-    await db
-      .delete(tasks)
-      .where(and(eq(tasks.pestEventId, eventId), eq(tasks.source, "auto_program"), eq(tasks.status, "open")));
+  // Resolving goes through the shared helper (also used by maybeAutoResolve,
+  // lib/threshold-engine.ts) so cancelling outstanding auto_program tasks
+  // can't drift between a grower resolving manually and the system doing
+  // it automatically.
+  if (pestEventStatusEnum.enumValues.includes(body.status) && body.status === "resolved") {
+    row = await resolvePestEvent(eventId);
   }
 
   return NextResponse.json(row);
