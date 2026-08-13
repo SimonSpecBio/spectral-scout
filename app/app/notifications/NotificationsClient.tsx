@@ -23,6 +23,7 @@ const KIND_COLOR: Record<NotificationKind, string> = {
   rei_cleared: "#4E9E86",
   order_placed: "#8FA2BD",
   event_auto_resolved: "#4E9E86",
+  escalation: "#CE5D40",
 };
 
 const READ_KEY = "spectral-notifications-read";
