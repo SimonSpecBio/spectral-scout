@@ -7,6 +7,7 @@ import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { scaledPoints } from "@/lib/density";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import { findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
 import RecommendationsPanel from "./RecommendationsPanel";
 
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
@@ -87,9 +88,56 @@ export default function PestEventDetail({
   const [submittingTreatment, setSubmittingTreatment] = useState(false);
   const [treatmentQueued, setTreatmentQueued] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [quickLogging, setQuickLogging] = useState(false);
+  const [quickLogged, setQuickLogged] = useState(false);
   const selectedItem = inventoryItems.find((i) => i.id === inventoryItemId);
 
   const base = `/api/facilities/${facilityId}/pest-events/${event.id}`;
+
+  // "Prefills the product from the last-used product or a recommendation"
+  // -- repeats whatever was applied most recently to this event if
+  // anything has been, otherwise falls back to the pest program's top
+  // biocontrol pick (or top biopesticide if there's no biocontrol option),
+  // same catalog RecommendationsPanel reads from. null when there's
+  // nothing to prefill (brand-new species with no program and no prior
+  // treatments) -- the button just doesn't render rather than guessing.
+  const lastTreatment = treatmentsList[0];
+  let quickLog: { type: TreatmentType; product: string } | null = null;
+  if (lastTreatment?.product) {
+    quickLog = { type: lastTreatment.type, product: lastTreatment.product };
+  } else {
+    const program = findPestProgram(event.pestSpecies);
+    const agent = program?.primaryBiocontrol[0] ? findAgent(program.primaryBiocontrol[0]) : undefined;
+    const prod = !agent && program?.biopesticideRotation[0] ? findProduct(program.biopesticideRotation[0]) : undefined;
+    if (agent) quickLog = { type: "biological", product: agent.name };
+    else if (prod) quickLog = { type: "pesticide", product: prod.name };
+  }
+
+  async function handleQuickLog() {
+    if (!quickLog) return;
+    setQuickLogging(true);
+    setQuickLogged(false);
+    const matchedItem = inventoryItems.find((i) => i.name.toLowerCase() === quickLog!.product.toLowerCase());
+    const result = await queuedFetch(
+      `${base}/treatments`,
+      {
+        type: quickLog.type,
+        inventoryItemId: matchedItem?.id ?? null,
+        product: quickLog.product,
+        notes: "Quick log",
+      },
+      "Treatment"
+    );
+    if (result.ok) {
+      markEngaged();
+      setQuickLogged(true);
+      if (!result.queued && result.data) {
+        setTreatmentsList((prev) => [result.data as Treatment, ...prev]);
+        router.refresh();
+      }
+    }
+    setQuickLogging(false);
+  }
 
   async function toggleStatus() {
     const next = status === "active" ? "resolved" : "active";
@@ -210,6 +258,22 @@ export default function PestEventDetail({
           </button>
         </div>
       </div>
+
+      {status === "active" && quickLog && (
+        <button
+          onClick={handleQuickLog}
+          disabled={quickLogging}
+          className="card flex items-center justify-between p-4 text-left disabled:opacity-60"
+        >
+          <div>
+            <div className="label-mono">{lastTreatment?.product ? "Quick log — repeat last" : "Quick log — recommended"}</div>
+            <div className="text-sm">{quickLog.product}</div>
+          </div>
+          <span className="shrink-0 rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]">
+            {quickLogging ? "Logging…" : quickLogged ? "Logged ✓" : "Log"}
+          </span>
+        </button>
+      )}
 
       {status === "resolved" && event.autoResolved && (
         <div className="card flex items-center gap-3 p-4" style={{ background: "#14231d", border: "0.5px solid #245942" }}>
