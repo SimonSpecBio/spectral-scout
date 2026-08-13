@@ -6,6 +6,7 @@ import Nodemailer from "next-auth/providers/nodemailer";
 import { db } from "@/db";
 import { accounts, sessions, users, verificationTokens } from "@/db/auth-schema";
 import { invites, memberships, organizations, staff } from "@/db/schema";
+import { checkSignInRateLimit } from "@/lib/rate-limit";
 
 // Same static-allowlist pattern as spectral-ops/spectral-rnd/spectral-pilot's
 // staff side -- internal Spectral team only.
@@ -90,12 +91,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   session: { strategy: "database" },
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account, email }) {
       // Staff must already be on the allowlist. Everyone else (grower
       // self-serve signup) is always allowed in -- org provisioning happens
       // in the session callback below, on first successful sign-in.
-      const email = user.email?.toLowerCase();
-      return !!email;
+      const userEmail = user.email?.toLowerCase();
+      if (!userEmail) return false;
+
+      // email.verificationRequest is true specifically on the call that's
+      // about to send a magic-link email (not the later call after the
+      // grower clicks the link) -- the right checkpoint to throttle before
+      // this triggers a real Resend send. Scoped to the nodemailer
+      // provider only; Google (staff) sign-in is unaffected.
+      if (account?.provider === "nodemailer" && email?.verificationRequest && !checkSignInRateLimit(userEmail)) {
+        return false;
+      }
+
+      return true;
     },
     // Runs on every session fetch (database strategy = no JWT to decode).
     // First sign-in for a brand-new grower email: no scout_staff row and no
