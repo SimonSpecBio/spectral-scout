@@ -2,7 +2,7 @@ import { and, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, inventoryItems, inventoryOrders, pestEvents, tasks, treatments } from "@/db/schema";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
-import { computeScoutingAlerts } from "@/lib/scouting-alerts";
+import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-alerts";
 import { computeMonitoringAlerts } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { taskActionHref, taskUrgency } from "@/lib/tasks";
@@ -73,7 +73,7 @@ export async function computeNotifications(organizationId: string, userId: strin
       title: `Scouting log over threshold — confirm?`,
       sub: `${a.infestedPct}% infested`,
       at: a.at,
-      href: `/app/new-event?facility=${a.facilityId}&area=${a.facilityAreaId}`,
+      href: scoutingAlertConfirmHref(a),
     });
   }
 

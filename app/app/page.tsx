@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { facilities, facilityAreas, facilityMapObjects, inventoryItems, pestEvents, tasks, treatments } from "@/db/schema";
 import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
-import { computeScoutingAlerts } from "@/lib/scouting-alerts";
+import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-alerts";
 import { taskActionHref, taskUrgency } from "@/lib/tasks";
 import { computeMonitoringAlerts } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
@@ -391,7 +391,7 @@ export default async function HomePage({
                 return (
                   <Link
                     key={`scouting-${a.observationId}`}
-                    href={`/app/new-event?facility=${a.facilityId}&area=${a.facilityAreaId}`}
+                    href={scoutingAlertConfirmHref(a)}
                     className="flex items-center gap-3 p-3.5"
                   >
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />

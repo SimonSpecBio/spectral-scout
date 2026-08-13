@@ -10,6 +10,14 @@ export interface ScoutingAlert {
   infestedPct: number;
   threshold: number;
   at: Date;
+  // Carried over so confirming into a New Pest Event doesn't make the
+  // grower re-enter what was already observed -- the dropped pin (may be
+  // null, same as any general session, see scout_observation's comment)
+  // and the raw tally behind infestedPct.
+  x: number | null;
+  y: number | null;
+  sampleSize: number;
+  pestCount: number;
 }
 
 // The general/unlinked Scouting flow's counterpart to computeTrapAlerts and
@@ -68,7 +76,24 @@ export async function computeScoutingAlerts(organizationId: string): Promise<Sco
       infestedPct,
       threshold: DEFAULT_INFESTED_PCT_THRESHOLD,
       at: s.createdAt,
+      x: s.x,
+      y: s.y,
+      sampleSize: s.sampleSize,
+      pestCount: s.pestCount ?? 0,
     });
   }
   return alerts.sort((a, b) => b.at.getTime() - a.at.getTime());
+}
+
+// Shared by the dashboard's Attention Required card and the Notifications
+// feed so the two confirm links can't drift apart. Just the ids -- New
+// Pest Event re-reads the observation row itself (ownership-verified
+// there) for the dropped pin and raw tally rather than trusting URL
+// params for that data, so passing them here would be redundant. Linking
+// observationId is what lets New Pest Event set this session as the new
+// event's first monitoring session instead of leaving it stranded
+// unpromoted, which would otherwise keep re-alerting on the same data
+// forever. Only the species is left for the grower to fill in.
+export function scoutingAlertConfirmHref(a: ScoutingAlert): string {
+  return `/app/new-event?facility=${a.facilityId}&area=${a.facilityAreaId}&observationId=${a.observationId}`;
 }

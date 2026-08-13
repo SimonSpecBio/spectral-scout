@@ -9,20 +9,48 @@ import SpeciesPicker from "../SpeciesPicker";
 type Severity = "low" | "moderate" | "high" | "severe";
 const SEVERITIES: Severity[] = ["low", "moderate", "high", "severe"];
 
+interface ScoutingHandoff {
+  observationId: string;
+  x: number | null;
+  y: number | null;
+  sampleSize: number;
+  pestCount: number;
+}
+
+// A scouting alert that gets confirmed as a new event two things: don't
+// make the grower re-enter what was already observed, and don't leave the
+// originating session stranded unpromoted (it would otherwise keep
+// re-alerting on the same over-threshold data forever, see
+// lib/scouting-alerts.ts's comment). Severity defaults from the observed
+// infested % using the same rough bands the severity buttons already
+// imply, rather than always landing on "moderate" regardless of how bad
+// the handoff data actually looked.
+function severityFromHandoff(h: ScoutingHandoff): Severity {
+  const pct = h.sampleSize > 0 ? (h.pestCount / h.sampleSize) * 100 : 0;
+  if (pct >= 60) return "severe";
+  if (pct >= 40) return "high";
+  if (pct >= 20) return "moderate";
+  return "low";
+}
+
 export default function NewEventForm({
   facilities,
   presetFacilityId,
   presetAreaId,
+  handoff,
 }: {
   facilities: PickerFacility[];
   presetFacilityId?: string;
   presetAreaId?: string;
+  handoff: ScoutingHandoff | null;
 }) {
   const router = useRouter();
   const [species, setSpecies] = useState("");
   const [scientificName, setScientificName] = useState<string | null>(null);
-  const [severity, setSeverity] = useState<Severity>("moderate");
-  const [notes, setNotes] = useState("");
+  const [severity, setSeverity] = useState<Severity>(handoff ? severityFromHandoff(handoff) : "moderate");
+  const [notes, setNotes] = useState(
+    handoff ? `Scouting handoff: ${handoff.pestCount}/${handoff.sampleSize} checked over threshold.` : ""
+  );
   const [submitting, setSubmitting] = useState(false);
   const [placingLocation, setPlacingLocation] = useState(false);
 
@@ -31,7 +59,16 @@ export default function NewEventForm({
     const res = await fetch(`/api/facilities/${facilityId}/pest-events`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ facilityAreaId: areaId, pestSpecies: species, scientificName, severity, notes, x, y }),
+      body: JSON.stringify({
+        facilityAreaId: areaId,
+        pestSpecies: species,
+        scientificName,
+        severity,
+        notes,
+        x,
+        y,
+        sourceObservationId: handoff?.observationId ?? null,
+      }),
     });
     if (res.ok) {
       const row = await res.json();
@@ -49,6 +86,8 @@ export default function NewEventForm({
         facilities={facilities}
         initialFacilityId={presetFacilityId}
         initialAreaId={presetAreaId}
+        initialX={handoff?.x ?? undefined}
+        initialY={handoff?.y ?? undefined}
         onConfirm={handleConfirmLocation}
         onCancel={() => setPlacingLocation(false)}
       />

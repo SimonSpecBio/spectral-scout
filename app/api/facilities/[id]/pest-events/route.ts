@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { eventKindEnum, facilityAreas, pestEvents, severityEnum } from "@/db/schema";
+import { eventKindEnum, facilityAreas, pestEvents, scoutingObservations, severityEnum } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -65,5 +65,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       notes: typeof body.notes === "string" && body.notes ? body.notes : null,
     })
     .returning();
+
+  // Confirming a scouting alert into an event (lib/scouting-alerts.ts)
+  // links the originating session as this event's first monitoring
+  // session -- ownership- and area-verified before trusting it, same
+  // pattern as facilityAreaId above. Without this the session would stay
+  // "unpromoted" and keep re-surfacing as a scouting alert forever even
+  // though the grower already acted on it.
+  if (typeof body.sourceObservationId === "string" && facilityAreaId) {
+    await db
+      .update(scoutingObservations)
+      .set({ promotedPestEventId: row.id })
+      .where(
+        and(
+          eq(scoutingObservations.id, body.sourceObservationId),
+          eq(scoutingObservations.organizationId, session.organizationId!),
+          eq(scoutingObservations.facilityAreaId, facilityAreaId)
+        )
+      );
+  }
+
   return NextResponse.json(row);
 }

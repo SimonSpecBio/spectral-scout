@@ -1,19 +1,32 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { facilities, facilityAreas } from "@/db/schema";
+import { facilities, facilityAreas, scoutingObservations } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
 import NewEventForm from "./NewEventForm";
 
 export default async function NewEventPage({
   searchParams,
 }: {
-  searchParams: Promise<{ facility?: string; area?: string }>;
+  searchParams: Promise<{ facility?: string; area?: string; observationId?: string }>;
 }) {
   const session = await requireGrowerSession();
   if (!session) return null;
 
-  const { facility: presetFacilityId, area: presetAreaId } = await searchParams;
+  const { facility: presetFacilityId, area: presetAreaId, observationId } = await searchParams;
+
+  // Client-supplied like every other cross-referenced id -- verify it
+  // actually belongs to this org before trusting the handoff data (or
+  // writing back to it on submit). A bad/foreign id just means no handoff
+  // prefill, not an error -- the form still works as a normal blank one.
+  const handoffObservation = observationId
+    ? (
+        await db
+          .select()
+          .from(scoutingObservations)
+          .where(and(eq(scoutingObservations.id, observationId), eq(scoutingObservations.organizationId, session.organizationId!)))
+      )[0]
+    : null;
 
   const orgFacilities = await db
     .select()
@@ -45,7 +58,22 @@ export default async function NewEventPage({
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">New pest event</h1>
-      <NewEventForm facilities={pickerFacilities} presetFacilityId={presetFacilityId} presetAreaId={presetAreaId} />
+      <NewEventForm
+        facilities={pickerFacilities}
+        presetFacilityId={presetFacilityId}
+        presetAreaId={presetAreaId}
+        handoff={
+          handoffObservation
+            ? {
+                observationId: handoffObservation.id,
+                x: handoffObservation.x,
+                y: handoffObservation.y,
+                sampleSize: handoffObservation.sampleSize ?? 0,
+                pestCount: handoffObservation.pestCount ?? 0,
+              }
+            : null
+        }
+      />
     </div>
   );
 }

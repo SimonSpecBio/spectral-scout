@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BAYS, bayLabel, CANVAS_H, CANVAS_W, type Bay } from "@/lib/floorplan-bays";
+import { BAYS, bayLabel, CANVAS_H, CANVAS_W, nearestBay, type Bay } from "@/lib/floorplan-bays";
 
 // Same bench-grid rendering as LocationPlacement, but wrapped in a facility
 // switcher: "fill the form first, then pick site + bay on one map screen"
@@ -37,6 +37,8 @@ export default function LocationPicker({
   onCancel,
   initialFacilityId,
   initialAreaId,
+  initialX,
+  initialY,
 }: {
   facilities: PickerFacility[];
   onConfirm: (facilityId: string, areaId: string, x: number, y: number) => void;
@@ -48,13 +50,20 @@ export default function LocationPicker({
   // reassignable from there same as any other visit.
   initialFacilityId?: string;
   initialAreaId?: string;
+  // A dropped pin carried over from a scouting handoff (lib/scouting-
+  // alerts.ts) -- pre-selects the nearest bay instead of leaving "no
+  // location selected," same "starting point, not a lock" rule as above.
+  initialX?: number;
+  initialY?: number;
 }) {
   const initialIdx = initialFacilityId ? facilities.findIndex((f) => f.id === initialFacilityId) : -1;
   const [facilityIdx, setFacilityIdx] = useState(initialIdx >= 0 ? initialIdx : 0);
   const [areaId, setAreaId] = useState<string | null>(
     (initialIdx >= 0 && initialAreaId) || facilities[initialIdx >= 0 ? initialIdx : 0]?.areas[0]?.id || null
   );
-  const [selected, setSelected] = useState<Bay | null>(null);
+  const [selected, setSelected] = useState<Bay | null>(
+    initialX != null && initialY != null ? nearestBay(initialX, initialY) : null
+  );
   const [confirming, setConfirming] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
