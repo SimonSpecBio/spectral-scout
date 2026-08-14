@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
-    "@vercel/blob": "^0.27.3",
+    "@vercel/blob": "^2.8.0",
     "drizzle-orm": "^0.45.2",
     "konva": "^9.3.16",
     "next": "16.2.10",
