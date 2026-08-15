@@ -18,6 +18,7 @@ const SECONDARY = [
   { href: "/app/inventory", label: "Inventory" },
   { href: "/app/rei-phi", label: "Re-entry & harvest" },
   { href: "/app/team", label: "Team" },
+  { href: "/app/settings/catalog", label: "Species & thresholds" },
 ] as const;
 
 // Desktop's primary nav (ARCHITECTURE.md section 5a: "no bottom bar. Use a left

@@ -92,6 +92,13 @@
       "when": 1786585628962,
       "tag": "0012_chunky_swordsman",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786757050745,
+      "tag": "0013_special_deathbird",
+      "breakpoints": true
     }
   ]
 }

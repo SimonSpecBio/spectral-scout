@@ -1,13 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PEST_CATALOG } from "@/lib/pest-catalog";
 
-// Autocomplete over the real pest/pathogen catalog (lib/pest-catalog.ts),
-// with freeform text as the fallback for anything not in the ~11-entry
-// preset list -- never blocks entry on a match. Picking a suggestion fills
-// the latin name alongside the common name, same pairing the mockups show
-// (e.g. "Whitefly" / "Aleyrodidae").
+interface CustomSpeciesRow {
+  id: string;
+  kind: "pest" | "pathogen";
+  commonName: string;
+  scientificName: string | null;
+}
+
+// Autocomplete over the real pest/pathogen catalog (lib/pest-catalog.ts)
+// plus the org's own custom species (/api/species -- settings/catalog),
+// with freeform text as the fallback for anything in neither list -- never
+// blocks entry on a match. Picking a suggestion fills the latin name
+// alongside the common name, same pairing the mockups show (e.g.
+// "Whitefly" / "Aleyrodidae").
 export default function SpeciesPicker({
   kind,
   value,
@@ -25,8 +33,30 @@ export default function SpeciesPicker({
   bare?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
+  const [custom, setCustom] = useState<CustomSpeciesRow[]>([]);
+
+  useEffect(() => {
+    fetch("/api/species")
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setCustom)
+      .catch(() => {});
+  }, []);
+
   const query = value.trim().toLowerCase();
-  const options = query ? PEST_CATALOG.filter((p) => p.kind === kind && p.commonName.toLowerCase().includes(query)).slice(0, 6) : [];
+  const catalogOptions = query
+    ? PEST_CATALOG.filter((p) => p.kind === kind && p.commonName.toLowerCase().includes(query))
+    : [];
+  const customOptions = query
+    ? custom
+        .filter(
+          (c) =>
+            c.kind === kind &&
+            c.commonName.toLowerCase().includes(query) &&
+            !catalogOptions.some((p) => p.commonName.toLowerCase() === c.commonName.toLowerCase())
+        )
+        .map((c) => ({ id: c.id, commonName: c.commonName, latin: c.scientificName }))
+    : [];
+  const options = [...catalogOptions, ...customOptions].slice(0, 6);
 
   return (
     <div className="relative">

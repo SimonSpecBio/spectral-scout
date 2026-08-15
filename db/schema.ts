@@ -592,9 +592,12 @@ export const tasks = pgTable(
 // sampling, Counts, and disease assessment all converge on the same
 // sampleSize/pestCount shape (ARCHITECTURE.md ยง3's "convergence rule"),
 // so one metric (infested % = pestCount/sampleSize) covers all three --
-// no separate metric-type column needed. No UI writes this table yet;
-// DEFAULT_INFESTED_PCT_THRESHOLD in lib/threshold-engine.ts covers any
-// species with no row.
+// no separate metric-type column needed. DEFAULT_INFESTED_PCT_THRESHOLD
+// in lib/threshold-engine.ts covers any species with no row. Written from
+// /app/settings/catalog (owner role) -- getSpeciesThreshold,
+// computeMonitoringAlerts, maybeAutoResolve, and computeEscalationAlerts
+// all already read this table live, so a row written here takes effect
+// everywhere immediately, no other code changes needed.
 export const monitoringThresholds = pgTable(
   "scout_monitoring_threshold",
   {
@@ -607,4 +610,32 @@ export const monitoringThresholds = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("scout_monitoring_threshold_organization_id_idx").on(table.organizationId)]
+).enableRLS();
+
+// Org-added species/pathogens that aren't in the built-in PEST_CATALOG
+// (lib/pest-catalog.ts) -- SpeciesPicker was already never blocked on a
+// catalog match (freeform text always worked), but a name typed once
+// wasn't remembered or suggested again. This is deliberately just a
+// name + kind, not a full custom treatment program: PEST_CATALOG's
+// treatment programs (lib/treatments-catalog.ts -- preventive/
+// biocontrol/biopesticide/chemical tiers, follow-up cadences) are a much
+// larger nested-data-entry problem, scoped out as its own follow-up. A
+// custom species with no program still works everywhere -- monitoring,
+// thresholds, auto-resolve, escalation -- it just won't have
+// RecommendationsPanel suggestions, same as any species the app has
+// never heard of already gets today (see RecommendationsPanel's "no
+// preset program" fallback).
+export const customSpecies = pgTable(
+  "scout_custom_species",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    kind: eventKindEnum("kind").notNull().default("pest"),
+    commonName: text("common_name").notNull(),
+    scientificName: text("scientific_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_custom_species_organization_id_idx").on(table.organizationId)]
 ).enableRLS();

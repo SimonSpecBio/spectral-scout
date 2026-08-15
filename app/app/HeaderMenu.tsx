@@ -9,6 +9,7 @@ const SECONDARY = [
   { href: "/app/inventory", label: "Inventory" },
   { href: "/app/rei-phi", label: "Re-entry & harvest" },
   { href: "/app/team", label: "Team" },
+  { href: "/app/settings/catalog", label: "Species & thresholds" },
 ] as const;
 
 // Mobile/tablet's entry point to secondary screens -- primary nav lives in
