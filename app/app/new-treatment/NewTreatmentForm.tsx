@@ -4,15 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
-import LocationPlacement from "../LocationPlacement";
+import LocationPicker, { type PickerFacility } from "../LocationPicker";
 
 const TYPES = ["biological", "pesticide", "spectral_light"] as const;
 
 export default function NewTreatmentForm({
-  facilityId,
+  facilities,
   items,
 }: {
-  facilityId: string;
+  facilities: PickerFacility[];
   items: { id: string; name: string; unit: string; quantity: number }[];
 }) {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function NewTreatmentForm({
 
   const selectedItem = items.find((i) => i.id === inventoryItemId);
 
-  async function submit(x: number, y: number) {
+  async function submit(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
     const result = await queuedFetch(
       `/api/facilities/${facilityId}/treatments`,
@@ -54,7 +54,13 @@ export default function NewTreatmentForm({
   }
 
   if (placingLocation) {
-    return <LocationPlacement onConfirm={submit} onCancel={() => setPlacingLocation(false)} />;
+    return (
+      <LocationPicker
+        facilities={facilities}
+        onConfirm={(facilityId, areaId, x, y) => submit(facilityId, areaId, x, y)}
+        onCancel={() => setPlacingLocation(false)}
+      />
+    );
   }
 
   return (
@@ -137,7 +143,7 @@ export default function NewTreatmentForm({
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || facilities.length === 0}
         className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
       >
         {submitting ? "Logging…" : "Log location"}

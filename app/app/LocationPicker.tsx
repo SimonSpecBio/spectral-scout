@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { BAYS, bayLabel, CANVAS_H, CANVAS_W, nearestBay, type Bay } from "@/lib/floorplan-bays";
 
-// Same bench-grid rendering as LocationPlacement, but wrapped in a facility
-// switcher: "fill the form first, then pick site + bay on one map screen"
-// (the pest/disease event creation flow, per the user's explicit choice
-// over the old site-list -> area-list -> form -> map order). Every
+// The single location-picking component every creation flow uses now
+// (pest/disease events, traps, treatments, scouting): "fill the form
+// first, then pick site + area + bay on one swipeable map screen,"
+// replacing the old site-list -> area-list -> form -> single-facility-map
+// order. Every
 // facility/area still shares the one generic BAYS grid (see
 // lib/floorplan-bays.ts) -- swiping changes which facility/area you're
 // placing into, not the visual layout, until real per-facility floor plans

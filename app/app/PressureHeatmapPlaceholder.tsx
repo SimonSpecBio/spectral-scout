@@ -12,7 +12,7 @@ interface EventInput {
 
 // The "Pests" lens (the default/only lens before the switcher existed):
 // each event's stored (x, y) gets matched to its nearest of the 20 shared
-// bay slots (lib/floorplan-bays.ts -- the same slots LocationPlacement
+// bay slots (lib/floorplan-bays.ts -- the same slots LocationPicker
 // writes to), and that bay's bar is colored by the worst severity of
 // whatever landed there. Rendering itself now lives in BayBarMap, shared
 // with the other map lenses (see MapLensSwitcher).

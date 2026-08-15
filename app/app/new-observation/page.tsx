@@ -7,18 +7,20 @@ import CountsFlow from "../CountsFlow";
 import MethodChoice from "../MethodChoice";
 import MonitoringFlow from "../facilities/[id]/pest-events/[eventId]/monitoring/MonitoringFlow";
 
-// Routine scouting, reached from the global "+" -- pick a site and area,
-// then the exact same tap-through protocol as event-scoped monitoring,
-// just posting to the general (unlinked) scouting endpoint.
+// Routine scouting, reached from the global "+". Method comes first (it
+// determines which form to fill, same idea as the form-first pattern
+// everywhere else), then the form itself, then site + area + bay all get
+// picked together on one swipeable map screen -- no site/area list-picker
+// pages up front anymore.
 export default async function NewObservationPage({
   searchParams,
 }: {
-  searchParams: Promise<{ facility?: string; area?: string; method?: string }>;
+  searchParams: Promise<{ method?: string }>;
 }) {
   const session = await requireGrowerSession();
   if (!session) return null;
 
-  const { facility: facilityId, area: areaId, method } = await searchParams;
+  const { method } = await searchParams;
 
   const orgFacilities = await db
     .select()
@@ -40,66 +42,29 @@ export default async function NewObservationPage({
     );
   }
 
-  if (!facilityId) {
-    return (
-      <div className="mx-auto flex max-w-md flex-col gap-4">
-        <h1 className="text-2xl font-semibold">New observation</h1>
-        <div className="text-sm text-[var(--text-dim)]">Which site?</div>
-        {orgFacilities.map((f) => (
-          <Link key={f.id} href={`/app/new-observation?facility=${f.id}`} className="card card-interactive p-4">
-            {f.name}
-          </Link>
-        ))}
-      </div>
-    );
-  }
-
-  const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, facilityId));
-
-  if (!areaId) {
-    if (areas.length === 0) {
-      return (
-        <div className="mx-auto flex max-w-md flex-col gap-4">
-          <h1 className="text-2xl font-semibold">New observation</h1>
-          <div className="card p-6 text-sm text-[var(--text-dim)]">
-            This site has no areas yet.{" "}
-            <Link href={`/app/facilities/${facilityId}`} className="text-[var(--accent)]">
-              Add a room or greenhouse
-            </Link>{" "}
-            first.
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className="mx-auto flex max-w-md flex-col gap-4">
-        <h1 className="text-2xl font-semibold">New observation</h1>
-        <div className="text-sm text-[var(--text-dim)]">Which area?</div>
-        {areas.map((a) => (
-          <Link key={a.id} href={`/app/new-observation?facility=${facilityId}&area=${a.id}`} className="card card-interactive p-4">
-            {a.name}
-          </Link>
-        ))}
-      </div>
-    );
-  }
-
   if (!method) {
-    return <MethodChoice baseHref={`/app/new-observation?facility=${facilityId}&area=${areaId}`} />;
+    return (
+      <div className="mx-auto flex max-w-md flex-col gap-4">
+        <h1 className="text-2xl font-semibold">New observation</h1>
+        <MethodChoice baseHref="/app/new-observation" />
+      </div>
+    );
   }
+
+  const allAreas = await db.select().from(facilityAreas);
+  const pickerFacilities = orgFacilities.map((f) => ({
+    id: f.id,
+    name: f.name,
+    areas: allAreas.filter((a) => a.facilityId === f.id).map((a) => ({ id: a.id, name: a.name })),
+  }));
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">New observation</h1>
       {method === "counts" ? (
-        <CountsFlow postUrl={`/api/facilities/${facilityId}/areas/${areaId}/scouting`} redirectHref="/app" capturesLocation />
+        <CountsFlow facilities={pickerFacilities} redirectHref="/app" />
       ) : (
-        <MonitoringFlow
-          postUrl={`/api/facilities/${facilityId}/areas/${areaId}/scouting`}
-          redirectHref="/app"
-          isPilotTier={session.accountTier === "pilot"}
-          capturesLocation
-        />
+        <MonitoringFlow facilities={pickerFacilities} redirectHref="/app" isPilotTier={session.accountTier === "pilot"} />
       )}
     </div>
   );

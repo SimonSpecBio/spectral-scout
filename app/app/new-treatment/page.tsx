@@ -10,11 +10,9 @@ import NewTreatmentForm from "./NewTreatmentForm";
 // preventive spray with no infestation behind it. Event-scoped treatments
 // still go through the pest event's own Treatments tab (PestEventDetail),
 // which inherits the event's location automatically.
-export default async function NewTreatmentPage({ searchParams }: { searchParams: Promise<{ facility?: string }> }) {
+export default async function NewTreatmentPage() {
   const session = await requireGrowerSession();
   if (!session) return null;
-
-  const { facility: facilityId } = await searchParams;
 
   const orgFacilities = await db
     .select()
@@ -36,27 +34,21 @@ export default async function NewTreatmentPage({ searchParams }: { searchParams:
     );
   }
 
-  if (!facilityId) {
-    return (
-      <div className="mx-auto flex max-w-md flex-col gap-4">
-        <h1 className="text-2xl font-semibold">Application log</h1>
-        <div className="text-sm text-[var(--text-dim)]">Which site?</div>
-        {orgFacilities.map((f) => (
-          <Link key={f.id} href={`/app/new-treatment?facility=${f.id}`} className="card card-interactive p-4">
-            {f.name}
-          </Link>
-        ))}
-      </div>
-    );
-  }
-
-  const items = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
+  const [allAreas, items] = await Promise.all([
+    db.select().from(facilityAreas),
+    db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!)),
+  ]);
+  const pickerFacilities = orgFacilities.map((f) => ({
+    id: f.id,
+    name: f.name,
+    areas: allAreas.filter((a) => a.facilityId === f.id).map((a) => ({ id: a.id, name: a.name })),
+  }));
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">Application log</h1>
       <NewTreatmentForm
-        facilityId={facilityId}
+        facilities={pickerFacilities}
         items={items.map((i) => ({ id: i.id, name: i.name, unit: i.unit, quantity: Number(i.quantity) }))}
       />
     </div>

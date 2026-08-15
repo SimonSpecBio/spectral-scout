@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
-import LocationPlacement from "./LocationPlacement";
+import LocationPicker, { type PickerFacility } from "./LocationPicker";
 
 // "Counts" capture method (ARCHITECTURE.md ยง3's convergence table: "pests
 // on 5 leaves -> mean pests / leaf") -- a quick tally, deliberately not the
@@ -14,13 +14,19 @@ import LocationPlacement from "./LocationPlacement";
 // the density math (pestCount/sampleSize) means the same thing either way.
 export default function CountsFlow({
   postUrl,
+  facilities,
   redirectHref,
-  capturesLocation,
   taskId,
 }: {
-  postUrl: string;
+  // Event-scoped monitoring passes a static postUrl (the event's own
+  // pin is already known, nothing to place) -- exactly one of postUrl /
+  // facilities is provided depending on the caller. General scouting
+  // passes facilities instead: site + area + bay all get picked via
+  // LocationPicker after this form, and the post URL is built from
+  // whichever facility/area the grower actually lands on.
+  postUrl?: string;
+  facilities?: PickerFacility[];
   redirectHref: string;
-  capturesLocation?: boolean;
   // Set when this session is fulfilling a specific scheduled task (a
   // "Recheck X -- Bay Y" task from the recommendation engine's follow-up
   // cadence) -- logging the session also completes that task instead of
@@ -40,10 +46,10 @@ export default function CountsFlow({
     setCounts((prev) => prev.map((c, idx) => (idx === i ? Math.max(0, v) : c)));
   }
 
-  async function submitSession(x: number | null, y: number | null) {
+  async function submitSession(url: string, x: number | null, y: number | null) {
     setSubmitting(true);
     const result = await queuedFetch(
-      postUrl,
+      url,
       { sampleSize: counts.length, pestCount: total, leafGrid: null, notes: notes || null, x, y },
       "Counts"
     );
@@ -65,12 +71,18 @@ export default function CountsFlow({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (capturesLocation) setPlacingLocation(true);
-    else submitSession(null, null);
+    if (facilities) setPlacingLocation(true);
+    else if (postUrl) submitSession(postUrl, null, null);
   }
 
-  if (placingLocation) {
-    return <LocationPlacement onConfirm={(x, y) => submitSession(x, y)} onCancel={() => setPlacingLocation(false)} />;
+  if (placingLocation && facilities) {
+    return (
+      <LocationPicker
+        facilities={facilities}
+        onConfirm={(facilityId, areaId, x, y) => submitSession(`/api/facilities/${facilityId}/areas/${areaId}/scouting`, x, y)}
+        onCancel={() => setPlacingLocation(false)}
+      />
+    );
   }
 
   return (
@@ -127,10 +139,10 @@ export default function CountsFlow({
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || (!!facilities && facilities.length === 0)}
         className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
       >
-        {submitting ? (capturesLocation ? "Logging…" : "Submitting…") : capturesLocation ? "Log location" : "Submit session"}
+        {submitting ? (facilities ? "Logging…" : "Submitting…") : facilities ? "Log location" : "Submit session"}
       </button>
     </form>
   );

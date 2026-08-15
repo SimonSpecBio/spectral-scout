@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { aggregateLeafGrid, emptyLeafGrid, type LeafState, type PlantLeaves } from "@/lib/density";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
-import LocationPlacement from "../../../../../LocationPlacement";
+import LocationPicker, { type PickerFacility } from "../../../../../LocationPicker";
 
 const POSITIONS = ["Top", "Middle", "Bottom"] as const;
 const CYCLE: LeafState[] = ["unchecked", "absent", "low", "medium", "high"];
@@ -30,25 +30,26 @@ const PLANT_HEALTH = [
 // (postUrl targets the area directly) -- same form either way.
 export default function MonitoringFlow({
   postUrl,
+  facilities,
   redirectHref,
   isPilotTier,
-  capturesLocation,
   taskId,
 }: {
-  postUrl: string;
-  redirectHref: string;
-  isPilotTier: boolean;
   // Event-scoped monitoring inherits the parent event's own pin server-side
   // (the location is already known -- see the monitoring POST route), so
-  // only the general/unlinked flow needs to ask. Optional, same as temp/
-  // humidity: a quick walkthrough is never blocked on placing a pin.
-  capturesLocation?: boolean;
+  // passes a static postUrl and no facilities -- only the general/unlinked
+  // flow needs to ask, via LocationPicker after this form, and its post
+  // URL gets built from whichever facility/area the grower lands on.
+  postUrl?: string;
+  facilities?: PickerFacility[];
+  redirectHref: string;
+  isPilotTier: boolean;
   // Set when fulfilling a specific scheduled task (see CountsFlow's
   // comment) -- logging the session also completes that task.
   taskId?: string;
 }) {
   const router = useRouter();
-  const draftKey = `scout-monitoring-draft:${postUrl}`;
+  const draftKey = `scout-monitoring-draft:${postUrl ?? "new-observation"}`;
 
   // Read any in-progress draft once, synchronously, as part of the initial
   // render (a lazy useState initializer, not an effect) -- avoids both a
@@ -106,11 +107,11 @@ export default function MonitoringFlow({
     setTempUnit(u);
   }
 
-  async function submitSession(x: number | null, y: number | null) {
+  async function submitSession(url: string, x: number | null, y: number | null) {
     setSubmitting(true);
     const avgTempF = temp === "" ? null : tempUnit === "F" ? temp : Math.round((temp * 9) / 5 + 32);
     const result = await queuedFetch(
-      postUrl,
+      url,
       {
         sampleSize: agg.leavesChecked,
         pestCount: agg.leavesInfested,
@@ -149,17 +150,18 @@ export default function MonitoringFlow({
     // Location is optional -- skip straight to submitting if this session
     // doesn't capture one (event-scoped monitoring inherits the event's own
     // pin server-side instead).
-    if (capturesLocation) {
+    if (facilities) {
       setPlacingLocation(true);
-    } else {
-      submitSession(null, null);
+    } else if (postUrl) {
+      submitSession(postUrl, null, null);
     }
   }
 
-  if (placingLocation) {
+  if (placingLocation && facilities) {
     return (
-      <LocationPlacement
-        onConfirm={(x, y) => submitSession(x, y)}
+      <LocationPicker
+        facilities={facilities}
+        onConfirm={(facilityId, areaId, x, y) => submitSession(`/api/facilities/${facilityId}/areas/${areaId}/scouting`, x, y)}
         onCancel={() => setPlacingLocation(false)}
       />
     );
@@ -350,10 +352,10 @@ export default function MonitoringFlow({
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || (!!facilities && facilities.length === 0)}
         className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
       >
-        {submitting ? (capturesLocation ? "Logging…" : "Submitting…") : capturesLocation ? "Log location" : "Submit session"}
+        {submitting ? (facilities ? "Logging…" : "Submitting…") : facilities ? "Log location" : "Submit session"}
       </button>
       <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
     </form>
