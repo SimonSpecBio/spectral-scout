@@ -41,11 +41,11 @@ export default function BayBarMap({
           <text x="16" y="278">05</text>
         </g>
         <g stroke="var(--map-grid-stroke)" strokeWidth="0.5">
-          <line x1="14" y1="54" x2="284" y2="54" />
-          <line x1="14" y1="110" x2="284" y2="110" />
-          <line x1="14" y1="166" x2="284" y2="166" />
-          <line x1="14" y1="222" x2="284" y2="222" />
-          <line x1="14" y1="278" x2="284" y2="278" />
+          <line x1="14" y1="82" x2="284" y2="82" />
+          <line x1="14" y1="138" x2="284" y2="138" />
+          <line x1="14" y1="194" x2="284" y2="194" />
+          <line x1="14" y1="250" x2="284" y2="250" />
+          <line x1="14" y1="306" x2="284" y2="306" />
         </g>
         <rect x="38" y="18" width="246" height="288" rx="3" fill="none" stroke="var(--map-frame-stroke)" strokeWidth="1" />
         <line x1="161" y1="22" x2="161" y2="302" stroke="var(--map-grid-stroke)" strokeWidth="0.75" strokeDasharray="1 5" />
