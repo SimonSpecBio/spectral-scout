@@ -14,16 +14,16 @@ interface Notification {
 }
 
 const KIND_COLOR: Record<NotificationKind, string> = {
-  threshold: "#CE5D40",
-  trap: "#CE5D40",
-  scouting: "#CE5D40",
-  lowstock: "#CE5D40",
-  task_overdue: "#CE5D40",
+  threshold: "var(--danger)",
+  trap: "var(--danger)",
+  scouting: "var(--danger)",
+  lowstock: "var(--danger)",
+  task_overdue: "var(--danger)",
   task_assigned: "#8FA2BD",
-  rei_cleared: "#4E9E86",
+  rei_cleared: "var(--success)",
   order_placed: "#8FA2BD",
-  event_auto_resolved: "#4E9E86",
-  escalation: "#CE5D40",
+  event_auto_resolved: "var(--success)",
+  escalation: "var(--danger)",
 };
 
 const READ_KEY = "spectral-notifications-read";

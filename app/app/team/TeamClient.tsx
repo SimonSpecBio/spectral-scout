@@ -23,7 +23,7 @@ function Avatar({ name, email }: { name: string | null; email: string }) {
   return (
     <span
       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs"
-      style={{ background: "#243449", color: "var(--text-dim)" }}
+      style={{ background: "var(--chip-bg)", color: "var(--text-dim)" }}
     >
       {initialsFor(name, email)}
     </span>

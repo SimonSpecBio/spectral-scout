@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from "react-konva";
 import type Konva from "konva";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
+import { useTheme } from "@/app/app/ThemeProvider";
 
 // "line" is part of the schema's shape vocabulary (for rows/benches drawn
 // as a simple segment) but has no drawing tool yet -- only rendered if a
@@ -70,9 +71,12 @@ const SEVERITY_RADIUS: Record<Severity, number> = { low: 7, moderate: 9.5, high:
 const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 600;
 // Konva renders to canvas, not DOM, so it can't read CSS custom properties
-// -- these have to match --map-blue/--map-blue-soft in globals.css literally.
-const MAP_BLUE = "#7ec4f0";
-const MAP_BLUE_FILL = "#bfe3fa";
+// -- these have to match --map-blue/--map-blue-soft/--text in globals.css
+// literally, per theme (useTheme() below), instead of one hardcoded set.
+const CANVAS_COLORS = {
+  light: { mapBlue: "#2f7fc4", mapBlueFill: "#eaf3fb", line: "#1c2431", trendUp: "#c1502e", trendDown: "#2f8f6e" },
+  dark: { mapBlue: "#7ec4f0", mapBlueFill: "#bfe3fa", line: "#ffffff", trendUp: "#ce5d40", trendDown: "#4e9e86" },
+} as const;
 const SEVERITY_RANK: Record<Severity, number> = { low: 0, moderate: 1, high: 2, severe: 3 };
 
 // Every drawn zone is the same calm light blue by default -- color is a
@@ -146,6 +150,8 @@ export default function MapEditor({
   initialPestEvents: PestEvent[];
 }) {
   const router = useRouter();
+  const { theme } = useTheme();
+  const { mapBlue: MAP_BLUE, mapBlueFill: MAP_BLUE_FILL, line: CANVAS_LINE, trendUp: CANVAS_TREND_UP, trendDown: CANVAS_TREND_DOWN } = CANVAS_COLORS[theme];
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [objects, setObjects] = useState<MapObject[]>(initialObjects);
   const [pestEvents, setPestEvents] = useState<PestEvent[]>(initialPestEvents);
@@ -457,7 +463,7 @@ export default function MapEditor({
               // solid fill was exactly what made "Zone 1"/"Zone 2" labels
               // unreadable (light text on a bright light-blue fill).
               const zoneFill = hotspot ? `${SEVERITY_COLOR[hotspot]}55` : `${MAP_BLUE_FILL}2e`;
-              const zoneStroke = selectedId === obj.id ? "#ffffff" : hotspot ? SEVERITY_COLOR[hotspot] : MAP_BLUE;
+              const zoneStroke = selectedId === obj.id ? CANVAS_LINE : hotspot ? SEVERITY_COLOR[hotspot] : MAP_BLUE;
               const zoneStrokeWidth = selectedId === obj.id ? 3 : hotspot ? 2.5 : 1.5;
 
               // A zone's name isn't visible unless it's rendered as its own
@@ -474,7 +480,7 @@ export default function MapEditor({
                     y={cy}
                     text={obj.label}
                     fontSize={14}
-                    fill="#e7edf5"
+                    fill={CANVAS_LINE}
                     align="center"
                     offsetX={obj.label.length * 3.5}
                     listening={false}
@@ -556,7 +562,7 @@ export default function MapEditor({
                   x={obj.geometry.x}
                   y={obj.geometry.y}
                   text={obj.label ?? ""}
-                  fill="#fff"
+                  fill={CANVAS_LINE}
                   fontSize={16}
                 />
               );
@@ -613,7 +619,7 @@ export default function MapEditor({
                       x={ev.x!}
                       y={ev.y!}
                       radius={r + 5}
-                      stroke="#ffffff"
+                      stroke={CANVAS_LINE}
                       strokeWidth={1.5}
                       dash={[3, 3]}
                       listening={false}
@@ -627,7 +633,7 @@ export default function MapEditor({
                     y={ev.y!}
                     radius={r}
                     fill={SEVERITY_COLOR[ev.severity]}
-                    stroke="#fff"
+                    stroke={CANVAS_LINE}
                     strokeWidth={1.5}
                     onClick={onActivate}
                     onTap={onActivate}
@@ -641,7 +647,7 @@ export default function MapEditor({
                       y={ev.y! - r - 2}
                       text={ev.trend === "up" ? "▲" : "▼"}
                       fontSize={11}
-                      fill={ev.trend === "up" ? "#e0553d" : "#7fb87a"}
+                      fill={ev.trend === "up" ? CANVAS_TREND_UP : CANVAS_TREND_DOWN}
                       listening={false}
                     />
                   );

@@ -95,7 +95,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
                     {assignee && (
                       <span
                         className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px]"
-                        style={{ background: "#243449", color: "var(--text-dim)" }}
+                        style={{ background: "var(--chip-bg)", color: "var(--text-dim)" }}
                       >
                         {initialsFor(assignee.name, assignee.email)}
                       </span>

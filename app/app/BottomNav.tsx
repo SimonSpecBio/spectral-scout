@@ -9,7 +9,7 @@ const NAV = [
     href: "/app",
     label: "Home",
     icon: (active: boolean) => (
-      <g fill="none" stroke={active ? "#E6ECF5" : "#5A6B85"} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
+      <g fill="none" stroke={active ? "var(--text)" : "var(--text-faint)"} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
         <path d="M2 8 l6 -2.4 l6 2.4 l6 -2.4 v12 l-6 2.4 l-6 -2.4 l-6 2.4 z" />
         <path d="M8 4.4 v12 M14 6 v12" />
       </g>
@@ -19,7 +19,7 @@ const NAV = [
     href: "/app/schedule",
     label: "Schedule",
     icon: (active: boolean) => (
-      <g fill="none" stroke={active ? "#E6ECF5" : "#5A6B85"} strokeWidth="1.5" strokeLinecap="round">
+      <g fill="none" stroke={active ? "var(--text)" : "var(--text-faint)"} strokeWidth="1.5" strokeLinecap="round">
         <rect x="2" y="4" width="18" height="16" rx="2.5" />
         <path d="M2 9 h18 M7 1.5 v5 M15 1.5 v5" />
       </g>
@@ -29,10 +29,10 @@ const NAV = [
     href: "/app/timeline",
     label: "Timeline",
     icon: (active: boolean) => (
-      <g stroke={active ? "#E6ECF5" : "#5A6B85"} strokeWidth="1.5" strokeLinecap="round">
+      <g stroke={active ? "var(--text)" : "var(--text-faint)"} strokeWidth="1.5" strokeLinecap="round">
         <line x1="4" y1="3" x2="4" y2="19" />
-        <circle cx="4" cy="7" r="1.8" fill={active ? "#E6ECF5" : "#5A6B85"} stroke="none" />
-        <circle cx="4" cy="15" r="1.8" fill={active ? "#E6ECF5" : "#5A6B85"} stroke="none" />
+        <circle cx="4" cy="7" r="1.8" fill={active ? "var(--text)" : "var(--text-faint)"} stroke="none" />
+        <circle cx="4" cy="15" r="1.8" fill={active ? "var(--text)" : "var(--text-faint)"} stroke="none" />
         <line x1="9" y1="7" x2="19" y2="7" />
         <line x1="9" y1="15" x2="17" y2="15" />
       </g>
@@ -42,7 +42,7 @@ const NAV = [
     href: "/app/logs",
     label: "Logs",
     icon: (active: boolean) => (
-      <g stroke={active ? "#E6ECF5" : "#5A6B85"} strokeWidth="1.5" strokeLinecap="round">
+      <g stroke={active ? "var(--text)" : "var(--text-faint)"} strokeWidth="1.5" strokeLinecap="round">
         <line x1="2" y1="4" x2="18" y2="4" />
         <line x1="2" y1="10" x2="18" y2="10" />
         <line x1="2" y1="16" x2="12" y2="16" />

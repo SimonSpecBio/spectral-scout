@@ -1,9 +1,78 @@
 @import "tailwindcss";
 
+/* Light mode is the default (no data-theme attribute, or data-theme="light")
+   -- matches the reviewed mockup's blue-accent palette ("Cherenkov
+   Radiation Blue" per brand style guide), re-valuing the same token names
+   the dark palette already used rather than inventing a second system.
+   Dark mode ([data-theme="dark"], toggled from /app/settings) below keeps
+   every value pixel-identical to what shipped before this pass. */
 :root {
-  /* Deep navy + rust palette, matching the reference mockup -- replaces
-     the earlier dark-teal system everywhere var(--accent)/var(--bg)/etc
-     get used, not just on the screens built this pass. */
+  --bg: #f6f4f0;
+  --surface: #ffffff;
+  /* A hair off-white so a "recessed panel" nested inside a white .card
+     (DiseaseEventForm's species box, an expanded inventory row) still
+     reads as sunken instead of disappearing into the card around it. */
+  --surface-raised: #f6f4f0;
+  --border: #e7e2d9;
+  --border-soft: #ede9df;
+  --text: #1c2431;
+  --text-dim: #5c6a80;
+  --text-faint: #93a0b3;
+  --accent: #22bbff;
+  --accent-soft: #b9852b;
+  --on-accent: #082336;
+  /* Darker shade of the same brand hue, for text/links on light surfaces
+     where raw --accent fails contrast (used instead of --accent for body
+     text, never for fills/buttons). */
+  --accent-text: #0b84c4;
+  /* Tinted pill/badge background for accent-colored counts (the dashboard's
+     "N ALERTS" badge) -- per the mockup, routine "needs attention" flags
+     stay brand blue, not red. */
+  --accent-bg: #e3f5ff;
+  /* Reserved for a harder "this is actively bad/blocked" signal -- low/out
+     of stock, an active REI restriction (can't enter), a restricted
+     chemical, over-threshold trap capture -- distinct from --accent so
+     brand blue and "something's actually wrong" don't collapse into one
+     color now that accent isn't red anymore, the same way SEVERITY_COLOR
+     always stayed its own scale. */
+  --danger: #c1502e;
+  --danger-bg: #fbeae4;
+  --danger-border: #f0c4b3;
+  --success: #2f8f6e;
+  --success-bg: #e8f4ef;
+  --success-border: #bfe3d3;
+  --warning: #a5751f;
+  --warning-bg: #fbf1de;
+  --map-blue: #2f7fc4;
+  --map-blue-soft: #eaf3fb;
+  --map-grid-line: rgba(47, 127, 196, 0.12);
+  /* The bay-floorplan "blueprint" SVGs (BayBarMap, LocationPicker,
+     PressureGraph) were hardcoded to one dark-navy look before light mode
+     existed -- these give them a theme-aware equivalent instead of always
+     rendering a near-black canvas. */
+  --map-canvas-bg: var(--map-blue-soft);
+  --map-grid-stroke: rgba(47, 127, 196, 0.18);
+  /* Subtler than the outer .map-canvas-frame border (which stays
+     var(--map-blue) in both themes) -- an inner reference-line stroke, not
+     the frame edge itself. */
+  --map-frame-stroke: var(--map-blue);
+  --map-bay-fill: #ffffff;
+  --map-bay-selected-fill: #d8ecfb;
+  --map-label: var(--text-dim);
+  --map-label-dim: var(--text-faint);
+  /* Neutral chip/avatar background (TeamClient, task assignee chips) and
+     progress-bar track background -- both were a dark steel-blue tuned for
+     the navy surface. */
+  --chip-bg: #eef1f6;
+  --track-bg: #eceef2;
+  /* Empty/idle swatch fill shared by BayBarMap's unfilled bays,
+     DiseaseEventForm's unassessed leaf cells, and MonitoringFlow's
+     unchecked leaf state. */
+  --idle-fill: #eceef2;
+  --shadow-card: 0 1px 2px rgba(28, 36, 49, 0.06), 0 1px 0 rgba(28, 36, 49, 0.04), 0 0 0 1px rgba(28, 36, 49, 0.04);
+}
+
+[data-theme="dark"] {
   --bg: #070c14;
   --surface: #0d1524;
   --surface-raised: #172234;
@@ -14,14 +83,29 @@
   --text-faint: #4a5a75;
   --accent: #ce5d40;
   --accent-soft: #c79a3a;
-  /* Text color on top of a solid --accent fill (buttons, badges) -- was
-     hardcoded as "#0B1626" in ~25 places and "#0D1524" in one (the bottom
-     nav's + button), two near-identical rust-adjacent darks that had
-     quietly drifted apart. One token now. */
   --on-accent: #0b1626;
+  --accent-text: #ce5d40;
+  --accent-bg: #231411;
+  --danger: #ce5d40;
+  --danger-bg: #231411;
+  --danger-border: #3a211a;
+  --success: #4e9e86;
+  --success-bg: #14231d;
+  --success-border: #245942;
+  --warning: #c79a3a;
+  --warning-bg: #2a2210;
   --map-blue: #7ec4f0;
   --map-blue-soft: #bfe3fa;
   --map-grid-line: rgba(126, 196, 240, 0.09);
+  --map-canvas-bg: #0a1120;
+  --map-grid-stroke: #111c2d;
+  --map-frame-stroke: #1e2c46;
+  --map-bay-fill: #172234;
+  --map-bay-selected-fill: #1d2c48;
+  --chip-bg: #243449;
+  --track-bg: #1b2740;
+  --idle-fill: #172234;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 body {
@@ -48,15 +132,18 @@ body {
 .card {
   background: var(--surface);
   border-radius: 1rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  box-shadow: var(--shadow-card);
 }
 
 .card-interactive {
   transition: box-shadow 150ms ease, transform 150ms ease;
 }
 .card-interactive:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(28, 36, 49, 0.06);
   transform: translateY(-1px);
+}
+[data-theme="dark"] .card-interactive:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .badge {
@@ -65,24 +152,24 @@ body {
   font-size: 0.75rem;
 }
 
-/* The dark-navy floating pill used by every "continue to place location"
-   / "log location" action across the event, treatment, trap, and scouting
+/* The floating pill used by every "continue to place location" / "log
+   location" action across the event, treatment, trap, and scouting
    creation flows -- was six copies of the same inline style object before
    this, drifting being one edit away at any time. */
 .btn-location {
-  background: #25385a;
-  border: 0.5px solid #37507a;
+  background: var(--map-bay-selected-fill);
+  border: 0.5px solid var(--map-blue);
   color: var(--text);
 }
 
-/* Blueprint-style frame for the facility map canvas -- a light blue edge
-   and faint grid distinguish it from the rest of the app's dark teal cards,
-   deliberately evoking a technical drawing surface since that's what it is. */
+/* Blueprint-style frame for the facility map canvas -- a blue edge and
+   faint grid distinguish it from the rest of the app's cards, deliberately
+   evoking a technical drawing surface since that's what it is. */
 .map-canvas-frame {
   position: relative;
   border-radius: 1.25rem;
   border: 2px solid var(--map-blue);
-  background-color: var(--surface);
+  background-color: var(--map-canvas-bg);
   overflow: hidden;
 }
 

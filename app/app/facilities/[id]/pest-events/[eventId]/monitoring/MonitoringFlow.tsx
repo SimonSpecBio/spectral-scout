@@ -196,7 +196,7 @@ export default function MonitoringFlow({
                         s === "unchecked"
                           ? "transparent"
                           : s === "absent"
-                            ? "#2a3b52"
+                            ? "var(--idle-fill)"
                             : s === "low"
                               ? "#6bb77b55"
                               : s === "medium"

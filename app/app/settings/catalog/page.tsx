@@ -1,4 +1,5 @@
 import { asc, eq } from "drizzle-orm";
+import Link from "next/link";
 import { db } from "@/db";
 import { customSpecies, monitoringThresholds } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
@@ -31,6 +32,9 @@ export default async function CatalogSettingsPage() {
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
+      <Link href="/app/settings" className="text-sm text-[var(--text-dim)]">
+        &lsaquo; Settings
+      </Link>
       <h1 className="text-2xl font-semibold">Species &amp; thresholds</h1>
       <CatalogClient
         isOwner={session.membershipRole === "owner"}

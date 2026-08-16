@@ -312,8 +312,8 @@ export default function PestEventDetail({
       )}
 
       {status === "resolved" && event.autoResolved && (
-        <div className="card flex items-center gap-3 p-4" style={{ background: "#14231d", border: "0.5px solid #245942" }}>
-          <span style={{ color: "#4E9E86" }}>✓</span>
+        <div className="card flex items-center gap-3 p-4" style={{ background: "var(--success-bg)", border: "0.5px solid var(--success-border)" }}>
+          <span style={{ color: "var(--success)" }}>✓</span>
           <div className="flex-1 text-sm">
             Auto-resolved — the last two monitoring sessions came back under threshold, no infestation left to track.
           </div>
@@ -338,7 +338,7 @@ export default function PestEventDetail({
                   onClick={() => acceptSuggestion(s)}
                   disabled={accepted || acceptingSuggestion === s.id}
                   className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-70 ${
-                    accepted ? "text-[#4E9E86]" : "bg-[var(--accent)] text-[var(--on-accent)]"
+                    accepted ? "text-[var(--success)]" : "bg-[var(--accent)] text-[var(--on-accent)]"
                   }`}
                 >
                   {accepted ? "Scheduled ✓" : acceptingSuggestion === s.id ? "Scheduling…" : "Accept"}

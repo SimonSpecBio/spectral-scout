@@ -17,7 +17,7 @@ import SpeciesPicker from "../SpeciesPicker";
 const POSITIONS = ["Bot", "Mid", "Top"] as const;
 // Same fills as the reference design: transparent/dashed for unassessed,
 // then 4 alpha steps of the accent color for the severity classes.
-const CLASS_FILL = ["#172234", "rgba(206,93,64,0.20)", "rgba(206,93,64,0.42)", "rgba(206,93,64,0.66)", "#CE5D40"];
+const CLASS_FILL = ["var(--idle-fill)", "rgba(206,93,64,0.20)", "rgba(206,93,64,0.42)", "rgba(206,93,64,0.66)", "#CE5D40"];
 
 function cycle(cell: DiseaseClass | null): DiseaseClass | null {
   if (cell === null) return 0;
@@ -103,7 +103,7 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
 
       <div className="flex flex-col gap-2">
         <span className="label-mono">Species</span>
-        <div className="flex flex-col gap-2 rounded-xl border border-[var(--border-soft)] p-3.5" style={{ background: "#111c2e" }}>
+        <div className="flex flex-col gap-2 rounded-xl border border-[var(--border-soft)] p-3.5" style={{ background: "var(--surface-raised)" }}>
           <SpeciesPicker
             kind="pathogen"
             value={commonName}
@@ -167,14 +167,14 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
       <div className="flex flex-col gap-2">
         <span className="label-mono">Summary</span>
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-xl p-3" style={{ background: "#111c2e" }}>
+          <div className="rounded-xl p-3" style={{ background: "var(--surface-raised)" }}>
             <div className="label-mono">Incidence</div>
             <div className="font-mono text-lg font-medium" style={{ color: "var(--accent)" }}>
               {agg.incidencePct}%
             </div>
             <div className="label-mono">leaves infected</div>
           </div>
-          <div className="rounded-xl p-3" style={{ background: "#111c2e" }}>
+          <div className="rounded-xl p-3" style={{ background: "var(--surface-raised)" }}>
             <div className="label-mono">Mean severity</div>
             <div className="font-mono text-lg font-medium">{agg.meanSeverityPct}%</div>
             <div className="label-mono">leaf area</div>

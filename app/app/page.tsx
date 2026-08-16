@@ -348,7 +348,7 @@ export default async function HomePage({
           <span className="font-medium">{selectedFacility.name}</span>
         )}
         {facilityEvents.length > 0 && (
-          <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "#231411" }}>
+          <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "var(--accent-bg)" }}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
             <span className="label-mono" style={{ color: "var(--accent)" }}>
               {facilityEvents.length} ALERT{facilityEvents.length === 1 ? "" : "S"}

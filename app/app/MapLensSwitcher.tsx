@@ -63,19 +63,19 @@ export default function MapLensSwitcher({
       if (!e.lastScoutedAt) continue;
       const days = Math.floor((Date.now() - new Date(e.lastScoutedAt).getTime()) / DAY_MS);
       const overdue = days >= OVERDUE_AFTER_DAYS;
-      colorByBay.set(e.key, overdue ? "#4a2a22" : "#223451");
+      colorByBay.set(e.key, overdue ? "var(--danger-bg)" : "var(--map-bay-selected-fill)");
       badgeByBay.set(e.key, `${days}D`);
     }
   } else if (lens === "temp") {
     for (const e of bayLensEntries) {
       if (e.avgTempF == null) continue;
-      colorByBay.set(e.key, "#223451");
+      colorByBay.set(e.key, "var(--map-bay-selected-fill)");
       badgeByBay.set(e.key, `${e.avgTempF}°F`);
     }
   } else if (lens === "humidity") {
     for (const e of bayLensEntries) {
       if (e.avgHumidityPct == null) continue;
-      colorByBay.set(e.key, "#223451");
+      colorByBay.set(e.key, "var(--map-bay-selected-fill)");
       badgeByBay.set(e.key, `${e.avgHumidityPct}%`);
     }
   }

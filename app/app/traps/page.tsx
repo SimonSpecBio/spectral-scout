@@ -136,9 +136,9 @@ export default async function TrapsPage({
             const latest = s.latestReadings[0];
             const alert = alertByTrapId.get(s.trap.id);
             return (
-              <div key={s.trap.id} className="flex flex-col" style={s.overThreshold ? { background: "#150E0C" } : undefined}>
+              <div key={s.trap.id} className="flex flex-col" style={s.overThreshold ? { background: "var(--danger-bg)" } : undefined}>
                 <div className="flex items-center gap-3 p-3.5">
-                  {s.overThreshold && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />}
+                  {s.overThreshold && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--danger)" }} />}
                   <div className="flex-1">
                     <div className="text-sm">{s.trap.label}</div>
                     <div className="label-mono">{s.bayLabel.toUpperCase()}</div>
@@ -148,13 +148,13 @@ export default async function TrapsPage({
                       <polyline
                         points={sparkPoints(s.history, 60, 24, 3)}
                         fill="none"
-                        stroke={s.overThreshold ? "var(--accent)" : "#4E6280"}
+                        stroke={s.overThreshold ? "var(--danger)" : "var(--text-faint)"}
                         strokeWidth="1.5"
                       />
                     </svg>
                   )}
                   <div className="text-right">
-                    <div className="text-sm" style={{ color: s.overThreshold ? "var(--accent)" : undefined }}>
+                    <div className="text-sm" style={{ color: s.overThreshold ? "var(--danger)" : undefined }}>
                       {latest ? latest.catchPerDay.toFixed(1) : "—"}
                     </div>
                     <div className="label-mono">/DAY</div>
@@ -168,12 +168,12 @@ export default async function TrapsPage({
                         : `/app/new-event?facility=${selectedFacility.id}&area=${s.trap.facilityAreaId}`
                     }
                     className="mx-3.5 mb-3.5 flex items-center justify-between rounded-lg px-3 py-2 text-xs"
-                    style={{ background: "#231411" }}
+                    style={{ background: "var(--danger-bg)" }}
                   >
                     <span className="text-[var(--text)]">
                       {alert.dedupedIntoEventId ? "Event already tracking this" : `Confirm ${alert.pestSpecies} event?`}
                     </span>
-                    <span style={{ color: "var(--accent)" }}>›</span>
+                    <span style={{ color: "var(--danger)" }}>›</span>
                   </Link>
                 )}
               </div>

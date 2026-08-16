@@ -79,10 +79,10 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
           active.map((r) => (
             <div key={r.treatmentId} className="flex flex-col gap-3">
               {r.reiActive && r.reiEndsAt && (
-                <div className="card flex items-center justify-between p-4" style={{ background: "#150E0C", borderColor: "#3A211A" }}>
+                <div className="card flex items-center justify-between p-4" style={{ background: "var(--danger-bg)", borderColor: "var(--danger-border)" }}>
                   <div>
                     <div className="flex items-center gap-2 text-sm font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--danger)" }} />
                       {r.bay} — no entry
                     </div>
                     <div className="text-xs text-[var(--text-dim)]">
@@ -90,7 +90,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg font-medium" style={{ color: "var(--accent)" }}>
+                    <div className="text-lg font-medium" style={{ color: "var(--danger)" }}>
                       {formatCountdown(r.reiEndsAt.getTime() - Date.now())}
                     </div>
                     <div className="label-mono">re-entry at</div>
@@ -101,7 +101,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
                 <div className="card flex items-center justify-between p-4">
                   <div>
                     <div className="flex items-center gap-2 text-sm font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#C79A3A" }} />
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--warning)" }} />
                       {r.bay} — no harvest
                     </div>
                     <div className="text-xs text-[var(--text-dim)]">
@@ -109,7 +109,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg font-medium" style={{ color: "#C79A3A" }}>
+                    <div className="text-lg font-medium" style={{ color: "var(--warning)" }}>
                       {formatCountdown(r.phiEndsAt.getTime() - Date.now())}
                     </div>
                     <div className="label-mono">harvest from</div>
@@ -130,7 +130,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
             <>
               {bioTreatments.map((t) => (
                 <div key={t.id} className="flex items-center gap-3 p-3.5">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#4E9E86" }} />
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--success)" }} />
                   <div>
                     <div className="text-sm">{t.x != null && t.y != null ? bayLabel(nearestBay(t.x, t.y)) : "—"} · {t.product ?? "biocontrol"} released</div>
                     <div className="label-mono">Biocontrol · no restriction</div>
@@ -139,7 +139,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
               ))}
               {clearRestricted.map((r) => (
                 <div key={r.treatmentId} className="flex items-center gap-3 p-3.5">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#4E9E86" }} />
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--success)" }} />
                   <div>
                     <div className="text-sm">
                       {r.bay} · {r.product}

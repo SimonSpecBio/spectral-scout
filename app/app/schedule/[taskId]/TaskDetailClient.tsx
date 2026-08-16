@@ -68,7 +68,7 @@ export default function TaskDetailClient({
         <div className="flex items-center gap-3">
           <span
             className="flex h-9 w-9 items-center justify-center rounded-full text-xs"
-            style={{ background: "#243449", color: "var(--text-dim)" }}
+            style={{ background: "var(--chip-bg)", color: "var(--text-dim)" }}
           >
             {current ? initialsFor(current.name, current.email) : "—"}
           </span>

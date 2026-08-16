@@ -170,13 +170,13 @@ export default function LocationPicker({
 
           <div
             className="flex-1 overflow-hidden"
-            style={{ background: "#0a1120" }}
+            style={{ background: "var(--map-canvas-bg)" }}
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
           >
             <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMid meet" className="block h-full w-full">
-              <rect x="38" y="20" width="220" height="360" rx="3" fill="none" stroke="#1e2c46" strokeWidth="1" />
-              <line x1="148" y1="24" x2="148" y2="376" stroke="#111c2d" strokeWidth="0.75" strokeDasharray="1 5" />
+              <rect x="38" y="20" width="220" height="360" rx="3" fill="none" stroke="var(--map-frame-stroke)" strokeWidth="1" />
+              <line x1="148" y1="24" x2="148" y2="376" stroke="var(--map-grid-stroke)" strokeWidth="0.75" strokeDasharray="1 5" />
               {BAYS.map((b) => {
                 const { cx, cy } = toView(b);
                 const isSelected = selected?.row === b.row && selected?.index === b.index;
@@ -188,7 +188,7 @@ export default function LocationPicker({
                     width={BENCH_W}
                     height={BENCH_H}
                     rx={4.5}
-                    fill={isSelected ? "#1d2c48" : "#172234"}
+                    fill={isSelected ? "var(--map-bay-selected-fill)" : "var(--map-bay-fill)"}
                     stroke={isSelected ? "var(--accent)" : "none"}
                     strokeWidth={1.5}
                     onClick={() => setSelected(b)}
@@ -196,9 +196,9 @@ export default function LocationPicker({
                   />
                 );
               })}
-              <g fontFamily="ui-monospace, monospace" fontSize="8" letterSpacing="0.14em">
-                <text x="50" y="15" fill="#4a5a75">ROW A</text>
-                <text x="160" y="15" fill="#4a5a75">ROW B</text>
+              <g fontFamily="ui-monospace, monospace" fontSize="8" letterSpacing="0.14em" fill="var(--map-label)">
+                <text x="50" y="15">ROW A</text>
+                <text x="160" y="15">ROW B</text>
               </g>
               {selectedView && (
                 <>

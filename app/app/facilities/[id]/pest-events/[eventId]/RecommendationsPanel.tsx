@@ -6,9 +6,9 @@ import { AGENTS, findPestProgram, PRODUCTS } from "@/lib/treatments-catalog";
 
 const STOCK_LABEL: Record<StockStatus, string> = { in_stock: "IN STOCK", low: "LOW STOCK", out: "OUT OF STOCK", unknown: "NOT IN INVENTORY" };
 const STOCK_COLOR: Record<StockStatus, string> = {
-  in_stock: "#4E9E86",
-  low: "var(--accent)",
-  out: "var(--accent)",
+  in_stock: "var(--success)",
+  low: "var(--danger)",
+  out: "var(--danger)",
   unknown: "var(--text-faint)",
 };
 
@@ -97,7 +97,7 @@ export default function RecommendationsPanel({
         </div>
         {caution && <div className="text-xs text-[var(--text-dim)]">{caution}</div>}
         {applied[name] ? (
-          <div className="text-xs" style={{ color: "#4E9E86" }}>
+          <div className="text-xs" style={{ color: "var(--success)" }}>
             ✓ {applied[name]}
           </div>
         ) : (
@@ -166,7 +166,7 @@ export default function RecommendationsPanel({
           </button>
           {showRestricted && (
             <div className="flex flex-col gap-2">
-              <div className="rounded-md p-3 text-xs" style={{ background: "#231411", color: "var(--accent)" }}>
+              <div className="rounded-md p-3 text-xs" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
                 Restricted or prohibited on cannabis in many markets -- verify legality in your jurisdiction before
                 use. Not a substitute for checking the current product label.
               </div>

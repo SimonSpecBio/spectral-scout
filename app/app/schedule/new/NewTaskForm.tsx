@@ -168,7 +168,7 @@ export default function NewTaskForm({
               <span
                 className="flex h-9 w-9 items-center justify-center rounded-full text-xs"
                 style={{
-                  background: "#243449",
+                  background: "var(--chip-bg)",
                   color: "var(--text-dim)",
                   border: assigneeUserId === m.userId ? "1.5px solid var(--accent)" : "1.5px solid transparent",
                 }}

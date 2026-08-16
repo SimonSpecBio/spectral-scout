@@ -109,7 +109,7 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
                     <button onClick={() => setExpanded((e) => (e === item.id ? null : item.id))} className="flex w-full flex-col gap-1.5 p-3.5 text-left">
                       <div className="flex items-center justify-between">
                         <span className="text-sm">{item.name}</span>
-                        <span className="text-sm" style={{ color: low ? "var(--accent)" : "var(--text)" }}>
+                        <span className="text-sm" style={{ color: low ? "var(--danger)" : "var(--text)" }}>
                           {item.quantity}
                           {item.unit === "units" ? "" : item.unit}
                         </span>
@@ -121,13 +121,13 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
                           {item.phiDays != null && `PHI ${item.phiDays}D`}
                         </div>
                       )}
-                      <div className="h-1 w-full overflow-hidden rounded-full" style={{ background: "#1B2740" }}>
+                      <div className="h-1 w-full overflow-hidden rounded-full" style={{ background: "var(--track-bg)" }}>
                         <div
                           className="h-full rounded-full"
-                          style={{ width: `${pctOfReorderX3}%`, background: low ? "var(--accent)" : "#4E6280" }}
+                          style={{ width: `${pctOfReorderX3}%`, background: low ? "var(--danger)" : "var(--text-faint)" }}
                         />
                       </div>
-                      {low && <span className="label-mono text-[var(--accent)]">LOW STOCK</span>}
+                      {low && <span className="label-mono text-[var(--danger)]">LOW STOCK</span>}
                     </button>
                     {expanded === item.id && (
                       <div className="flex flex-col gap-3 border-t border-[var(--border)] bg-[var(--surface-raised)]/30 p-3.5">
@@ -318,7 +318,7 @@ function AddFromCatalog({ onAdded, onCancel }: { onAdded: (item: Item) => void; 
         </button>
       </div>
       {picked?.restricted && (
-        <div className="rounded-md p-2 text-xs" style={{ background: "#231411", color: "var(--accent)" }}>
+        <div className="rounded-md p-2 text-xs" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
           Restricted in many cannabis markets -- verify legality before use.
         </div>
       )}
