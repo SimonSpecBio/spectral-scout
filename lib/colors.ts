@@ -1,6 +1,6 @@
 // Shared color maps -- SEVERITY_COLOR was copy-pasted verbatim in four
 // files (events/page.tsx, PestEventDetail.tsx, MapEditor.tsx,
-// PressureHeatmapPlaceholder.tsx) and URGENCY_COLOR in two
+// PressureBayMap.tsx) and URGENCY_COLOR in two
 // (schedule/page.tsx, schedule/[taskId]/page.tsx). One definition now, so
 // a future palette tweak can't update three copies and miss the fourth.
 

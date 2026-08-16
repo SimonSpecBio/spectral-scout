@@ -5,8 +5,8 @@ const IDLE_FILL = "var(--idle-fill)";
 // The shared bay-bar canvas underneath every dashboard map lens (Pests,
 // Last scouted, Temp, Humidity) -- same 20 shared bay slots, same layout,
 // just a different fill/badge per bay depending which lens is selected.
-// Extracted from what was PressureHeatmapPlaceholder's pests-only rendering
-// so the other three lenses don't reimplement this SVG from scratch.
+// Extracted from what was PressureBayMap's pests-only rendering so the
+// other three lenses don't reimplement this SVG from scratch.
 export default function BayBarMap({
   colorByBay,
   badgeByBay,

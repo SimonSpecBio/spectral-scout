@@ -14,9 +14,12 @@ interface EventInput {
 // each event's stored (x, y) gets matched to its nearest of the 20 shared
 // bay slots (lib/floorplan-bays.ts -- the same slots LocationPicker
 // writes to), and that bay's bar is colored by the worst severity of
-// whatever landed there. Rendering itself now lives in BayBarMap, shared
-// with the other map lenses (see MapLensSwitcher).
-export default function PressureHeatmapPlaceholder({ events }: { events: EventInput[] }) {
+// whatever landed there. This is real event data, not a mock -- but the
+// 20 bay slots are a generic layout shared by every facility, not that
+// facility's actual floor plan, so MapLensSwitcher labels it as such.
+// Rendering itself now lives in BayBarMap, shared with the other map
+// lenses (see MapLensSwitcher).
+export default function PressureBayMap({ events }: { events: EventInput[] }) {
   const colorByBay = new Map<string, string>();
   const severityByBay = new Map<string, Severity>();
   for (const ev of events) {

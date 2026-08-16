@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import BayBarMap from "./BayBarMap";
-import PressureHeatmapPlaceholder from "./PressureHeatmapPlaceholder";
+import PressureBayMap from "./PressureBayMap";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 
@@ -26,9 +26,8 @@ const LENS_LABEL: Record<Lens, string> = { pests: "Pests", scouted: "Last scoute
 // rule rather than four separate maps. Swipe left/right on the map to
 // step through lenses; the dropdown below is the same control for anyone
 // who'd rather jump straight to one (or is on a mouse, where swipe isn't
-// natural). Pests reuses the existing PressureHeatmapPlaceholder as-is;
-// the other three are computed from bay-keyed scouting data
-// (lib/map-lenses.ts).
+// natural). Pests reuses the existing PressureBayMap as-is; the other
+// three are computed from bay-keyed scouting data (lib/map-lenses.ts).
 export default function MapLensSwitcher({
   events,
   bayLensEntries,
@@ -83,8 +82,9 @@ export default function MapLensSwitcher({
   return (
     <div className="flex flex-col gap-2">
       <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-        {lens === "pests" ? <PressureHeatmapPlaceholder events={events} /> : <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} />}
+        {lens === "pests" ? <PressureBayMap events={events} /> : <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} />}
       </div>
+      <p className="text-center text-[10px] text-[var(--text-faint)]">Generic bay layout, not your exact floor plan</p>
       <select
         value={lens}
         onChange={(e) => setLens(e.target.value as Lens)}

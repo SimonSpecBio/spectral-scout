@@ -60,13 +60,13 @@ function bandFromRatio(ratio: number): Severity {
 
 // The whole app in one screen, per the "mission control, not a drawing
 // tool" direction. The lens-switching pressure heatmap (MapLensSwitcher --
-// dragging precise shapes doesn't work on a phone screen, and the real
-// row/bay data model doesn't exist yet, see PressureHeatmapPlaceholder)
-// now shows on every screen size, side by side with the real interactive
-// Konva map once there's room (lg:) rather than being mobile-only; the
-// editable map still needs desktop-grade precision, so it stays desktop-
-// only. Everything else (pressure graph, attention required, today's tasks,
-// recent activity) is real data on both.
+// dragging precise shapes doesn't work on a phone screen, so it recolors a
+// generic 20-bay grid from real event data instead of the facility's exact
+// floor plan, see PressureBayMap) now shows on every screen size, side by
+// side with the real interactive Konva map once there's room (lg:) rather
+// than being mobile-only; the editable map still needs desktop-grade
+// precision, so it stays desktop-only. Everything else (pressure graph,
+// attention required, today's tasks, recent activity) is real data on both.
 export default async function HomePage({
   searchParams,
 }: {

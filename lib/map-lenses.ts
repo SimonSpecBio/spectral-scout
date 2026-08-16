@@ -12,7 +12,7 @@ export interface BayLensStats {
 // Powers the dashboard map's Last scouted / Temp / Humidity lenses --
 // every located scouting observation snaps to its nearest of the 20 shared
 // bay slots (same `${row}${index}` key convention pest events use for the
-// Pests lens, see PressureHeatmapPlaceholder), and each bay reports its
+// Pests lens, see PressureBayMap), and each bay reports its
 // most recent reading. A bay with no located observations yet just has no
 // entry (rendered as idle by the caller), same as a bay with no pest event.
 export async function computeBayLensStats(areaId: string): Promise<Map<string, BayLensStats>> {

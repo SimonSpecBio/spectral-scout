@@ -1,10 +1,11 @@
 // Canvas-space (900x600, the same space the real Konva map and stored
-// pest_events x/y already use) positions of the 20 placeholder "bay" slots.
-// Single source of truth for both LocationPlacement (tap-to-place, writes
-// an event's x/y from a bay) and PressureHeatmapPlaceholder (colors a bay's
-// bar by finding which real events are nearest to it) -- so "Bay A3" means
-// the exact same physical point in both places, not two independently-
-// eyeballed layouts that can drift apart.
+// pest_events x/y already use) positions of the 20 generic "bay" slots
+// (a stand-in layout shared by every facility, not that facility's actual
+// floor plan). Single source of truth for both LocationPlacement
+// (tap-to-place, writes an event's x/y from a bay) and PressureBayMap
+// (colors a bay's bar by finding which real events are nearest to it) --
+// so "Bay A3" means the exact same physical point in both places, not two
+// independently-eyeballed layouts that can drift apart.
 export const CANVAS_W = 900;
 export const CANVAS_H = 600;
 
