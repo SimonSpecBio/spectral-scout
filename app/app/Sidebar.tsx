@@ -12,7 +12,6 @@ const PRIMARY = [
 ] as const;
 
 const SECONDARY = [
-  { href: "/app/notifications", label: "Notifications" },
   { href: "/app/facilities", label: "Sites" },
   { href: "/app/traps", label: "Sticky traps" },
   { href: "/app/inventory", label: "Inventory" },
@@ -30,13 +29,31 @@ export default function Sidebar({ email, isPilot }: { email: string | null | und
 
   return (
     <aside className="sticky top-8 hidden h-fit w-52 shrink-0 flex-col gap-6 lg:flex">
-      <div>
-        <div className="font-semibold">Spectral Scout</div>
-        {isPilot && (
-          <span className="mt-1 inline-block rounded-full bg-[var(--accent)]/20 px-2 py-0.5 text-xs text-[var(--accent)]">
-            Pilot program
-          </span>
-        )}
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="font-semibold">Spectral Scout</div>
+          {isPilot && (
+            <span className="mt-1 inline-block rounded-full bg-[var(--accent)]/20 px-2 py-0.5 text-xs text-[var(--accent)]">
+              Pilot program
+            </span>
+          )}
+        </div>
+        <Link
+          href="/app/notifications"
+          aria-label="Notifications"
+          className="flex h-8 w-8 shrink-0 items-center justify-center text-[var(--text-faint)]"
+          style={{ color: pathname === "/app/notifications" ? "var(--text)" : "var(--text-faint)" }}
+        >
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+            <path
+              d="M8.5 1.5c-2 0-3.5 1.6-3.5 3.6v2.4l-1 2.5h9l-1-2.5V5.1c0-2-1.5-3.6-3.5-3.6z"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinejoin="round"
+            />
+            <path d="M7 12.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+        </Link>
       </div>
 
       <QuickActionsMenu variant="sidebar" />
