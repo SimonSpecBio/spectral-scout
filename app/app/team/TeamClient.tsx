@@ -69,10 +69,11 @@ export default function TeamClient({
     setSubmitting(false);
   }
 
-  async function removeMember(membershipId: string) {
-    const res = await fetch(`/api/team/members/${membershipId}`, { method: "DELETE" });
+  async function removeMember(member: Member) {
+    if (!confirm(`Remove ${member.name ?? member.email} from the team?`)) return;
+    const res = await fetch(`/api/team/members/${member.membershipId}`, { method: "DELETE" });
     if (res.ok) {
-      setMembers((prev) => prev.filter((m) => m.membershipId !== membershipId));
+      setMembers((prev) => prev.filter((m) => m.membershipId !== member.membershipId));
       router.refresh();
     } else {
       const body = await res.json().catch(() => ({}));
@@ -80,9 +81,10 @@ export default function TeamClient({
     }
   }
 
-  async function cancelInvite(inviteId: string) {
-    const res = await fetch(`/api/team/invites/${inviteId}`, { method: "DELETE" });
-    if (res.ok) setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
+  async function cancelInvite(invite: Invite) {
+    if (!confirm(`Cancel the invite to ${invite.email}?`)) return;
+    const res = await fetch(`/api/team/invites/${invite.id}`, { method: "DELETE" });
+    if (res.ok) setPendingInvites((prev) => prev.filter((i) => i.id !== invite.id));
   }
 
   return (
@@ -96,7 +98,7 @@ export default function TeamClient({
               <div className="label-mono">{m.role.toUpperCase()}</div>
             </div>
             {isOwner && m.userId !== currentUserId && (
-              <button onClick={() => removeMember(m.membershipId)} className="text-xs text-[var(--accent)]">
+              <button onClick={() => removeMember(m)} className="text-xs text-[var(--accent)]">
                 Remove
               </button>
             )}
@@ -115,7 +117,7 @@ export default function TeamClient({
                   <div className="label-mono">{i.role.toUpperCase()}</div>
                 </div>
                 {isOwner && (
-                  <button onClick={() => cancelInvite(i.id)} className="text-xs text-[var(--text-dim)]">
+                  <button onClick={() => cancelInvite(i)} className="text-xs text-[var(--text-dim)]">
                     Cancel
                   </button>
                 )}

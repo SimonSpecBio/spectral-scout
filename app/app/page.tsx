@@ -2,6 +2,7 @@ import Link from "next/link";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, facilityMapObjects, inventoryItems, pestEvents, tasks, treatments } from "@/db/schema";
+import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
 import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-alerts";
@@ -36,6 +37,25 @@ function relativeTime(date: Date): string {
   if (days <= 0) return "Today";
   if (days === 1) return "Yesterday";
   return `${days} days ago`;
+}
+
+// Trap/scouting alerts have no linked event yet (that's the whole point --
+// they're a suggestion to create one), so there's no real severity to read.
+// Bands them from how far over threshold they are instead, using the same
+// cutoffs NewEventForm's severityFromHandoff already applies to infested %
+// when promoting a scouting handoff into an event, so a scout sees the same
+// number read the same way in both places.
+function bandFromInfestedPct(pct: number): Severity {
+  if (pct >= 60) return "severe";
+  if (pct >= 40) return "high";
+  if (pct >= 20) return "moderate";
+  return "low";
+}
+function bandFromRatio(ratio: number): Severity {
+  if (ratio >= 3) return "severe";
+  if (ratio >= 2) return "high";
+  if (ratio >= 1.5) return "moderate";
+  return "low";
 }
 
 // The whole app in one screen, per the "mission control, not a drawing
@@ -140,6 +160,7 @@ export default async function HomePage({
     .filter((e) => e.status === "active")
     .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
 
+  const eventSeverityById = new Map(active.map((e) => [e.id, e.severity]));
   const todaysFollowUps = active.filter((e) => needsFollowUp(e.createdAt));
   const resolvedToday = events.filter((e) => e.status === "resolved" && e.resolvedAt && isToday(e.resolvedAt));
   const myTasksToday = myOpenTasks
@@ -181,7 +202,7 @@ export default async function HomePage({
     ...trapAlerts.map((a) => ({ kind: "trap" as const, alert: a })),
     ...scoutingAlerts.map((a) => ({ kind: "scouting" as const, alert: a })),
     ...lowStockItems.map((i) => ({ kind: "lowstock" as const, item: i })),
-  ].slice(0, 4);
+  ];
 
   const treatmentsByEvent = new Map<string, typeof orgTreatments>();
   for (const t of orgTreatments) {
@@ -357,13 +378,6 @@ export default async function HomePage({
         )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-        <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
-        <div className="hidden sm:block">{desktopMapSection}</div>
-      </div>
-
-      <PressureGraph events={events.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
-
       <section className="flex flex-col gap-3">
         <span className="label-mono">Attention required</span>
         {attention.length === 0 ? (
@@ -379,7 +393,10 @@ export default async function HomePage({
                     href={`/app/new-event?facility=${a.facilityId}&area=${a.facilityAreaId}`}
                     className="flex items-center gap-3 p-3.5"
                   >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: SEVERITY_COLOR[bandFromRatio(a.catchPerDay / a.threshold)] }}
+                    />
                     <div className="flex-1">
                       <div className="text-sm">{a.trapLabel} spike &mdash; confirm {a.pestSpecies}?</div>
                       <div className="label-mono">
@@ -398,7 +415,10 @@ export default async function HomePage({
                     href={scoutingAlertConfirmHref(a)}
                     className="flex items-center gap-3 p-3.5"
                   >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: SEVERITY_COLOR[bandFromInfestedPct(a.infestedPct)] }}
+                    />
                     <div className="flex-1">
                       <div className="text-sm">Scouting log over threshold — confirm?</div>
                       <div className="label-mono">
@@ -417,7 +437,10 @@ export default async function HomePage({
                     href={`/app/facilities/${a.facilityId}/pest-events/${a.eventId}`}
                     className="flex items-center gap-3 p-3.5"
                   >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: SEVERITY_COLOR[eventSeverityById.get(a.eventId) ?? bandFromInfestedPct(a.infestedPct)] }}
+                    />
                     <div className="flex-1">
                       <div className="text-sm">{a.pestSpecies} over threshold</div>
                       <div className="label-mono">
@@ -436,7 +459,10 @@ export default async function HomePage({
                     href={`/app/facilities/${a.facilityId}/pest-events/${a.eventId}?tab=recommended`}
                     className="flex items-center gap-3 p-3.5"
                   >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: SEVERITY_COLOR[eventSeverityById.get(a.eventId) ?? bandFromInfestedPct(a.latestPct)] }}
+                    />
                     <div className="flex-1">
                       <div className="text-sm">{a.pestSpecies} not improving — try a different tier?</div>
                       <div className="label-mono">
@@ -451,7 +477,10 @@ export default async function HomePage({
                 const i = item.item;
                 return (
                   <Link key={`lowstock-${i.id}`} href="/app/inventory" className="flex items-center gap-3 p-3.5">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: SEVERITY_COLOR[Number(i.quantity) <= 0 ? "severe" : "moderate"] }}
+                    />
                     <div className="flex-1">
                       <div className="text-sm">{i.name} low stock</div>
                       <div className="label-mono">
@@ -465,7 +494,7 @@ export default async function HomePage({
               const e = item.event;
               return (
               <Link key={`${item.kind}-${e.id}`} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="flex items-center gap-3 p-3.5">
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[e.severity] }} />
                 <div className="flex-1">
                   <div className="text-sm capitalize">{item.kind === "followup" ? `${e.pestSpecies} recheck overdue` : `${e.pestSpecies} trending up`}</div>
                   <div className="label-mono">
@@ -479,6 +508,13 @@ export default async function HomePage({
           </div>
         )}
       </section>
+
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
+        <div className="hidden sm:block">{desktopMapSection}</div>
+      </div>
+
+      <PressureGraph events={events.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

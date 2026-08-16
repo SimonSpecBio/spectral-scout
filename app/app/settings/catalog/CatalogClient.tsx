@@ -62,9 +62,10 @@ export default function CatalogClient({
     setSpeciesSubmitting(false);
   }
 
-  async function removeSpecies(id: string) {
-    const res = await fetch(`/api/species/${id}`, { method: "DELETE" });
-    if (res.ok) setSpecies((prev) => prev.filter((s) => s.id !== id));
+  async function removeSpecies(row: SpeciesRow) {
+    if (!confirm(`Remove "${row.commonName}" from the species list?`)) return;
+    const res = await fetch(`/api/species/${row.id}`, { method: "DELETE" });
+    if (res.ok) setSpecies((prev) => prev.filter((s) => s.id !== row.id));
   }
 
   async function addThreshold(e: React.FormEvent) {
@@ -92,9 +93,10 @@ export default function CatalogClient({
     setThresholdSubmitting(false);
   }
 
-  async function removeThreshold(id: string) {
-    const res = await fetch(`/api/thresholds/${id}`, { method: "DELETE" });
-    if (res.ok) setThresholds((prev) => prev.filter((t) => t.id !== id));
+  async function removeThreshold(row: ThresholdRow) {
+    if (!confirm(`Remove the monitoring threshold for "${row.pestSpecies}"?`)) return;
+    const res = await fetch(`/api/thresholds/${row.id}`, { method: "DELETE" });
+    if (res.ok) setThresholds((prev) => prev.filter((t) => t.id !== row.id));
   }
 
   return (
@@ -119,7 +121,7 @@ export default function CatalogClient({
                   </div>
                 </div>
                 {isOwner && (
-                  <button onClick={() => removeSpecies(s.id)} className="text-xs text-[var(--accent)]">
+                  <button onClick={() => removeSpecies(s)} className="text-xs text-[var(--accent)]">
                     Remove
                   </button>
                 )}
@@ -186,7 +188,7 @@ export default function CatalogClient({
                 <div className="flex items-center gap-3">
                   <span className="label-mono">{t.infestedPctThreshold}%</span>
                   {isOwner && (
-                    <button onClick={() => removeThreshold(t.id)} className="text-xs text-[var(--accent)]">
+                    <button onClick={() => removeThreshold(t)} className="text-xs text-[var(--accent)]">
                       Remove
                     </button>
                   )}
