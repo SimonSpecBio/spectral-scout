@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { queuedFetch } from "@/lib/offline-queue";
 
 export default function NewFacilityForm() {
   const router = useRouter();
@@ -13,20 +14,14 @@ export default function NewFacilityForm() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    try {
-      const res = await fetch("/api/facilities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Failed to create facility");
+    const result = await queuedFetch("/api/facilities", { name }, "New site");
+    if (result.ok) {
       setName("");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setSubmitting(false);
+    } else {
+      setError("Failed to create facility");
     }
+    setSubmitting(false);
   }
 
   return (

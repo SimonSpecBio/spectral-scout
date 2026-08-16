@@ -38,6 +38,7 @@ export default function CountsFlow({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [placingLocation, setPlacingLocation] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const total = counts.reduce((a, b) => a + b, 0);
   const mean = total / counts.length;
@@ -48,6 +49,7 @@ export default function CountsFlow({
 
   async function submitSession(url: string, x: number | null, y: number | null) {
     setSubmitting(true);
+    setError(null);
     const result = await queuedFetch(
       url,
       { sampleSize: counts.length, pestCount: total, leafGrid: null, notes: notes || null, x, y },
@@ -66,6 +68,7 @@ export default function CountsFlow({
     } else {
       setSubmitting(false);
       setPlacingLocation(false);
+      setError("Couldn't save this session. Check your connection and try again.");
     }
   }
 
@@ -136,6 +139,15 @@ export default function CountsFlow({
           className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
         />
       </div>
+
+      {error && (
+        <div className="card flex items-center justify-between gap-3 p-3.5 text-sm" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
+          {error}
+          <button type="button" onClick={() => setError(null)} className="shrink-0 text-[var(--text-dim)]">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <button
         type="submit"

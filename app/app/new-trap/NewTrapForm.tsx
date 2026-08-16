@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { queuedFetch } from "@/lib/offline-queue";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 
 // No fields precede placement -- a trap has nothing to configure besides
@@ -16,12 +17,8 @@ export default function NewTrapForm({ facilities }: { facilities: PickerFacility
 
   async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
-    const res = await fetch(`/api/facilities/${facilityId}/areas/${areaId}/traps`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ x, y }),
-    });
-    if (res.ok) {
+    const result = await queuedFetch(`/api/facilities/${facilityId}/areas/${areaId}/traps`, { x, y }, "New trap");
+    if (result.ok) {
       router.push(`/app/traps?facility=${facilityId}&area=${areaId}`);
     } else {
       setSubmitting(false);

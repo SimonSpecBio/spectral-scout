@@ -77,6 +77,7 @@ export default function MonitoringFlow({
   const [satisfaction, setSatisfaction] = useState<number | null>(typeof draft?.satisfaction === "number" ? draft.satisfaction : null);
   const [submitting, setSubmitting] = useState(false);
   const [placingLocation, setPlacingLocation] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Autosave -- this write is a side effect on an external system
   // (localStorage), which is exactly what effects are for; no setState here.
@@ -109,6 +110,7 @@ export default function MonitoringFlow({
 
   async function submitSession(url: string, x: number | null, y: number | null) {
     setSubmitting(true);
+    setError(null);
     const avgTempF = temp === "" ? null : tempUnit === "F" ? temp : Math.round((temp * 9) / 5 + 32);
     const result = await queuedFetch(
       url,
@@ -142,6 +144,7 @@ export default function MonitoringFlow({
     } else {
       setSubmitting(false);
       setPlacingLocation(false);
+      setError("Couldn't save this session. Check your connection and try again.");
     }
   }
 
@@ -349,6 +352,15 @@ export default function MonitoringFlow({
           </label>
         )}
       </div>
+
+      {error && (
+        <div className="card flex items-center justify-between gap-3 p-3.5 text-sm" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
+          {error}
+          <button type="button" onClick={() => setError(null)} className="shrink-0 text-[var(--text-dim)]">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <button
         type="submit"

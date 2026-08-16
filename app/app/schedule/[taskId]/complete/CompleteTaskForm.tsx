@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { queuedFetch } from "@/lib/offline-queue";
 
 const PRESETS = [5, 15, 30, 60];
 
@@ -21,12 +22,8 @@ export default function CompleteTaskForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    const res = await fetch(`/api/tasks/${taskId}/complete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ minutesSpent: minutes }),
-    });
-    if (res.ok) {
+    const result = await queuedFetch(`/api/tasks/${taskId}/complete`, { minutesSpent: minutes }, "Task completion");
+    if (result.ok) {
       router.push("/app/schedule");
     } else {
       setSubmitting(false);

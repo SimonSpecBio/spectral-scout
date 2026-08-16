@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import SpeciesPicker from "../SpeciesPicker";
@@ -56,10 +57,9 @@ export default function NewEventForm({
 
   async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
-    const res = await fetch(`/api/facilities/${facilityId}/pest-events`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const result = await queuedFetch(
+      `/api/facilities/${facilityId}/pest-events`,
+      {
         facilityAreaId: areaId,
         pestSpecies: species,
         scientificName,
@@ -68,12 +68,22 @@ export default function NewEventForm({
         x,
         y,
         sourceObservationId: handoff?.observationId ?? null,
-      }),
-    });
-    if (res.ok) {
-      const row = await res.json();
+      },
+      "Pest event"
+    );
+    if (result.ok) {
       markEngaged();
-      router.push(`/app/facilities/${facilityId}/pest-events/${row.id}`);
+      // Queued (offline): no server-generated id exists yet to link to a
+      // detail page, so land on the facility instead of the usual
+      // pest-events/[id] route -- same reasoning as CountsFlow/
+      // MonitoringFlow landing on a fixed route rather than one derived
+      // from this response.
+      if (result.queued) {
+        router.push(`/app/facilities/${facilityId}`);
+      } else {
+        const row = result.data as { id: string };
+        router.push(`/app/facilities/${facilityId}/pest-events/${row.id}`);
+      }
     } else {
       setSubmitting(false);
       setPlacingLocation(false);

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
+import { queuedFetch } from "@/lib/offline-queue";
 
 const TYPES = ["scout", "monitor", "release", "treatment", "trap_read", "sulfur", "sanitation", "test", "other"] as const;
 
@@ -38,10 +39,9 @@ export default function NewTaskForm({
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const res = await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const result = await queuedFetch(
+      "/api/tasks",
+      {
         title,
         type,
         facilityId: facilityId || null,
@@ -49,13 +49,13 @@ export default function NewTaskForm({
         assigneeUserId: assigneeUserId || null,
         dueAt: new Date(dueAt).toISOString(),
         repeatEveryDays: repeatEveryDays === "" ? null : repeatEveryDays,
-      }),
-    });
-    if (res.ok) {
+      },
+      "New task"
+    );
+    if (result.ok) {
       router.push("/app/schedule");
     } else {
-      const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Couldn't assign task.");
+      setError("Couldn't assign task.");
       setSubmitting(false);
     }
   }

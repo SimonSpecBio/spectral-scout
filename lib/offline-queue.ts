@@ -1,14 +1,19 @@
-// Offline capture queue (INSTALL_PWA.md ยง2/ยง6) -- scoped to the three
-// capture types the spec calls out (scouting/sampling sessions, trap
-// readings, treatments), not a generic fetch wrapper for every mutation in
-// the app. Lives at the application layer (IndexedDB + an online-event
-// listener) rather than intercepted inside the service worker's fetch
-// handler: matching/replaying arbitrary POST bodies generically inside
-// sw.js is harder to get right and to test than having each capture form
-// itself decide "did this save, or does it need to queue" and reporting
-// that back to the user -- which a bare fetch interception can't do (the
-// UI would just see a successful-looking response with no way to say
-// "this is still pending").
+// Offline capture queue -- originally scoped to just scouting/sampling
+// sessions, trap readings, and treatments (the three types INSTALL_PWA.md's
+// spec called out), extended to every field-capture form (facilities,
+// areas, traps, pest/disease events, tasks) since there was no principled
+// reason a new pest event should hard-fail offline while a scouting log
+// silently queues -- both happen standing in the same greenhouse. Still not
+// a generic wrapper for arbitrary mutations elsewhere in the app (e.g. team
+// management, catalog edits), just every form whose job is capturing
+// something in the field. Lives at the application layer (IndexedDB + an
+// online-event listener) rather than intercepted inside the service
+// worker's fetch handler: matching/replaying arbitrary POST bodies
+// generically inside sw.js is harder to get right and to test than having
+// each capture form itself decide "did this save, or does it need to
+// queue" and reporting that back to the user -- which a bare fetch
+// interception can't do (the UI would just see a successful-looking
+// response with no way to say "this is still pending").
 //
 // IMPORTANT LIMITATION: this has only been exercised via `npm run build`
 // (a type/syntax check) -- verifying the actual offline -> reconnect ->

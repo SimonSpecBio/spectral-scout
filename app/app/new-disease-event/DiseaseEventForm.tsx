@@ -10,6 +10,7 @@ import {
   type DiseaseClass,
   type DiseaseLeaves,
 } from "@/lib/disease";
+import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import SpeciesPicker from "../SpeciesPicker";
@@ -49,10 +50,9 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
   // once a real pin position exists.
   async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
-    const eventRes = await fetch(`/api/facilities/${facilityId}/pest-events`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const eventResult = await queuedFetch(
+      `/api/facilities/${facilityId}/pest-events`,
+      {
         facilityAreaId: areaId,
         kind: "pathogen",
         pestSpecies: commonName.trim(),
@@ -61,15 +61,29 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
         notes: notes || null,
         x,
         y,
-      }),
-    });
-    if (!eventRes.ok) {
+      },
+      "Disease event"
+    );
+    if (!eventResult.ok) {
       setSubmitting(false);
       setPlacingLocation(false);
       return;
     }
-    const event = await eventRes.json();
 
+    // Queued (offline): the event itself is safely queued for sync, but the
+    // leaf-grid assessment is a second request that needs the server-
+    // generated event id from the first -- there's no id yet to attach it
+    // to, and this queue only handles independent POSTs, not a dependent
+    // chain. The assessment grid is dropped rather than silently held
+    // somewhere it can't actually be synced; land on the facility instead
+    // of a not-yet-existing detail page, same as NewEventForm.
+    if (eventResult.queued) {
+      markEngaged();
+      router.push(`/app/facilities/${facilityId}`);
+      return;
+    }
+
+    const event = eventResult.data as { id: string };
     if (agg.leavesAssessed > 0) {
       await fetch(`/api/facilities/${facilityId}/pest-events/${event.id}/monitoring`, {
         method: "POST",

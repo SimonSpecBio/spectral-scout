@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { queuedFetch } from "@/lib/offline-queue";
 
 const AREA_KINDS = ["greenhouse", "flowering_room", "propagation_room", "growing_bay", "building", "other"] as const;
 
@@ -16,20 +17,14 @@ export default function NewAreaForm({ facilityId }: { facilityId: string }) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    try {
-      const res = await fetch(`/api/facilities/${facilityId}/areas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, kind }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Failed to create area");
+    const result = await queuedFetch(`/api/facilities/${facilityId}/areas`, { name, kind }, "New area");
+    if (result.ok) {
       setName("");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setSubmitting(false);
+    } else {
+      setError("Failed to create area");
     }
+    setSubmitting(false);
   }
 
   return (
