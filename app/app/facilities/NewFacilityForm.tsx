@@ -40,7 +40,7 @@ export default function NewFacilityForm() {
       >
         {submitting ? "Adding…" : "Add facility"}
       </button>
-      {error && <span className="self-center text-sm text-red-400">{error}</span>}
+      {error && <span className="self-center text-sm text-[var(--danger)]">{error}</span>}
     </form>
   );
 }

@@ -121,7 +121,7 @@ export default function CatalogClient({
                   </div>
                 </div>
                 {isOwner && (
-                  <button onClick={() => removeSpecies(s)} className="text-xs text-[var(--accent)]">
+                  <button onClick={() => removeSpecies(s)} className="text-xs text-[var(--danger)]">
                     Remove
                   </button>
                 )}
@@ -159,7 +159,7 @@ export default function CatalogClient({
               placeholder="Scientific name (optional)"
               className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
             />
-            {speciesError && <div className="text-sm text-[var(--accent)]">{speciesError}</div>}
+            {speciesError && <div className="text-sm text-[var(--danger)]">{speciesError}</div>}
             <button
               type="submit"
               disabled={speciesSubmitting || !speciesName.trim()}
@@ -188,7 +188,7 @@ export default function CatalogClient({
                 <div className="flex items-center gap-3">
                   <span className="label-mono">{t.infestedPctThreshold}%</span>
                   {isOwner && (
-                    <button onClick={() => removeThreshold(t)} className="text-xs text-[var(--accent)]">
+                    <button onClick={() => removeThreshold(t)} className="text-xs text-[var(--danger)]">
                       Remove
                     </button>
                   )}
@@ -218,7 +218,7 @@ export default function CatalogClient({
               required
               className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
             />
-            {thresholdError && <div className="text-sm text-[var(--accent)]">{thresholdError}</div>}
+            {thresholdError && <div className="text-sm text-[var(--danger)]">{thresholdError}</div>}
             <button
               type="submit"
               disabled={thresholdSubmitting || !thresholdName.trim() || !thresholdPct}

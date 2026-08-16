@@ -28,7 +28,7 @@ export default function NewTrapForm({ facilities }: { facilities: PickerFacility
 
   return (
     <>
-      {error && <div className="card p-4 text-sm text-[var(--accent)]">{error}</div>}
+      {error && <div className="card p-4 text-sm text-[var(--danger)]">{error}</div>}
       <LocationPicker facilities={facilities} onConfirm={handleConfirmLocation} onCancel={() => router.back()} />
       {submitting && <div className="fixed inset-x-0 top-0 z-[60] p-2 text-center text-xs text-[var(--text-dim)]">Adding trap…</div>}
     </>

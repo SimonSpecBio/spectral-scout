@@ -124,7 +124,7 @@ export default function LogTrapReadingsForm({
         </div>
       </div>
 
-      {error && <div className="text-sm text-[var(--accent)]">{error}</div>}
+      {error && <div className="text-sm text-[var(--danger)]">{error}</div>}
 
       <button
         type="submit"

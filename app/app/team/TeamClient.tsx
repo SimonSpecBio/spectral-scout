@@ -98,7 +98,7 @@ export default function TeamClient({
               <div className="label-mono">{m.role.toUpperCase()}</div>
             </div>
             {isOwner && m.userId !== currentUserId && (
-              <button onClick={() => removeMember(m)} className="text-xs text-[var(--accent)]">
+              <button onClick={() => removeMember(m)} className="text-xs text-[var(--danger)]">
                 Remove
               </button>
             )}
@@ -152,7 +152,7 @@ export default function TeamClient({
               </button>
             ))}
           </div>
-          {error && <div className="text-sm text-[var(--accent)]">{error}</div>}
+          {error && <div className="text-sm text-[var(--danger)]">{error}</div>}
           <button
             type="submit"
             disabled={submitting || !email.trim()}

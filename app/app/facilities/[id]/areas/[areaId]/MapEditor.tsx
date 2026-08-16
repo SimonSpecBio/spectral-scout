@@ -390,7 +390,7 @@ export default function MapEditor({
             </button>
           )}
           {selectedId && (
-            <button onClick={deleteSelected} className="rounded-md border border-red-400 px-3 py-1.5 text-sm text-red-400">
+            <button onClick={deleteSelected} className="rounded-md border border-[var(--danger)] px-3 py-1.5 text-sm text-[var(--danger)]">
               Delete selected
             </button>
           )}
@@ -730,7 +730,7 @@ export default function MapEditor({
               >
                 Mark resolved
               </button>
-              <button onClick={deleteSelectedEvent} className="rounded-md border border-red-400 px-3 py-1.5 text-sm text-red-400">
+              <button onClick={deleteSelectedEvent} className="rounded-md border border-[var(--danger)] px-3 py-1.5 text-sm text-[var(--danger)]">
                 Delete
               </button>
             </div>

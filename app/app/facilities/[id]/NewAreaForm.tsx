@@ -54,7 +54,7 @@ export default function NewAreaForm({ facilityId }: { facilityId: string }) {
       >
         {submitting ? "Adding…" : "Add area"}
       </button>
-      {error && <span className="self-center text-sm text-red-400">{error}</span>}
+      {error && <span className="self-center text-sm text-[var(--danger)]">{error}</span>}
     </form>
   );
 }
