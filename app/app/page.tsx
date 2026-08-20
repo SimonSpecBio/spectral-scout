@@ -404,6 +404,11 @@ export default async function HomePage({
         </div>
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
+        <div className="hidden sm:block">{desktopMapSection}</div>
+      </div>
+
       <section className="flex flex-col gap-3">
         <span className="label-mono">Attention required</span>
         {attention.length === 0 ? (
@@ -534,11 +539,6 @@ export default async function HomePage({
           </div>
         )}
       </section>
-
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-        <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
-        <div className="hidden sm:block">{desktopMapSection}</div>
-      </div>
 
       <PressureGraph events={events.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
 
