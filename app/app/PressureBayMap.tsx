@@ -3,6 +3,9 @@ import { BAYS, nearestBay } from "@/lib/floorplan-bays";
 import BayBarMap from "./BayBarMap";
 
 const SEVERITY_RANK: Record<Severity, number> = { low: 0, moderate: 1, high: 2, severe: 3 };
+const SEVERITY_LEGEND = (Object.keys(SEVERITY_RANK) as Severity[])
+  .sort((a, b) => SEVERITY_RANK[a] - SEVERITY_RANK[b])
+  .map((s) => ({ label: s[0].toUpperCase() + s.slice(1), color: SEVERITY_COLOR[s] }));
 
 interface EventInput {
   x: number;
@@ -49,5 +52,5 @@ export default function PressureBayMap({ events }: { events: EventInput[] }) {
     }
   }
 
-  return <BayBarMap colorByBay={colorByBay} glowBar={glowBar} />;
+  return <BayBarMap colorByBay={colorByBay} glowBar={glowBar} legend={SEVERITY_LEGEND} />;
 }

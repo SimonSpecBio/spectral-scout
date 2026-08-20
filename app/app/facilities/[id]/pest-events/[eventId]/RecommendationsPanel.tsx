@@ -7,7 +7,10 @@ import { AGENTS, findPestProgram, PRODUCTS } from "@/lib/treatments-catalog";
 const STOCK_LABEL: Record<StockStatus, string> = { in_stock: "IN STOCK", low: "LOW STOCK", out: "OUT OF STOCK", unknown: "NOT IN INVENTORY" };
 const STOCK_COLOR: Record<StockStatus, string> = {
   in_stock: "var(--success)",
-  low: "var(--danger)",
+  // Low is a caution (still usable, reorder soon) -- out is a hard blocker
+  // (can't apply it at all). Both used to map to the same --danger red,
+  // collapsing a "plan ahead" signal into a "you can't do this" one.
+  low: "var(--warning)",
   out: "var(--danger)",
   unknown: "var(--text-faint)",
 };

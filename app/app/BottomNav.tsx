@@ -88,7 +88,7 @@ function NavItem({ item, active, divider }: { item: (typeof NAV)[number]; active
       <svg width="20" height="20" viewBox="0 0 20 20">
         {item.icon(active)}
       </svg>
-      <span className="label-mono" style={{ color: active ? "var(--text)" : "var(--text-faint)", fontSize: "8.5px", letterSpacing: "0.06em" }}>
+      <span className="label-mono" style={{ color: active ? "var(--text)" : "var(--text-faint)", fontSize: "11px", letterSpacing: "0.06em" }}>
         {item.label.toUpperCase()}
       </span>
     </Link>

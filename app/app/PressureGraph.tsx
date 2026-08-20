@@ -16,11 +16,14 @@ interface EventInput {
 // timestamps. No made-up "threshold" line -- there's no real economic-
 // threshold concept in the data yet, so this only shows what's actually
 // knowable: the trend itself, and the change over the window.
+const WEEKDAY_LETTER = ["S", "M", "T", "W", "T", "F", "S"];
+
 export default function PressureGraph({ events }: { events: EventInput[] }) {
   const today = new Date();
   today.setHours(23, 59, 59, 999);
 
   const days: number[] = [];
+  const dayLabels: string[] = [];
   for (let i = 6; i >= 0; i--) {
     const dayEnd = new Date(today.getTime() - i * DAY_MS);
     const dayStart = new Date(dayEnd);
@@ -29,6 +32,7 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
       .filter((e) => e.createdAt <= dayEnd && (e.resolvedAt == null || e.resolvedAt >= dayStart))
       .reduce((sum, e) => sum + SEVERITY_WEIGHT[e.severity], 0);
     days.push(pressure);
+    dayLabels.push(WEEKDAY_LETTER[dayStart.getDay()]);
   }
 
   const latest = days[days.length - 1];
@@ -46,7 +50,7 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
           </span>
         )}
       </div>
-      <svg viewBox="0 0 252 60" className="block w-full">
+      <svg viewBox="0 0 252 72" className="block w-full">
         <g fontFamily="ui-monospace, monospace" fontSize="8" fill="var(--map-label)">
           <text x="0" y="12">{max}</text>
           <text x="0" y="56">0</text>
@@ -64,6 +68,13 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
           strokeLinejoin="round"
           transform="translate(22, 4)"
         />
+        <g fontFamily="ui-monospace, monospace" fontSize="7" fill="var(--map-label-dim)" textAnchor="middle">
+          {dayLabels.map((label, i) => (
+            <text key={i} x={22 + 4 + (i * 218) / 6} y="68">
+              {label}
+            </text>
+          ))}
+        </g>
       </svg>
     </div>
   );

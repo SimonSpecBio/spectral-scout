@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from "react-konva";
 import type Konva from "konva";
+import { CANVAS_TEXT } from "@/lib/canvas-text-scale";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { useTheme } from "@/app/app/ThemeProvider";
 
@@ -367,6 +368,18 @@ export default function MapEditor({
         </button>
       </div>
 
+      {/* Precision drag/resize editing on a Konva canvas is genuinely hard
+          one-handed on a phone -- a deliberate, confirmed call (spike
+          rec: no code gate exists or should exist, since a tablet/laptop
+          touchscreen can be perfectly fine; this is just an honest heads-up
+          on the narrow-viewport case, not a block). The abstract bay-bar
+          heatmap on the dashboard covers day-to-day mobile use instead. */}
+      {mode === "edit" && (
+        <div className="card p-3 text-xs text-[var(--text-dim)] lg:hidden">
+          Precise layout editing works best on a larger screen. For a quick check in the field, the bay heatmap on Home covers most day-to-day use.
+        </div>
+      )}
+
       {mode === "edit" && (
         <div className="flex flex-wrap items-center gap-2">
           {(["select", "rect", "circle", "polygon", "label", "pest"] as const).map((t) => (
@@ -479,7 +492,7 @@ export default function MapEditor({
                     x={cx}
                     y={cy}
                     text={obj.label}
-                    fontSize={14}
+                    fontSize={CANVAS_TEXT.sm}
                     fill={CANVAS_LINE}
                     align="center"
                     offsetX={obj.label.length * 3.5}
@@ -563,7 +576,7 @@ export default function MapEditor({
                   y={obj.geometry.y}
                   text={obj.label ?? ""}
                   fill={CANVAS_LINE}
-                  fontSize={16}
+                  fontSize={CANVAS_TEXT.base}
                 />
               );
             })}
@@ -646,7 +659,7 @@ export default function MapEditor({
                       x={ev.x! + r + 2}
                       y={ev.y! - r - 2}
                       text={ev.trend === "up" ? "▲" : "▼"}
-                      fontSize={11}
+                      fontSize={CANVAS_TEXT.xs}
                       fill={ev.trend === "up" ? CANVAS_TREND_UP : CANVAS_TREND_DOWN}
                       listening={false}
                     />
