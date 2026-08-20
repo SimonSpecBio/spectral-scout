@@ -27,11 +27,13 @@ export default function NewTreatmentForm({
   const [notes, setNotes] = useState("");
   const [placingLocation, setPlacingLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const selectedItem = items.find((i) => i.id === inventoryItemId);
 
   async function submit(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
+    setError(null);
     const result = await queuedFetch(
       `/api/facilities/${facilityId}/treatments`,
       {
@@ -53,6 +55,7 @@ export default function NewTreatmentForm({
     } else {
       setSubmitting(false);
       setPlacingLocation(false);
+      setError("Couldn't save this application log. Check your connection and try again.");
     }
   }
 
@@ -140,6 +143,18 @@ export default function NewTreatmentForm({
             />
           </FormField>
         </div>
+
+        {error && (
+          <div
+            className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
+            style={{ background: "var(--danger-bg)", color: "var(--danger)" }}
+          >
+            {error}
+            <button type="button" onClick={() => setError(null)} className="shrink-0 text-[var(--text-dim)]">
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <SubmitButton disabled={submitting || facilities.length === 0} variant="floating">
           {submitting ? "Logging…" : "Log location"}

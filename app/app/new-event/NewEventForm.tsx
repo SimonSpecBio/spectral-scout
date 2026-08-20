@@ -78,6 +78,7 @@ export default function NewEventForm({
   );
   const [submitting, setSubmitting] = useState(false);
   const [placingLocation, setPlacingLocation] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -89,6 +90,7 @@ export default function NewEventForm({
 
   async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
+    setError(null);
     const result = await queuedFetch(
       `/api/facilities/${facilityId}/pest-events`,
       {
@@ -120,6 +122,7 @@ export default function NewEventForm({
     } else {
       setSubmitting(false);
       setPlacingLocation(false);
+      setError("Couldn't save this event. Check your connection and try again.");
     }
   }
 
@@ -183,6 +186,17 @@ export default function NewEventForm({
             className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
           />
         </FormField>
+        {error && (
+          <div
+            className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
+            style={{ background: "var(--danger-bg)", color: "var(--danger)" }}
+          >
+            {error}
+            <button type="button" onClick={() => setError(null)} className="shrink-0 text-[var(--text-dim)]">
+              Dismiss
+            </button>
+          </div>
+        )}
         <SubmitButton disabled={submitting || !species.trim() || facilities.length === 0} variant="floating">
           {submitting ? "Logging…" : "Log location"}
         </SubmitButton>

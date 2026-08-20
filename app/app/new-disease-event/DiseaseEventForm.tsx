@@ -49,6 +49,7 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
   const [notes, setNotes] = useState(typeof draft?.notes === "string" ? draft.notes : "");
   const [submitting, setSubmitting] = useState(false);
   const [placingLocation, setPlacingLocation] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -73,6 +74,7 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
   // once a real pin position exists.
   async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
+    setError(null);
     const eventResult = await queuedFetch(
       `/api/facilities/${facilityId}/pest-events`,
       {
@@ -90,6 +92,7 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
     if (!eventResult.ok) {
       setSubmitting(false);
       setPlacingLocation(false);
+      setError("Couldn't save this disease event. Check your connection and try again.");
       return;
     }
 
@@ -237,6 +240,18 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
           className="rounded-xl border border-[var(--border-soft)] px-3.5 py-3 text-sm outline-none placeholder:text-[var(--text-faint)]"
         />
       </FormField>
+
+      {error && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
+          style={{ background: "var(--danger-bg)", color: "var(--danger)" }}
+        >
+          {error}
+          <button type="button" onClick={() => setError(null)} className="shrink-0 text-[var(--text-dim)]">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <SubmitButton
         onClick={() => setPlacingLocation(true)}
