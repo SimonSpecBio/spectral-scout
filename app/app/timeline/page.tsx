@@ -44,7 +44,10 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Timeline</h1>
+      <div>
+        <h1 className="text-2xl font-semibold">Timeline</h1>
+        <p className="text-xs text-[var(--text-dim)]">Everything that happened, org-wide, as a scrollable narrative.</p>
+      </div>
 
       <div className="flex gap-2">
         {SCOPES.map((s) => (

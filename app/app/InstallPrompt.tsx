@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { hasEngaged } from "@/lib/pwa-engagement";
+import { useToastStackPosition } from "@/lib/toast-stack";
 
 const DISMISS_KEY = "spectral-install-dismissed";
 
@@ -71,12 +72,18 @@ export default function InstallPrompt() {
     dismiss();
   }
 
+  const stackPosition = useToastStackPosition("bottom", "install-prompt", visible);
+
   if (!visible) return null;
 
   return (
     <div
       className="fixed inset-x-4 bottom-24 z-40 mx-auto flex max-w-sm items-center gap-3 rounded-xl p-3.5 lg:bottom-6"
-      style={{ background: "var(--surface-raised)", border: "0.5px solid var(--border-soft)" }}
+      style={{
+        background: "var(--surface-raised)",
+        border: "0.5px solid var(--border-soft)",
+        transform: stackPosition > 0 ? `translateY(-${stackPosition * 4.5}rem)` : undefined,
+      }}
     >
       {showIosTip ? (
         <div className="flex-1 text-xs text-[var(--text-dim)]">

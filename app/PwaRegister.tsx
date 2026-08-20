@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useToastStackPosition } from "@/lib/toast-stack";
 
 // Registers the service worker (INSTALL_PWA.md ยง2) and surfaces the
 // "Update available" toast (ยง6) when a new version has been fetched and is
@@ -50,13 +51,20 @@ export default function PwaRegister() {
     setWaitingWorker(null);
   }
 
+  const stackPosition = useToastStackPosition("bottom", "pwa-update", !!waitingWorker);
+
   if (!waitingWorker) return null;
 
   return (
     <button
       onClick={applyUpdate}
       className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-xs items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm lg:bottom-6"
-      style={{ background: "var(--surface-raised)", border: "0.5px solid var(--border-soft)", color: "var(--text)" }}
+      style={{
+        background: "var(--surface-raised)",
+        border: "0.5px solid var(--border-soft)",
+        color: "var(--text)",
+        transform: stackPosition > 0 ? `translateY(-${stackPosition * 4.5}rem)` : undefined,
+      }}
     >
       Update available — tap to refresh
     </button>

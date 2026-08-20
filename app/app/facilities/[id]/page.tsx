@@ -18,7 +18,7 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
   const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, id));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex max-w-md flex-col gap-6">
       <div>
         <Link href="/app/facilities" className="text-sm text-[var(--text-dim)]">
           ← Sites
@@ -28,15 +28,22 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
 
       <NewAreaForm facilityId={id} />
 
-      <div className="flex flex-col gap-2">
-        {areas.length === 0 && <div className="text-[var(--text-dim)]">No areas yet -- add a room or greenhouse above.</div>}
-        {areas.map((area) => (
-          <Link key={area.id} href={`/app/facilities/${id}/areas/${area.id}`} className="card card-interactive flex items-center justify-between p-4">
-            <span>{area.name}</span>
-            <span className="text-sm text-[var(--text-dim)]">{area.kind.replace("_", " ")}</span>
-          </Link>
-        ))}
-      </div>
+      {areas.length === 0 ? (
+        <div className="card p-4 text-sm text-[var(--text-dim)]">No areas yet -- add a room or greenhouse above.</div>
+      ) : (
+        <div className="card flex flex-col divide-y divide-[var(--border)]">
+          {areas.map((area) => (
+            <Link
+              key={area.id}
+              href={`/app/facilities/${id}/areas/${area.id}`}
+              className="flex items-center justify-between gap-4 px-4 py-3 text-sm hover:bg-[var(--surface-raised)]"
+            >
+              <span>{area.name}</span>
+              <span className="text-[var(--text-dim)]">{area.kind.replace("_", " ")}</span>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

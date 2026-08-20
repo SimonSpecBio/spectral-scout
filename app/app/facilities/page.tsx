@@ -15,17 +15,20 @@ export default async function FacilitiesPage() {
     .where(eq(facilities.organizationId, session.organizationId!));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">Sites</h1>
       <NewFacilityForm />
-      <div className="flex flex-col gap-2">
-        {rows.length === 0 && <div className="text-[var(--text-dim)]">No sites yet.</div>}
-        {rows.map((f) => (
-          <Link key={f.id} href={`/app/facilities/${f.id}`} className="card card-interactive p-4">
-            {f.name}
-          </Link>
-        ))}
-      </div>
+      {rows.length === 0 ? (
+        <div className="card p-4 text-sm text-[var(--text-dim)]">No sites yet.</div>
+      ) : (
+        <div className="card flex flex-col divide-y divide-[var(--border)]">
+          {rows.map((f) => (
+            <Link key={f.id} href={`/app/facilities/${f.id}`} className="px-4 py-3 text-sm hover:bg-[var(--surface-raised)]">
+              {f.name}
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

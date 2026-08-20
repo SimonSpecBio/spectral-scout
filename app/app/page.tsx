@@ -163,9 +163,22 @@ export default async function HomePage({
   const eventSeverityById = new Map(active.map((e) => [e.id, e.severity]));
   const todaysFollowUps = active.filter((e) => needsFollowUp(e.createdAt));
   const resolvedToday = events.filter((e) => e.status === "resolved" && e.resolvedAt && isToday(e.resolvedAt));
-  const myTasksToday = myOpenTasks
-    .filter((t) => isToday(t.dueAt) || taskUrgency(t) === "overdue")
-    .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
+  const myTasksToday = myOpenTasks.filter((t) => isToday(t.dueAt) || taskUrgency(t) === "overdue");
+
+  // "Today's tasks" used to render three separate sub-lists back to back
+  // (assigned tasks, overdue follow-ups, resolved-today) with only the
+  // first actually sorted -- a scout had to read the whole card to find
+  // what was most urgent instead of it just being first. One list, open
+  // items ranked by how overdue/due-soon they are (earlier timestamp =
+  // more urgent), done items always last (already handled, lowest
+  // priority regardless of when) and sorted by most-recently-resolved.
+  const todaysTaskRows = [
+    ...myTasksToday.map((t) => ({ key: `task-${t.id}`, urgencyAt: t.dueAt.getTime(), kind: "task" as const, task: t })),
+    ...todaysFollowUps.map((e) => ({ key: `followup-${e.id}`, urgencyAt: e.createdAt.getTime(), kind: "followup" as const, event: e })),
+  ].sort((a, b) => a.urgencyAt - b.urgencyAt);
+  const resolvedTodayRows = resolvedToday
+    .slice()
+    .sort((a, b) => (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0));
 
   // Both depend on results from the batch above (active, trapAlerts,
   // scoutingAlerts) but not on each other -- still worth one more
@@ -368,14 +381,27 @@ export default async function HomePage({
         ) : (
           <span className="font-medium">{selectedFacility.name}</span>
         )}
-        {facilityEvents.length > 0 && (
-          <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "var(--accent-bg)" }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
-            <span className="label-mono" style={{ color: "var(--accent)" }}>
-              {facilityEvents.length} ALERT{facilityEvents.length === 1 ? "" : "S"}
+        <div className="flex items-center gap-2">
+          {facilityEvents.length > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "var(--accent-bg)" }}>
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
+              <span className="label-mono" style={{ color: "var(--accent)" }}>
+                {facilityEvents.length} ALERT{facilityEvents.length === 1 ? "" : "S"}
+              </span>
             </span>
-          </span>
-        )}
+          )}
+          {/* Sites/facility management was mobile-overflow-menu-only before
+              this -- effectively hidden for anything beyond a single-
+              facility org. A direct shortcut from the dashboard itself,
+              where the facility switcher already lives. */}
+          <Link href="/app/facilities" className="flex h-8 w-8 items-center justify-center text-[var(--text-faint)]" aria-label="Manage sites">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
+              <path d="M8 1.5 1.5 5v6L8 14.5 14.5 11V5z" />
+              <path d="M1.5 5 8 8.5 14.5 5" />
+              <path d="M8 8.5v6" />
+            </svg>
+          </Link>
+        </div>
       </div>
 
       <section className="flex flex-col gap-3">
@@ -523,32 +549,33 @@ export default async function HomePage({
             Schedule →
           </Link>
         </div>
-        {myTasksToday.length === 0 && todaysFollowUps.length === 0 && resolvedToday.length === 0 ? (
+        {todaysTaskRows.length === 0 && resolvedTodayRows.length === 0 ? (
           <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing on the list today.</div>
         ) : (
           <div className="card flex flex-col gap-3 p-4">
-            {myTasksToday.map((t) => (
-              <Link key={t.id} href={taskActionHref(t)} className="flex items-center gap-3">
-                <span
-                  className="h-4 w-4 shrink-0 rounded border"
-                  style={{ borderColor: taskUrgency(t) === "overdue" ? "var(--accent)" : "var(--text-faint)" }}
-                />
-                <span className="text-sm" style={taskUrgency(t) === "overdue" ? { color: "var(--accent)" } : undefined}>
-                  {t.title}
-                </span>
-              </Link>
-            ))}
-            {todaysFollowUps.map((e) => (
-              <Link key={e.id} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="flex items-center gap-3">
-                <span className="h-4 w-4 shrink-0 rounded border border-[var(--text-faint)]" />
-                <span className="text-sm">
-                  Follow up {e.pestSpecies} -- {e.areaName ?? e.facilityName}
-                </span>
-              </Link>
-            ))}
-            {resolvedToday.map((e) => (
+            {todaysTaskRows.map((row) =>
+              row.kind === "task" ? (
+                <Link key={row.key} href={taskActionHref(row.task)} className="flex items-center gap-3">
+                  <span
+                    className="h-4 w-4 shrink-0 rounded border"
+                    style={{ borderColor: taskUrgency(row.task) === "overdue" ? "var(--accent)" : "var(--text-faint)" }}
+                  />
+                  <span className="text-sm" style={taskUrgency(row.task) === "overdue" ? { color: "var(--accent)" } : undefined}>
+                    {row.task.title}
+                  </span>
+                </Link>
+              ) : (
+                <Link key={row.key} href={`/app/facilities/${row.event.facilityId}/pest-events/${row.event.id}`} className="flex items-center gap-3">
+                  <span className="h-4 w-4 shrink-0 rounded border border-[var(--text-faint)]" />
+                  <span className="text-sm">
+                    Follow up {row.event.pestSpecies} -- {row.event.areaName ?? row.event.facilityName}
+                  </span>
+                </Link>
+              )
+            )}
+            {resolvedTodayRows.map((e) => (
               <div key={e.id} className="flex items-center gap-3">
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[var(--surface-raised)] text-[10px] text-[var(--text-faint)]">
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[var(--surface-raised)] text-[length:var(--text-2xs)] text-[var(--text-faint)]">
                   ✓
                 </span>
                 <span className="text-sm text-[var(--text-faint)] line-through">{e.pestSpecies} resolved</span>
