@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
 import { queuedFetch } from "@/lib/offline-queue";
+import FormField from "../../FormField";
+import SubmitButton from "../../SubmitButton";
 
 const TYPES = ["scout", "monitor", "release", "treatment", "trap_read", "sulfur", "sanitation", "test", "other"] as const;
 
@@ -63,27 +65,30 @@ export default function NewTaskForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="card flex flex-col gap-3 p-4">
-        <input
-          autoFocus
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Release P. persimilis — Bay A1"
-          required
-          className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-        />
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value as typeof type)}
-          className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm capitalize"
-        >
-          {TYPES.map((t) => (
-            <option key={t} value={t} style={{ background: "var(--surface)" }}>
-              {t.replace("_", " ")}
-            </option>
-          ))}
-        </select>
-        <label className="flex flex-col gap-1 text-sm text-[var(--text-dim)]">
-          Due
+        <FormField label="Title" required>
+          <input
+            autoFocus
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Release P. persimilis — Bay A1"
+            required
+            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+          />
+        </FormField>
+        <FormField label="Type">
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as typeof type)}
+            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm capitalize"
+          >
+            {TYPES.map((t) => (
+              <option key={t} value={t} style={{ background: "var(--surface)" }}>
+                {t.replace("_", " ")}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Due" required layout="row">
           <input
             type="datetime-local"
             value={dueAt}
@@ -91,9 +96,8 @@ export default function NewTaskForm({
             required
             className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-[var(--text)]"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-[var(--text-dim)]">
-          Repeats every (days, optional)
+        </FormField>
+        <FormField label="Repeats every (days, optional)" layout="row">
           <input
             type="number"
             inputMode="numeric"
@@ -103,41 +107,45 @@ export default function NewTaskForm({
             placeholder="7"
             className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-[var(--text)]"
           />
-        </label>
+        </FormField>
       </div>
 
       {facilities.length > 0 && (
         <div className="card flex flex-col gap-3 p-4">
           <div className="text-sm font-medium">Location</div>
-          <select
-            value={facilityId}
-            onChange={(e) => {
-              setFacilityId(e.target.value);
-              setPestEventId("");
-            }}
-            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-          >
-            {facilities.map((f) => (
-              <option key={f.id} value={f.id} style={{ background: "var(--surface)" }}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-          {eventsForFacility.length > 0 && (
+          <FormField label="Site">
             <select
-              value={pestEventId}
-              onChange={(e) => setPestEventId(e.target.value)}
+              value={facilityId}
+              onChange={(e) => {
+                setFacilityId(e.target.value);
+                setPestEventId("");
+              }}
               className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
             >
-              <option value="" style={{ background: "var(--surface)" }}>
-                Not linked to an event
-              </option>
-              {eventsForFacility.map((ev) => (
-                <option key={ev.id} value={ev.id} style={{ background: "var(--surface)" }}>
-                  {ev.pestSpecies}
+              {facilities.map((f) => (
+                <option key={f.id} value={f.id} style={{ background: "var(--surface)" }}>
+                  {f.name}
                 </option>
               ))}
             </select>
+          </FormField>
+          {eventsForFacility.length > 0 && (
+            <FormField label="Link to event (optional)">
+              <select
+                value={pestEventId}
+                onChange={(e) => setPestEventId(e.target.value)}
+                className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+              >
+                <option value="" style={{ background: "var(--surface)" }}>
+                  Not linked to an event
+                </option>
+                {eventsForFacility.map((ev) => (
+                  <option key={ev.id} value={ev.id} style={{ background: "var(--surface)" }}>
+                    {ev.pestSpecies}
+                  </option>
+                ))}
+              </select>
+            </FormField>
           )}
         </div>
       )}
@@ -185,13 +193,7 @@ export default function NewTaskForm({
 
       {error && <div className="text-sm text-[var(--danger)]">{error}</div>}
 
-      <button
-        type="submit"
-        disabled={submitting || !title.trim()}
-        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
-      >
-        {submitting ? "Assigning…" : "Assign task"}
-      </button>
+      <SubmitButton disabled={submitting || !title.trim()}>{submitting ? "Assigning…" : "Assign task"}</SubmitButton>
     </form>
   );
 }

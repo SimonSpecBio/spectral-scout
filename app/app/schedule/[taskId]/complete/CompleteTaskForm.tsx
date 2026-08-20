@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
+import SubmitButton from "../../../SubmitButton";
 
 const PRESETS = [5, 15, 30, 60];
 
@@ -100,13 +101,7 @@ export default function CompleteTaskForm({
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
-      >
-        {submitting ? "Logging…" : "Log & complete"}
-      </button>
+      <SubmitButton disabled={submitting}>{submitting ? "Logging…" : "Log & complete"}</SubmitButton>
     </form>
   );
 }
