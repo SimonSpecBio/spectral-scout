@@ -98,6 +98,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const userEmail = user.email?.toLowerCase();
       if (!userEmail) return false;
 
+      // Google is the staff-only sign-in path (see providers[] comment
+      // below) -- but /api/auth/signin is one shared page for both /app
+      // and /staff (proxy.ts), so nothing upstream actually stops a grower
+      // visitor from clicking "Sign in with Google" instead of using
+      // email. Without this check, any Google account -- not just staff --
+      // would fall through to session()'s auto-provisioning and silently
+      // get a brand-new grower org, with none of the throttling the
+      // nodemailer path below has. Reject outright rather than rate-limit:
+      // per-email throttling wouldn't meaningfully help here anyway, since
+      // each abusive signup needs a distinct Google identity, not repeated
+      // attempts on one.
+      if (account?.provider === "google" && !staffEmails.has(userEmail)) {
+        return false;
+      }
+
       // email.verificationRequest is true specifically on the call that's
       // about to send a magic-link email (not the later call after the
       // grower clicks the link) -- the right checkpoint to throttle before
