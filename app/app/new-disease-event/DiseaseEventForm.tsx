@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   aggregateDiseaseGrid,
   DISEASE_CLASS_LABELS,
@@ -12,13 +12,16 @@ import {
 } from "@/lib/disease";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import SpeciesPicker from "../SpeciesPicker";
+import SubmitButton from "../SubmitButton";
 
 const POSITIONS = ["Bot", "Mid", "Top"] as const;
 // Same fills as the reference design: transparent/dashed for unassessed,
 // then 4 alpha steps of the accent color for the severity classes.
 const CLASS_FILL = ["var(--idle-fill)", "rgba(206,93,64,0.20)", "rgba(206,93,64,0.42)", "rgba(206,93,64,0.66)", "#CE5D40"];
+const DRAFT_KEY = "scout-disease-event-draft";
 
 function cycle(cell: DiseaseClass | null): DiseaseClass | null {
   if (cell === null) return 0;
@@ -28,12 +31,32 @@ function cycle(cell: DiseaseClass | null): DiseaseClass | null {
 
 export default function DiseaseEventForm({ facilities }: { facilities: PickerFacility[] }) {
   const router = useRouter();
-  const [commonName, setCommonName] = useState("");
-  const [scientificName, setScientificName] = useState("");
-  const [grid, setGrid] = useState<DiseaseLeaves[]>(emptyDiseaseGrid);
-  const [notes, setNotes] = useState("");
+
+  const [draft] = useState(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [commonName, setCommonName] = useState(typeof draft?.commonName === "string" ? draft.commonName : "");
+  const [scientificName, setScientificName] = useState(typeof draft?.scientificName === "string" ? draft.scientificName : "");
+  const [grid, setGrid] = useState<DiseaseLeaves[]>(() =>
+    Array.isArray(draft?.grid) && draft.grid.length === 10 ? draft.grid : emptyDiseaseGrid()
+  );
+  const [notes, setNotes] = useState(typeof draft?.notes === "string" ? draft.notes : "");
   const [submitting, setSubmitting] = useState(false);
   const [placingLocation, setPlacingLocation] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ commonName, scientificName, grid, notes }));
+    } catch {
+      /* storage full or unavailable */
+    }
+  }, [commonName, scientificName, grid, notes]);
 
   const agg = aggregateDiseaseGrid(grid);
 
@@ -79,6 +102,7 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
     // of a not-yet-existing detail page, same as NewEventForm.
     if (eventResult.queued) {
       markEngaged();
+      localStorage.removeItem(DRAFT_KEY);
       router.push(`/app/facilities/${facilityId}`);
       return;
     }
@@ -98,11 +122,19 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
     }
 
     markEngaged();
+    localStorage.removeItem(DRAFT_KEY);
     router.push(`/app/facilities/${facilityId}/pest-events/${event.id}`);
   }
 
   if (placingLocation) {
-    return <LocationPicker facilities={facilities} onConfirm={handleConfirmLocation} onCancel={() => setPlacingLocation(false)} />;
+    return (
+      <LocationPicker
+        facilities={facilities}
+        onConfirm={handleConfirmLocation}
+        onCancel={() => setPlacingLocation(false)}
+        step={{ current: 2, total: 2 }}
+      />
+    );
   }
 
   return (
@@ -166,7 +198,7 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
                 <button
                   key={c}
                   onClick={() => toggleCell(r, c)}
-                  className="h-6 rounded-md"
+                  className="h-8 rounded-md"
                   style={{
                     background: cell === null ? "transparent" : CLASS_FILL[cell],
                     border: cell === null ? "0.5px dashed var(--border-soft)" : cell === 0 ? "0.5px solid var(--border-soft)" : "0.5px solid transparent",
@@ -196,8 +228,7 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <span className="label-mono">Notes</span>
+      <FormField label="Notes">
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -205,15 +236,16 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
           rows={2}
           className="rounded-xl border border-[var(--border-soft)] px-3.5 py-3 text-sm outline-none placeholder:text-[var(--text-faint)]"
         />
-      </div>
+      </FormField>
 
-      <button
+      <SubmitButton
         onClick={() => setPlacingLocation(true)}
         disabled={submitting || !commonName.trim() || facilities.length === 0}
-        className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
+        variant="floating"
       >
         {submitting ? "Logging…" : "Log location"}
-      </button>
+      </SubmitButton>
+      <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
     </div>
   );
 }

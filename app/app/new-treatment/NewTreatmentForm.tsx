@@ -4,7 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
+import { Stepper } from "../Stepper";
+import SubmitButton from "../SubmitButton";
 
 const TYPES = ["biological", "pesticide", "spectral_light"] as const;
 
@@ -18,9 +21,9 @@ export default function NewTreatmentForm({
   const router = useRouter();
   const [type, setType] = useState<(typeof TYPES)[number]>("biological");
   const [inventoryItemId, setInventoryItemId] = useState("");
-  const [quantityUsed, setQuantityUsed] = useState<number | "">("");
+  const [quantityUsed, setQuantityUsed] = useState(0);
   const [targetPest, setTargetPest] = useState("");
-  const [minutesSpent, setMinutesSpent] = useState<number | "">("");
+  const [minutesSpent, setMinutesSpent] = useState(0);
   const [notes, setNotes] = useState("");
   const [placingLocation, setPlacingLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -35,9 +38,9 @@ export default function NewTreatmentForm({
         type,
         inventoryItemId: inventoryItemId || null,
         product: selectedItem?.name ?? null,
-        quantityUsed: quantityUsed === "" ? null : quantityUsed,
+        quantityUsed: quantityUsed || null,
         targetPest: targetPest || null,
-        minutesSpent: minutesSpent === "" ? null : minutesSpent,
+        minutesSpent: minutesSpent || null,
         notes: notes || null,
         x,
         y,
@@ -59,95 +62,89 @@ export default function NewTreatmentForm({
         facilities={facilities}
         onConfirm={(facilityId, areaId, x, y) => submit(facilityId, areaId, x, y)}
         onCancel={() => setPlacingLocation(false)}
+        step={{ current: 2, total: 2 }}
       />
     );
   }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        setPlacingLocation(true);
-      }}
-      className="flex flex-col gap-4 pb-24"
-    >
-      <div className="card flex flex-col gap-3 p-4">
-        <div className="flex gap-2">
-          {TYPES.map((t) => (
-            <button
-              type="button"
-              key={t}
-              onClick={() => setType(t)}
-              className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize ${
-                type === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
-              }`}
-            >
-              {t.replace("_", " ")}
-            </button>
-          ))}
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-end">
+        <button type="button" onClick={() => router.back()} className="text-sm text-[var(--text-dim)]">
+          Cancel
+        </button>
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setPlacingLocation(true);
+        }}
+        className="flex flex-col gap-4 pb-24"
+      >
+        <div className="card flex flex-col gap-3 p-4">
+          <div className="flex gap-2">
+            {TYPES.map((t) => (
+              <button
+                type="button"
+                key={t}
+                onClick={() => setType(t)}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize ${
+                  type === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                }`}
+              >
+                {t.replace("_", " ")}
+              </button>
+            ))}
+          </div>
+
+          {items.length > 0 && (
+            <FormField label="Product from inventory (optional)">
+              <select
+                value={inventoryItemId}
+                onChange={(e) => setInventoryItemId(e.target.value)}
+                className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+              >
+                <option value="" style={{ background: "var(--surface)" }}>
+                  Product (not from inventory)
+                </option>
+                {items.map((i) => (
+                  <option key={i.id} value={i.id} style={{ background: "var(--surface)" }}>
+                    {i.name} ({i.quantity} {i.unit} in stock)
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
+          {inventoryItemId && (
+            <FormField label={`Quantity used${selectedItem ? ` (${selectedItem.unit})` : ""}`} layout="row">
+              <Stepper value={quantityUsed} onChange={setQuantityUsed} min={0} />
+            </FormField>
+          )}
+          <FormField label="Target pest (optional)">
+            <input
+              value={targetPest}
+              onChange={(e) => setTargetPest(e.target.value)}
+              placeholder="Target pest (optional)"
+              className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+            />
+          </FormField>
+          <FormField label="Time spent (minutes, for labor tracking)" layout="row">
+            <Stepper value={minutesSpent} onChange={setMinutesSpent} min={0} step={5} />
+          </FormField>
+          <FormField label="Notes (optional)">
+            <input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notes (optional)"
+              className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+            />
+          </FormField>
         </div>
 
-        {items.length > 0 && (
-          <select
-            value={inventoryItemId}
-            onChange={(e) => setInventoryItemId(e.target.value)}
-            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-          >
-            <option value="" style={{ background: "var(--surface)" }}>
-              Product (not from inventory)
-            </option>
-            {items.map((i) => (
-              <option key={i.id} value={i.id} style={{ background: "var(--surface)" }}>
-                {i.name} ({i.quantity} {i.unit} in stock)
-              </option>
-            ))}
-          </select>
-        )}
-        {inventoryItemId && (
-          <label className="flex items-center justify-between text-sm text-[var(--text-dim)]">
-            Quantity used
-            <input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              value={quantityUsed}
-              onChange={(e) => setQuantityUsed(e.target.value === "" ? "" : Number(e.target.value))}
-              className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-right text-[var(--text)]"
-            />
-          </label>
-        )}
-        <input
-          value={targetPest}
-          onChange={(e) => setTargetPest(e.target.value)}
-          placeholder="Target pest (optional)"
-          className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-        />
-        <label className="flex items-center justify-between text-sm text-[var(--text-dim)]">
-          Time spent (minutes, for labor tracking)
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            value={minutesSpent}
-            onChange={(e) => setMinutesSpent(e.target.value === "" ? "" : Number(e.target.value))}
-            className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-right text-[var(--text)]"
-          />
-        </label>
-        <input
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes (optional)"
-          className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-        />
-      </div>
-
-      <button
-        type="submit"
-        disabled={submitting || facilities.length === 0}
-        className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
-      >
-        {submitting ? "Logging…" : "Log location"}
-      </button>
-    </form>
+        <SubmitButton disabled={submitting || facilities.length === 0} variant="floating">
+          {submitting ? "Logging…" : "Log location"}
+        </SubmitButton>
+      </form>
+    </div>
   );
 }

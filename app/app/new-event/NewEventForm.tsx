@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import SpeciesPicker from "../SpeciesPicker";
+import SubmitButton from "../SubmitButton";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 const SEVERITIES: Severity[] = ["low", "moderate", "high", "severe"];
+const DRAFT_KEY = "scout-new-event-draft";
 
 interface ScoutingHandoff {
   observationId: string;
@@ -46,14 +49,43 @@ export default function NewEventForm({
   handoff: ScoutingHandoff | null;
 }) {
   const router = useRouter();
-  const [species, setSpecies] = useState("");
-  const [scientificName, setScientificName] = useState<string | null>(null);
-  const [severity, setSeverity] = useState<Severity>(handoff ? severityFromHandoff(handoff) : "moderate");
+
+  // Same draft-recovery pattern MonitoringFlow uses: a scouting handoff's
+  // prefill only applies when there's no in-progress draft to restore
+  // instead, so a saved draft always wins over stale handoff defaults.
+  const [draft] = useState(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [species, setSpecies] = useState(typeof draft?.species === "string" ? draft.species : "");
+  const [scientificName, setScientificName] = useState<string | null>(
+    typeof draft?.scientificName === "string" ? draft.scientificName : null
+  );
+  const [severity, setSeverity] = useState<Severity>(
+    draft?.severity && SEVERITIES.includes(draft.severity) ? draft.severity : handoff ? severityFromHandoff(handoff) : "moderate"
+  );
   const [notes, setNotes] = useState(
-    handoff ? `Scouting handoff: ${handoff.pestCount}/${handoff.sampleSize} checked over threshold.` : ""
+    typeof draft?.notes === "string"
+      ? draft.notes
+      : handoff
+        ? `Scouting handoff: ${handoff.pestCount}/${handoff.sampleSize} checked over threshold.`
+        : ""
   );
   const [submitting, setSubmitting] = useState(false);
   const [placingLocation, setPlacingLocation] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ species, scientificName, severity, notes }));
+    } catch {
+      /* storage full or unavailable */
+    }
+  }, [species, scientificName, severity, notes]);
 
   async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
@@ -73,6 +105,7 @@ export default function NewEventForm({
     );
     if (result.ok) {
       markEngaged();
+      localStorage.removeItem(DRAFT_KEY);
       // Queued (offline): no server-generated id exists yet to link to a
       // detail page, so land on the facility instead of the usual
       // pest-events/[id] route -- same reasoning as CountsFlow/
@@ -100,54 +133,61 @@ export default function NewEventForm({
         initialY={handoff?.y ?? undefined}
         onConfirm={handleConfirmLocation}
         onCancel={() => setPlacingLocation(false)}
+        step={{ current: 2, total: 2 }}
       />
     );
   }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        setPlacingLocation(true);
-      }}
-      className="card flex flex-col gap-3 p-4 pb-24"
-    >
-      <SpeciesPicker
-        kind="pest"
-        value={species}
-        onChange={(name, latin) => {
-          setSpecies(name);
-          setScientificName(latin);
-        }}
-        placeholder="Pest species (e.g. spider mites)"
-      />
-      <div className="flex gap-2">
-        {SEVERITIES.map((s) => (
-          <button
-            type="button"
-            key={s}
-            onClick={() => setSeverity(s)}
-            className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize ${
-              severity === s ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-end">
+        <button type="button" onClick={() => router.back()} className="text-sm text-[var(--text-dim)]">
+          Cancel
+        </button>
       </div>
-      <input
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        placeholder="Notes (optional)"
-        className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-      />
-      <button
-        type="submit"
-        disabled={submitting || !species.trim() || facilities.length === 0}
-        className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setPlacingLocation(true);
+        }}
+        className="card flex flex-col gap-3 p-4 pb-24"
       >
-        {submitting ? "Logging…" : "Log location"}
-      </button>
-    </form>
+        <SpeciesPicker
+          kind="pest"
+          value={species}
+          onChange={(name, latin) => {
+            setSpecies(name);
+            setScientificName(latin);
+          }}
+          placeholder="Pest species (e.g. spider mites)"
+        />
+        <div className="flex gap-2">
+          {SEVERITIES.map((s) => (
+            <button
+              type="button"
+              key={s}
+              onClick={() => setSeverity(s)}
+              className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize ${
+                severity === s ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+        <FormField label="Notes (optional)">
+          <input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+          />
+        </FormField>
+        <SubmitButton disabled={submitting || !species.trim() || facilities.length === 0} variant="floating">
+          {submitting ? "Logging…" : "Log location"}
+        </SubmitButton>
+        <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
+      </form>
+    </div>
   );
 }

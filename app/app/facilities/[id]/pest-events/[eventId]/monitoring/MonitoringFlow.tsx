@@ -6,6 +6,7 @@ import { aggregateLeafGrid, emptyLeafGrid, type LeafState, type PlantLeaves } fr
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import LocationPicker, { type PickerFacility } from "../../../../../LocationPicker";
+import { OptionalStepper } from "../../../../../Stepper";
 
 const POSITIONS = ["Top", "Middle", "Bottom"] as const;
 const CYCLE: LeafState[] = ["unchecked", "absent", "low", "medium", "high"];
@@ -166,6 +167,7 @@ export default function MonitoringFlow({
         facilities={facilities}
         onConfirm={(facilityId, areaId, x, y) => submitSession(`/api/facilities/${facilityId}/areas/${areaId}/scouting`, x, y)}
         onCancel={() => setPlacingLocation(false)}
+        step={{ current: 2, total: 2 }}
       />
     );
   }
@@ -271,16 +273,15 @@ export default function MonitoringFlow({
 
       <div className="card flex flex-col gap-3 p-4">
         <div className="text-sm font-medium">Environment</div>
-        <label className="flex flex-col gap-1 text-sm">
-          Average temperature
-          <div className="flex gap-2">
-            <input
-              type="number"
-              inputMode="numeric"
+        <div className="flex items-center justify-between text-sm">
+          <span>Average temperature</span>
+          <div className="flex items-center gap-2">
+            <OptionalStepper
               value={temp}
-              onChange={(e) => setTemp(e.target.value === "" ? "" : Number(e.target.value))}
-              placeholder={tempUnit === "F" ? "73" : "23"}
-              className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2"
+              onChange={setTemp}
+              start={tempUnit === "F" ? 73 : 23}
+              min={tempUnit === "F" ? -20 : -30}
+              max={tempUnit === "F" ? 130 : 55}
             />
             <div className="flex overflow-hidden rounded-md border border-[var(--border)]">
               {(["F", "C"] as const).map((u) => (
@@ -288,35 +289,21 @@ export default function MonitoringFlow({
                   type="button"
                   key={u}
                   onClick={() => toggleUnit(u)}
-                  className={`px-3 text-sm ${tempUnit === u ? "bg-[var(--accent)] text-[var(--on-accent)]" : "text-[var(--text-dim)]"}`}
+                  className={`px-3 py-2 text-sm ${tempUnit === u ? "bg-[var(--accent)] text-[var(--on-accent)]" : "text-[var(--text-dim)]"}`}
                 >
                   °{u}
                 </button>
               ))}
             </div>
           </div>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
+        </div>
+        <label className="flex items-center justify-between text-sm">
           Average humidity (%)
-          <input
-            type="number"
-            inputMode="numeric"
-            value={humidity}
-            onChange={(e) => setHumidity(e.target.value === "" ? "" : Number(e.target.value))}
-            placeholder="61"
-            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2"
-          />
+          <OptionalStepper value={humidity} onChange={setHumidity} start={61} min={0} max={100} />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex items-center justify-between text-sm">
           Average light (hours/day)
-          <input
-            type="number"
-            inputMode="numeric"
-            value={light}
-            onChange={(e) => setLight(e.target.value === "" ? "" : Number(e.target.value))}
-            placeholder="11"
-            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2"
-          />
+          <OptionalStepper value={light} onChange={setLight} start={11} min={0} max={24} />
         </label>
       </div>
 

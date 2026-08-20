@@ -40,6 +40,7 @@ export default function LocationPicker({
   initialAreaId,
   initialX,
   initialY,
+  step,
 }: {
   facilities: PickerFacility[];
   onConfirm: (facilityId: string, areaId: string, x: number, y: number) => void;
@@ -56,6 +57,12 @@ export default function LocationPicker({
   // location selected," same "starting point, not a lock" rule as above.
   initialX?: number;
   initialY?: number;
+  // Every creation flow that hands off here is "fill the form, then place
+  // location" -- the only cue that a further step exists used to be the
+  // form's own button label ("Log location"). Optional so callers with no
+  // real multi-step context (a deep link that skips straight here) aren't
+  // forced to fake one.
+  step?: { current: number; total: number };
 }) {
   const initialIdx = initialFacilityId ? facilities.findIndex((f) => f.id === initialFacilityId) : -1;
   const [facilityIdx, setFacilityIdx] = useState(initialIdx >= 0 ? initialIdx : 0);
@@ -103,7 +110,14 @@ export default function LocationPicker({
         <button onClick={onCancel} className="text-sm text-[var(--text-dim)]">
           Cancel
         </button>
-        <span className="text-sm font-medium">Place location</span>
+        <div className="flex flex-col items-center">
+          <span className="text-sm font-medium">Place location</span>
+          {step && (
+            <span className="label-mono text-[var(--text-faint)]">
+              STEP {step.current} OF {step.total}
+            </span>
+          )}
+        </div>
         <span className="w-9" />
       </div>
 

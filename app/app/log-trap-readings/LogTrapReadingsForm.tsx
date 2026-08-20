@@ -5,28 +5,7 @@ import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import SpeciesPicker from "../SpeciesPicker";
-
-function Stepper({ value, onChange, min = 0 }: { value: number; onChange: (v: number) => void; min?: number }) {
-  return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={() => onChange(Math.max(min, value - 1))}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)]"
-      >
-        −
-      </button>
-      <span className="w-8 text-center text-sm tabular-nums">{value}</span>
-      <button
-        type="button"
-        onClick={() => onChange(value + 1)}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)]"
-      >
-        +
-      </button>
-    </div>
-  );
-}
+import { Stepper } from "../Stepper";
 
 // "Sampling" (the leaf-grid protocol, /app/new-observation) and "Counts"
 // aren't built as alternate protocols here -- Traps is the only method this

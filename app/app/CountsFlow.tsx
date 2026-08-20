@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
@@ -34,11 +34,35 @@ export default function CountsFlow({
   taskId?: string;
 }) {
   const router = useRouter();
-  const [counts, setCounts] = useState<number[]>([0, 0, 0, 0, 0]);
-  const [notes, setNotes] = useState("");
+  const draftKey = `scout-counts-draft:${postUrl ?? "new-observation"}`;
+
+  // Same lazy-read-once + effect-write pattern MonitoringFlow uses, so a
+  // Counts session survives an accidental navigate-away the same way a
+  // plant-sampling one already does.
+  const [draft] = useState(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [counts, setCounts] = useState<number[]>(() =>
+    Array.isArray(draft?.counts) && draft.counts.length === 5 ? draft.counts : [0, 0, 0, 0, 0]
+  );
+  const [notes, setNotes] = useState(typeof draft?.notes === "string" ? draft.notes : "");
   const [submitting, setSubmitting] = useState(false);
   const [placingLocation, setPlacingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ counts, notes }));
+    } catch {
+      /* storage full or unavailable */
+    }
+  }, [draftKey, counts, notes]);
 
   const total = counts.reduce((a, b) => a + b, 0);
   const mean = total / counts.length;
@@ -57,6 +81,7 @@ export default function CountsFlow({
     );
     if (result.ok) {
       markEngaged();
+      localStorage.removeItem(draftKey);
       if (taskId) {
         await fetch(`/api/tasks/${taskId}/complete`, {
           method: "POST",
@@ -84,6 +109,7 @@ export default function CountsFlow({
         facilities={facilities}
         onConfirm={(facilityId, areaId, x, y) => submitSession(`/api/facilities/${facilityId}/areas/${areaId}/scouting`, x, y)}
         onCancel={() => setPlacingLocation(false)}
+        step={{ current: 2, total: 2 }}
       />
     );
   }
@@ -156,6 +182,7 @@ export default function CountsFlow({
       >
         {submitting ? (facilities ? "Logging…" : "Submitting…") : facilities ? "Log location" : "Submit session"}
       </button>
+      <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
     </form>
   );
 }
