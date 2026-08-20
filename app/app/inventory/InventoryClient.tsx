@@ -24,13 +24,15 @@ interface Order {
   expectedAt: string | null;
 }
 
+// "chemical" is the underlying InventoryCategory/DB enum value (unchanged,
+// no migration) -- "Synthetic" is just the user-facing label for it.
 const TABS: { value: InventoryCategory | "all"; label: string }[] = [
   { value: "all", label: "All" },
   { value: "beneficial", label: "Beneficials" },
   { value: "biopesticide", label: "Biopesticides" },
-  { value: "chemical", label: "Chemical" },
+  { value: "chemical", label: "Synthetic" },
 ];
-const CATEGORY_LABEL: Record<InventoryCategory, string> = { beneficial: "Beneficials", biopesticide: "Biopesticides", chemical: "Chemical" };
+const CATEGORY_LABEL: Record<InventoryCategory, string> = { beneficial: "Beneficials", biopesticide: "Biopesticides", chemical: "Synthetic" };
 
 function isLow(item: Item) {
   return item.reorderLevel != null && item.quantity <= item.reorderLevel;
@@ -159,7 +161,7 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
       )}
 
       {adding ? (
-        <AddFromCatalog onAdded={onItemAdded} onCancel={() => setAdding(false)} />
+        <AddFromCatalog defaultCategory={tab} onAdded={onItemAdded} onCancel={() => setAdding(false)} />
       ) : (
         <button onClick={() => setAdding(true)} className="rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--on-accent)]">
           + Add from catalog
@@ -221,8 +223,20 @@ function RestockRow({ item, onRestock }: { item: Item; onRestock: (qty: number) 
   );
 }
 
-function AddFromCatalog({ onAdded, onCancel }: { onAdded: (item: Item) => void; onCancel: () => void }) {
+function AddFromCatalog({
+  onAdded,
+  onCancel,
+  defaultCategory,
+}: {
+  onAdded: (item: Item) => void;
+  onCancel: () => void;
+  // Whichever tab the grower was on when they opened this -- a starting
+  // point, not a lock: the chips below still let them widen/narrow it.
+  // "all" (the default tab) means no filter, same as before this existed.
+  defaultCategory: InventoryCategory | "all";
+}) {
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<InventoryCategory | "all">(defaultCategory);
   const [picked, setPicked] = useState<CatalogEntry | null>(null);
   const [custom, setCustom] = useState(false);
   const [name, setName] = useState("");
@@ -233,7 +247,9 @@ function AddFromCatalog({ onAdded, onCancel }: { onAdded: (item: Item) => void; 
   const [submitting, setSubmitting] = useState(false);
 
   const results = query.trim()
-    ? INVENTORY_CATALOG.filter((c) => c.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 8)
+    ? INVENTORY_CATALOG.filter(
+        (c) => c.name.toLowerCase().includes(query.trim().toLowerCase()) && (categoryFilter === "all" || c.category === categoryFilter)
+      ).slice(0, 8)
     : [];
 
   function pick(entry: CatalogEntry) {
@@ -285,12 +301,26 @@ function AddFromCatalog({ onAdded, onCancel }: { onAdded: (item: Item) => void; 
           placeholder="Search products…"
           className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
         />
+        <div className="flex flex-wrap gap-2">
+          {TABS.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setCategoryFilter(t.value)}
+              className={`rounded-full px-3 py-1 text-xs ${
+                categoryFilter === t.value ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
         {results.length > 0 && (
           <div className="flex flex-col divide-y divide-[var(--border)]">
             {results.map((r) => (
               <button key={r.name} onClick={() => pick(r)} className="flex items-center justify-between py-2 text-left text-sm">
                 <span>{r.name}</span>
-                <span className="label-mono">{r.category.toUpperCase()}</span>
+                <span className="label-mono">{CATEGORY_LABEL[r.category].toUpperCase()}</span>
               </button>
             ))}
           </div>
@@ -343,7 +373,7 @@ function AddFromCatalog({ onAdded, onCancel }: { onAdded: (item: Item) => void; 
               Biopesticide
             </option>
             <option value="chemical" style={{ background: "var(--surface)" }}>
-              Chemical
+              Synthetic
             </option>
           </select>
         </>

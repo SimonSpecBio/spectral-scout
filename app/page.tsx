@@ -28,8 +28,7 @@ export default async function Home() {
         <a href="https://spectralbiocontrol.com" className="text-[var(--text-dim)] underline">
           Spectral Biocontrol
         </a>
-        . Find and confirm a pest here, then treat it chemical-free with Spectral&apos;s light-based hardware when
-        you&apos;re ready.
+        . Log your pest pressure here - automate your IPM with Spectral&apos;s Pesticidal Light Systems.
       </p>
     </main>
   );
