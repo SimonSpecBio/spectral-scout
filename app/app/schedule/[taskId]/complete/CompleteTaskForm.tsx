@@ -19,15 +19,18 @@ export default function CompleteTaskForm({
   const router = useRouter();
   const [minutes, setMinutes] = useState(15);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
+    setError(null);
     const result = await queuedFetch(`/api/tasks/${taskId}/complete`, { minutesSpent: minutes }, "Task completion");
     if (result.ok) {
       router.push("/app/schedule");
     } else {
       setSubmitting(false);
+      setError("Couldn't log this task. Check your connection and try again.");
     }
   }
 
@@ -101,6 +104,17 @@ export default function CompleteTaskForm({
         </div>
       )}
 
+      {error && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
+          style={{ background: "var(--danger-bg)", color: "var(--danger)" }}
+        >
+          {error}
+          <button type="button" onClick={() => setError(null)} className="shrink-0 text-[var(--text-dim)]">
+            Dismiss
+          </button>
+        </div>
+      )}
       <SubmitButton disabled={submitting}>{submitting ? "Logging…" : "Log & complete"}</SubmitButton>
     </form>
   );

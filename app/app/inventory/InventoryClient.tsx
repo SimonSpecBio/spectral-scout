@@ -45,6 +45,7 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
   const [tab, setTab] = useState<InventoryCategory | "all">("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const visible = tab === "all" ? items : items.filter((i) => i.category === tab);
   const groups: [InventoryCategory, Item[]][] =
@@ -55,23 +56,37 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
       : [[tab, visible]];
 
   async function restock(itemId: string, addQuantity: number) {
-    const res = await fetch(`/api/inventory/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addQuantity }),
-    });
-    if (res.ok) {
-      const row = await res.json();
-      setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity: Number(row.quantity) } : i)));
+    setError(null);
+    try {
+      const res = await fetch(`/api/inventory/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addQuantity }),
+      });
+      if (res.ok) {
+        const row = await res.json();
+        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity: Number(row.quantity) } : i)));
+      } else {
+        setError("Couldn't update stock. Check your connection and try again.");
+      }
+    } catch {
+      setError("Couldn't update stock. Check your connection and try again.");
     }
   }
 
   async function receiveOrder(itemId: string, orderId: string) {
-    const res = await fetch(`/api/inventory/${itemId}/orders/${orderId}/receive`, { method: "POST" });
-    if (res.ok) {
-      const row = await res.json();
-      setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity: Number(row.quantity) } : i)));
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    setError(null);
+    try {
+      const res = await fetch(`/api/inventory/${itemId}/orders/${orderId}/receive`, { method: "POST" });
+      if (res.ok) {
+        const row = await res.json();
+        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity: Number(row.quantity) } : i)));
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      } else {
+        setError("Couldn't mark this order received. Check your connection and try again.");
+      }
+    } catch {
+      setError("Couldn't mark this order received. Check your connection and try again.");
     }
   }
 
@@ -83,6 +98,17 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
 
   return (
     <div className="flex flex-col gap-4">
+      {error && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
+          style={{ background: "var(--danger-bg)", color: "var(--danger)" }}
+        >
+          {error}
+          <button type="button" onClick={() => setError(null)} className="shrink-0 text-[var(--text-dim)]">
+            Dismiss
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button

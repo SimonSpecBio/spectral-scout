@@ -49,6 +49,7 @@ export default function RecommendationsPanel({
 }) {
   const [applying, setApplying] = useState<string | null>(null);
   const [applied, setApplied] = useState<Record<string, string>>({}); // name -> confirmation message
+  const [error, setError] = useState<string | null>(null);
 
   const program = findPestProgram(pestSpecies);
   if (!program) {
@@ -61,19 +62,26 @@ export default function RecommendationsPanel({
 
   async function apply(kind: "biocontrol" | "biopesticide" | "chemical" | "spectral", name: string) {
     setApplying(name);
-    const res = await fetch(`/api/facilities/${facilityId}/pest-events/${eventId}/apply-program`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, name }),
-    });
-    if (res.ok) {
-      const { tasks } = await res.json();
-      const recheck = tasks.find((t: { type: string }) => t.type === "monitor");
-      const release = tasks.find((t: { type: string }) => t.type === "release");
-      const parts = [`${name} logged`];
-      if (recheck) parts.push(`recheck scheduled ${new Date(recheck.dueAt).toLocaleDateString()}`);
-      if (release) parts.push(`recurring release scheduled`);
-      setApplied((prev) => ({ ...prev, [name]: parts.join(" · ") }));
+    setError(null);
+    try {
+      const res = await fetch(`/api/facilities/${facilityId}/pest-events/${eventId}/apply-program`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, name }),
+      });
+      if (res.ok) {
+        const { tasks } = await res.json();
+        const recheck = tasks.find((t: { type: string }) => t.type === "monitor");
+        const release = tasks.find((t: { type: string }) => t.type === "release");
+        const parts = [`${name} logged`];
+        if (recheck) parts.push(`recheck scheduled ${new Date(recheck.dueAt).toLocaleDateString()}`);
+        if (release) parts.push(`recurring release scheduled`);
+        setApplied((prev) => ({ ...prev, [name]: parts.join(" · ") }));
+      } else {
+        setError(`Couldn't log ${name}. Check your connection and try again.`);
+      }
+    } catch {
+      setError(`Couldn't log ${name}. Check your connection and try again.`);
     }
     setApplying(null);
   }
@@ -145,6 +153,17 @@ export default function RecommendationsPanel({
 
   return (
     <div className="flex flex-col gap-4">
+      {error && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
+          style={{ background: "var(--danger-bg)", color: "var(--danger)" }}
+        >
+          {error}
+          <button type="button" onClick={() => setError(null)} className="shrink-0 text-[var(--text-dim)]">
+            Dismiss
+          </button>
+        </div>
+      )}
       <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
         <div className="label-mono pb-1">Spectral</div>
         {lightProtocol.applicability === "not_indicated" ? (
