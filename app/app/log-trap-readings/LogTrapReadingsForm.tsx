@@ -1,17 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import SpeciesPicker from "../SpeciesPicker";
 import { Stepper } from "../Stepper";
 
-// "Sampling" (the leaf-grid protocol, /app/new-observation) and "Counts"
-// aren't built as alternate protocols here -- Traps is the only method this
-// screen wires up, per what was actually asked for. The segmented control
-// still shows all three for orientation; Sampling links out to the real
-// existing flow, Counts is disabled rather than faked.
+// "Sampling" and "Counts" are both leaf-based methods that live on
+// /app/new-observation's own method-choice screen (ScoutingCapture), not
+// alternate protocols this trap-specific form implements itself -- Traps
+// is the only method this screen wires up. Both non-active options are
+// real links out to that flow rather than one working and one dead --
+// tapping either takes you to the real place to do that instead, same
+// treatment for both, not a disabled-vs-linked split.
 export default function LogTrapReadingsForm({
   facilityId,
   areaId,
@@ -65,8 +68,12 @@ export default function LogTrapReadingsForm({
         <div className="flex flex-col gap-1">
           <span className="text-xs text-[var(--text-dim)]">Method</span>
           <div className="flex overflow-hidden rounded-md border border-[var(--border)] text-sm">
-            <span className="flex-1 px-3 py-2 text-center text-[var(--text-faint)] opacity-50">Sampling</span>
-            <span className="flex-1 px-3 py-2 text-center text-[var(--text-faint)] opacity-50">Counts</span>
+            <Link href="/app/new-observation" className="flex-1 px-3 py-2 text-center text-[var(--text-dim)]">
+              Sampling
+            </Link>
+            <Link href="/app/new-observation" className="flex-1 px-3 py-2 text-center text-[var(--text-dim)]">
+              Counts
+            </Link>
             <span className="flex-1 bg-[var(--accent)] px-3 py-2 text-center font-medium text-[var(--on-accent)]">Traps</span>
           </div>
         </div>
