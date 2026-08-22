@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 const SECONDARY = [
+  { href: "/app/search", label: "Search" },
   { href: "/app/events", label: "Events" },
   { href: "/app/facilities", label: "Sites" },
   { href: "/app/traps", label: "Sticky traps" },

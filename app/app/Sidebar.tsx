@@ -6,6 +6,7 @@ import QuickActionsMenu from "./QuickActionsMenu";
 
 const PRIMARY = [
   { href: "/app", label: "Home" },
+  { href: "/app/search", label: "Search" },
   { href: "/app/schedule", label: "Schedule" },
   { href: "/app/timeline", label: "Timeline" },
   { href: "/app/logs", label: "Logs" },
