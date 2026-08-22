@@ -2,7 +2,8 @@ import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { facilityAreas, inventoryItems, observationPhotos, scoutingObservations, treatments } from "@/db/schema";
+import { users as authUsers } from "@/db/auth-schema";
+import { facilityAreas, inventoryItems, observationPhotos, pestEventComments, scoutingObservations, treatments } from "@/db/schema";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { getOwnedFacility } from "@/lib/facilities";
 import { computeFollowUpSuggestions } from "@/lib/recommendations";
@@ -39,6 +40,19 @@ export default async function PestEventPage({
     .where(eq(scoutingObservations.promotedPestEventId, eventId))
     .orderBy(desc(scoutingObservations.createdAt));
   const items = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
+  const comments = await db
+    .select({
+      id: pestEventComments.id,
+      body: pestEventComments.body,
+      createdAt: pestEventComments.createdAt,
+      authorUserId: pestEventComments.authorUserId,
+      authorName: authUsers.name,
+      authorEmail: authUsers.email,
+    })
+    .from(pestEventComments)
+    .leftJoin(authUsers, eq(pestEventComments.authorUserId, authUsers.id))
+    .where(eq(pestEventComments.pestEventId, eventId))
+    .orderBy(pestEventComments.createdAt);
   const thresholds = await getSpeciesThresholds(session.organizationId!, event.pestSpecies);
   const locationLabel = area ? `${area.name}, ${facility.name}` : facility.name;
 
@@ -78,7 +92,6 @@ export default async function PestEventPage({
           scientificName: event.scientificName,
           severity: event.severity,
           status: event.status,
-          notes: event.notes,
           createdAt: event.createdAt.toISOString(),
           resolvedAt: event.resolvedAt ? event.resolvedAt.toISOString() : null,
           autoResolved: event.autoResolved,
@@ -97,6 +110,8 @@ export default async function PestEventPage({
           appliedAt: t.appliedAt.toISOString(),
         }))}
         initialPhotos={photos.map((p) => ({ id: p.id, blobUrl: p.blobUrl, caption: p.caption }))}
+        initialComments={comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
+        currentUserId={session.user!.id!}
         initialMonitoring={monitoringSessions.flatMap((s) => {
           const metric = sessionMetric(s);
           return metric ? [{ id: s.id, date: s.date, metricKind: metric.kind, value: metric.value }] : [];

@@ -318,6 +318,31 @@ export const pestEvents = pgTable(
   ]
 ).enableRLS();
 
+// Replaces the single shared freeform `notes` field above with a real,
+// append-only thread -- a multi-person crew working the same event over
+// days previously had no way to tell who said what, when. `notes` itself
+// stays on pestEvents (unused by the app going forward, not dropped --
+// no destructive migration for a field that might still hold real data);
+// any pre-existing non-empty value gets one-time-migrated into this table
+// as the thread's first entry (see scripts/migrate-event-notes-to-
+// comments.ts) with authorUserId left null, since there's no real author
+// to attribute a freeform legacy note to -- shown as an unattributed
+// system entry rather than a fabricated one. v1 is intentionally just
+// append: no edit/delete after posting, no @mentions/notifications.
+export const pestEventComments = pgTable(
+  "scout_pest_event_comment",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    pestEventId: uuid("pest_event_id")
+      .notNull()
+      .references(() => pestEvents.id, { onDelete: "cascade" }),
+    authorUserId: uuid("author_user_id"),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_pest_event_comment_pest_event_id_idx").on(table.pestEventId)]
+).enableRLS();
+
 export const deviceStatusEnum = pgEnum("scout_device_status", ["working", "needs_attention", "down"]);
 export const plantHealthEnum = pgEnum("scout_plant_health", ["normal", "phytotoxicity_observed", "other_concern"]);
 

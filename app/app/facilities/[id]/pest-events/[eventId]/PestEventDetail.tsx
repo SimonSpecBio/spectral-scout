@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { initialsFor } from "@/lib/avatar";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { scaledPoints } from "@/lib/density";
 import { queuedFetch } from "@/lib/offline-queue";
@@ -29,6 +30,15 @@ interface Photo {
   caption: string | null;
 }
 
+interface Comment {
+  id: string;
+  body: string;
+  createdAt: string;
+  authorUserId: string | null;
+  authorName: string | null;
+  authorEmail: string | null;
+}
+
 interface MonitoringSession {
   id: string;
   date: string;
@@ -43,13 +53,12 @@ interface Event {
   scientificName: string | null;
   severity: Severity;
   status: "active" | "resolved";
-  notes: string | null;
   createdAt: string;
   resolvedAt: string | null;
   autoResolved: boolean;
 }
 
-const TABS = ["timeline", "recommended", "treatments", "photos", "monitoring", "notes"] as const;
+const TABS = ["timeline", "recommended", "treatments", "photos", "monitoring", "comments"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function PestEventDetail({
@@ -61,6 +70,8 @@ export default function PestEventDetail({
   initialTreatments,
   initialPhotos,
   initialMonitoring,
+  initialComments,
+  currentUserId,
   inventoryItems,
   thresholds,
   followUpSuggestions,
@@ -74,6 +85,8 @@ export default function PestEventDetail({
   initialTreatments: Treatment[];
   initialPhotos: Photo[];
   initialMonitoring: MonitoringSession[];
+  initialComments: Comment[];
+  currentUserId: string;
   inventoryItems: { id: string; name: string; unit: string; quantity: number; reorderLevel: number | null }[];
   thresholds: SpeciesThresholds;
   followUpSuggestions: FollowUpSuggestion[];
@@ -84,8 +97,9 @@ export default function PestEventDetail({
   const [status, setStatus] = useState(event.status);
   const [treatmentsList, setTreatmentsList] = useState(initialTreatments);
   const [photos, setPhotos] = useState(initialPhotos);
-  const [notes, setNotes] = useState(event.notes ?? "");
-  const [savingNotes, setSavingNotes] = useState(false);
+  const [comments, setComments] = useState(initialComments);
+  const [newComment, setNewComment] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
 
   const [treatmentType, setTreatmentType] = useState<TreatmentType>("biological");
   const [inventoryItemId, setInventoryItemId] = useState("");
@@ -189,14 +203,22 @@ export default function PestEventDetail({
     }
   }
 
-  async function saveNotes() {
-    setSavingNotes(true);
-    await fetch(base, {
-      method: "PATCH",
+  async function postComment(e: React.FormEvent) {
+    e.preventDefault();
+    const body = newComment.trim();
+    if (!body) return;
+    setPostingComment(true);
+    const res = await fetch(`${base}/comments`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes }),
+      body: JSON.stringify({ body }),
     });
-    setSavingNotes(false);
+    if (res.ok) {
+      const row = await res.json();
+      setComments((prev) => [...prev, row]);
+      setNewComment("");
+    }
+    setPostingComment(false);
   }
 
   async function applyTreatment(e: React.FormEvent) {
@@ -604,21 +626,48 @@ export default function PestEventDetail({
         </div>
       )}
 
-      {tab === "notes" && (
-        <div className="flex flex-col gap-2">
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={6}
-            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-          />
-          <button
-            onClick={saveNotes}
-            disabled={savingNotes}
-            className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
-          >
-            {savingNotes ? "Saving…" : "Save notes"}
-          </button>
+      {tab === "comments" && (
+        <div className="flex flex-col gap-4">
+          {comments.length === 0 ? (
+            <div className="card p-4 text-sm text-[var(--text-dim)]">No comments yet -- add one below.</div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {comments.map((c) => (
+                <div key={c.id} className="flex items-start gap-2.5">
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs"
+                    style={{ background: "var(--chip-bg)", color: "var(--text-dim)" }}
+                  >
+                    {c.authorUserId ? initialsFor(c.authorName, c.authorEmail ?? "") : "—"}
+                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2 text-xs text-[var(--text-dim)]">
+                      <span className="font-medium text-[var(--text)]">
+                        {c.authorUserId ? (c.authorUserId === currentUserId ? "You" : (c.authorName ?? c.authorEmail ?? "Someone")) : "Migrated note"}
+                      </span>
+                      <span>{new Date(c.createdAt).toLocaleString()}</span>
+                    </div>
+                    <div className="text-sm">{c.body}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <form onSubmit={postComment} className="flex gap-2">
+            <input
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment…"
+              className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={postingComment || !newComment.trim()}
+              className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
+            >
+              {postingComment ? "Posting…" : "Post"}
+            </button>
+          </form>
         </div>
       )}
     </div>
