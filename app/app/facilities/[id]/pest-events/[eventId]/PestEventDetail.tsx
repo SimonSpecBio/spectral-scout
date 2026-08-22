@@ -8,6 +8,7 @@ import { scaledPoints } from "@/lib/density";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
+import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
 import { findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
 import RecommendationsPanel from "./RecommendationsPanel";
 
@@ -31,8 +32,8 @@ interface Photo {
 interface MonitoringSession {
   id: string;
   date: string;
-  sampleSize: number;
-  pestCount: number;
+  metricKind: MetricKind;
+  value: number;
 }
 
 interface Event {
@@ -61,7 +62,7 @@ export default function PestEventDetail({
   initialPhotos,
   initialMonitoring,
   inventoryItems,
-  threshold,
+  thresholds,
   followUpSuggestions,
   initialTab,
 }: {
@@ -74,7 +75,7 @@ export default function PestEventDetail({
   initialPhotos: Photo[];
   initialMonitoring: MonitoringSession[];
   inventoryItems: { id: string; name: string; unit: string; quantity: number; reorderLevel: number | null }[];
-  threshold: number;
+  thresholds: SpeciesThresholds;
   followUpSuggestions: FollowUpSuggestion[];
   initialTab?: string;
 }) {
@@ -257,8 +258,17 @@ export default function PestEventDetail({
 
   // initialMonitoring arrives newest-first (matches the Monitoring tab's
   // list order); the graph needs oldest-first for a left-to-right timeline.
-  const chronological = [...initialMonitoring].reverse();
-  const densities = chronological.map((s) => (s.sampleSize > 0 ? (s.pestCount / s.sampleSize) * 100 : 0));
+  // Event-scoped monitoring can mix methods session to session (the "+"
+  // capture screen offers both Counts and Plant sampling every time), and
+  // occupancy % / density pests-per-leaf aren't the same scale -- charting
+  // both on one line would be meaningless. Keep only the run of sessions
+  // that share the LATEST session's metric kind, same "skip rather than
+  // mix scales" rule computeEscalationAlerts applies.
+  const chronologicalAll = [...initialMonitoring].reverse();
+  const chartMetricKind: MetricKind | null = chronologicalAll.length > 0 ? chronologicalAll[chronologicalAll.length - 1].metricKind : null;
+  const chronological = chartMetricKind ? chronologicalAll.filter((s) => s.metricKind === chartMetricKind) : [];
+  const densities = chronological.map((s) => s.value);
+  const chartThreshold = chartMetricKind === "density" ? thresholds.density : thresholds.pct;
   const latestDensity = densities[densities.length - 1];
   const baselineDensity = densities[0];
   const changeVsBaseline =
@@ -349,11 +359,11 @@ export default function PestEventDetail({
         </div>
       )}
 
-      {densities.length > 0 && (
+      {densities.length > 0 && chartMetricKind && (
         <div className="card flex flex-col items-start gap-4 overflow-x-auto p-4 sm:flex-row sm:items-center sm:gap-6">
           <svg width={220} height={52} className="shrink-0">
             {(() => {
-              const scaled = scaledPoints(densities, threshold, 220, 52);
+              const scaled = scaledPoints(densities, chartThreshold, 220, 52);
               return (
                 <>
                   <line
@@ -366,21 +376,23 @@ export default function PestEventDetail({
                     strokeDasharray="3 3"
                   />
                   <text x={2} y={scaled.refY - 3} className="font-mono" fontSize={8} fill="var(--text-faint)">
-                    {threshold}% threshold
+                    {chartMetricKind === "density" ? `${chartThreshold}/leaf threshold` : `${chartThreshold}% threshold`}
                   </text>
-                  <polyline points={scaled.points} fill="none" stroke="var(--accent)" strokeWidth={2} />
+                  <polyline points={scaled.points} fill="none" stroke="var(--danger)" strokeWidth={2} />
                 </>
               );
             })()}
           </svg>
           <div className="flex flex-wrap gap-6">
             <div>
-              <div className="text-2xl font-semibold">{Math.round(latestDensity)}%</div>
-              <div className="text-xs text-[var(--text-dim)]">latest infested</div>
+              <div className="text-2xl font-semibold">
+                {chartMetricKind === "density" ? latestDensity.toFixed(1) : `${Math.round(latestDensity)}%`}
+              </div>
+              <div className="text-xs text-[var(--text-dim)]">{chartMetricKind === "density" ? "latest pests/leaf" : "latest infested"}</div>
             </div>
             {changeVsBaseline != null && (
               <div>
-                <div className={`text-2xl font-semibold ${changeVsBaseline >= 0 ? "text-[var(--accent)]" : "text-red-400"}`}>
+                <div className={`text-2xl font-semibold ${changeVsBaseline >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
                   {changeVsBaseline >= 0 ? "▼" : "▲"} {Math.abs(changeVsBaseline)}%
                 </div>
                 <div className="text-xs text-[var(--text-dim)]">vs first session</div>
@@ -566,17 +578,21 @@ export default function PestEventDetail({
           ) : (
             <div className="card flex flex-col divide-y divide-[var(--border)]">
               {initialMonitoring.map((s, i) => {
-                const density = s.sampleSize > 0 ? s.pestCount / s.sampleSize : 0;
                 const prev = initialMonitoring[i + 1]; // sorted newest-first
-                const prevDensity = prev && prev.sampleSize > 0 ? prev.pestCount / prev.sampleSize : null;
+                // Only compare trend against the immediately-previous
+                // session when it used the same metric -- an occupancy %
+                // and a density pests/leaf reading aren't on the same
+                // scale, so a method switch between two sessions shows no
+                // arrow rather than a meaningless comparison.
+                const prevValue = prev && prev.metricKind === s.metricKind ? prev.value : null;
                 return (
                   <div key={s.id} className="flex items-center justify-between px-4 py-3 text-sm">
                     <span>{new Date(s.date).toLocaleDateString()}</span>
                     <span className="flex items-center gap-2">
-                      {density.toFixed(2)} density
-                      {prevDensity != null && (
-                        <span className={density > prevDensity ? "text-red-400" : density < prevDensity ? "text-[var(--accent)]" : "text-[var(--text-dim)]"}>
-                          {density > prevDensity ? "▲" : density < prevDensity ? "▼" : "→"}
+                      {metricLabel({ kind: s.metricKind, value: s.value })}
+                      {prevValue != null && (
+                        <span className={s.value > prevValue ? "text-[var(--danger)]" : s.value < prevValue ? "text-[var(--success)]" : "text-[var(--text-dim)]"}>
+                          {s.value > prevValue ? "▲" : s.value < prevValue ? "▼" : "→"}
                         </span>
                       )}
                     </span>

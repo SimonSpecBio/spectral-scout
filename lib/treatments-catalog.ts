@@ -48,6 +48,17 @@ export interface PestProgram {
   chemicalLastResort: string[]; // product ids
   followUp: { recheckDays: number; releaseIntervalDays: number; escalateIfNoDeclineDays: number } | null;
   cautions: string[];
+  // Real, sourced per-species overrides for lib/threshold-engine.ts's
+  // generic DEFAULT_DENSITY_THRESHOLD (3/leaf) and DEFAULT_INFESTED_PCT_THRESHOLD
+  // (15%) -- from the pest-threshold research pass (2026-08-21), citing
+  // UC IPM/extension sources per-pest (see each entry's comment). Omitted
+  // entirely for species where that research found no defensible number
+  // (aphids, broad/russet mite, thrips-on-leaves, mealybugs, root rot --
+  // all explicitly "no threshold established" in the source extension
+  // guidance), so those correctly keep falling back to the generic
+  // defaults rather than a fabricated one.
+  defaultDensityThreshold?: number;
+  defaultOccupancyPctThreshold?: number;
 }
 
 export const AGENTS: Agent[] = [
@@ -97,6 +108,13 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: ["pr_abamectin"],
     followUp: { recheckDays: 5, releaseIntervalDays: 7, escalateIfNoDeclineDays: 14 },
     cautions: ["Explodes in hot/dry conditions", "If using sulfur/oil, do not release predators into residue"],
+    // UC IPM Peppermint Pest Management Guidelines: ~5 mites/leaf action
+    // threshold; 15/23 sampled leaves (~65%) showing any presence is the
+    // documented occupancy-% equivalent. No cannabis-specific research
+    // exists (NC State: "no research has been done"); this is the
+    // best-documented ag-crop analog, high confidence.
+    defaultDensityThreshold: 5,
+    defaultOccupancyPctThreshold: 65,
   },
   {
     id: "pest_broadmite", commonName: "Broad / hemp russet mite", latin: "Polyphagotarsonemus latus / Aculops cannabicola", kind: "pest",
@@ -137,6 +155,14 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: [],
     followUp: { recheckDays: 5, releaseIntervalDays: 7, escalateIfNoDeclineDays: 21 },
     cautions: ["Identify species -- parasitoid choice differs", "Remove yellow cards before big parasitoid releases"],
+    // UC IPM/Naranjo et al. (field cotton, silverleaf whitefly): 10+
+    // adults/leaf during early migration (peer-reviewed range tested at
+    // 5-10/leaf for best economic return -- Simon confirmed 10 as the
+    // number to use), 40% of leaves infested (>=3 adults/leaf) as the
+    // occupancy equivalent. Field-cotton-derived, not greenhouse/cannabis-
+    // specific -- medium confidence, closest documented analog found.
+    defaultDensityThreshold: 10,
+    defaultOccupancyPctThreshold: 40,
   },
   {
     id: "pest_fungusgnat", commonName: "Fungus gnats", latin: "Bradysia spp.", kind: "pest",
@@ -167,6 +193,13 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: [],
     followUp: { recheckDays: 5, releaseIntervalDays: 7, escalateIfNoDeclineDays: 14 },
     cautions: ["No sulfur+oil overlap (2wk)", "No sulfur mid-late flower", "Rotate bicarbonate/Bacillus/sulfur for resistance"],
+    // Cornell Vegetables (cucurbit powdery mildew): 1 of 50 older leaves
+    // symptomatic (~2% incidence) triggers fungicide start -- closely
+    // mirrors this app's 10-plant leaf-grid sampling design. No
+    // cannabis-specific number exists; industry convention is "treat at
+    // first visible sign" anyway, which this low threshold matches well.
+    // No density figure -- PM isn't a countable-pest-per-leaf metric.
+    defaultOccupancyPctThreshold: 2,
   },
   {
     id: "path_botrytis", commonName: "Botrytis / gray mold (bud rot)", latin: "Botrytis cinerea", kind: "pathogen",
@@ -177,6 +210,20 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: [],
     followUp: { recheckDays: 3, releaseIntervalDays: 7, escalateIfNoDeclineDays: 7 },
     cautions: ["Largely an environmental/sanitation problem -- climate control is primary", "Handle infected tissue gently to avoid spore release"],
+    // Deliberately NO numeric threshold here, per the pest-research
+    // handoff's explicit instruction (monitoring_thresholds_seed.json):
+    // no authoritative number exists for botrytis, and forcing even a low
+    // single-digit-% gate "would understate the urgency" for a pathogen
+    // that spreads this fast via airborne spores in dense canopy --
+    // industry/extension guidance is universally "any visible sporulation
+    // = treat/remove immediately," not "wait until N% of leaves show it."
+    // An earlier pass here wrongly reused powdery mildew's 2% as a stand-in
+    // before that research existed; removed. Falls back to the generic
+    // 15% default for now, which is ALSO not really right for an
+    // any-detection pathogen -- the real fix is a dedicated "alert on any
+    // positive detection" path in threshold-engine.ts rather than
+    // expressing this as a percentage at all. Flagged as a follow-up, not
+    // solved by picking a different number here.
   },
   {
     id: "path_rootrot", commonName: "Root rot complex (Pythium / Fusarium)", latin: "Pythium spp. / Fusarium spp.", kind: "pathogen",

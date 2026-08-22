@@ -7,7 +7,7 @@ import { getOwnedPestEvent } from "@/lib/pest-events";
 import { getOwnedFacility } from "@/lib/facilities";
 import { computeFollowUpSuggestions } from "@/lib/recommendations";
 import { requireGrowerSession } from "@/lib/session";
-import { getSpeciesThreshold } from "@/lib/threshold-engine";
+import { getSpeciesThresholds, sessionMetric } from "@/lib/threshold-engine";
 import PestEventDetail from "./PestEventDetail";
 
 export default async function PestEventPage({
@@ -39,7 +39,7 @@ export default async function PestEventPage({
     .where(eq(scoutingObservations.promotedPestEventId, eventId))
     .orderBy(desc(scoutingObservations.createdAt));
   const items = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
-  const threshold = await getSpeciesThreshold(session.organizationId!, event.pestSpecies);
+  const thresholds = await getSpeciesThresholds(session.organizationId!, event.pestSpecies);
   const locationLabel = area ? `${area.name}, ${facility.name}` : facility.name;
 
   // "After an event auto-resolves, don't just go quiet" -- only computed
@@ -97,12 +97,10 @@ export default async function PestEventPage({
           appliedAt: t.appliedAt.toISOString(),
         }))}
         initialPhotos={photos.map((p) => ({ id: p.id, blobUrl: p.blobUrl, caption: p.caption }))}
-        initialMonitoring={monitoringSessions.map((s) => ({
-          id: s.id,
-          date: s.date,
-          sampleSize: s.sampleSize ?? 0,
-          pestCount: s.pestCount ?? 0,
-        }))}
+        initialMonitoring={monitoringSessions.flatMap((s) => {
+          const metric = sessionMetric(s);
+          return metric ? [{ id: s.id, date: s.date, metricKind: metric.kind, value: metric.value }] : [];
+        })}
         inventoryItems={items.map((i) => ({
           id: i.id,
           name: i.name,
@@ -110,7 +108,7 @@ export default async function PestEventPage({
           quantity: Number(i.quantity),
           reorderLevel: i.reorderLevel == null ? null : Number(i.reorderLevel),
         }))}
-        threshold={threshold}
+        thresholds={thresholds}
       />
     </div>
   );

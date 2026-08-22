@@ -28,17 +28,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const body = await request.json();
   const kind = typeof body.kind === "string" ? body.kind : "";
   const name = typeof body.name === "string" ? body.name.trim() : "";
-  if (!name || !["biocontrol", "biopesticide", "chemical"].includes(kind)) {
+  if (!name || !["biocontrol", "biopesticide", "chemical", "spectral"].includes(kind)) {
     return NextResponse.json({ error: "kind and name are required" }, { status: 400 });
   }
-  const treatmentType: (typeof treatmentTypeEnum.enumValues)[number] = kind === "biocontrol" ? "biological" : "pesticide";
+  const treatmentType: (typeof treatmentTypeEnum.enumValues)[number] =
+    kind === "biocontrol" ? "biological" : kind === "spectral" ? "spectral_light" : "pesticide";
 
   // Link to the real stock record if the org happens to have this exact
   // product/agent in Inventory already (name match) -- same reasoning as
   // matchInventoryStock's comment. No quantityUsed is guessed here, so
   // insertTreatmentAndDecrementStock links the row without decrementing
   // anything; a grower can add a quantity later from the Treatments tab.
-  const orgItems = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
+  // Spectral's own hardware, not a consumable -- never in Inventory, so
+  // there's nothing to name-match or decrement stock against (unlike every
+  // other kind here).
+  const orgItems =
+    kind === "spectral" ? [] : await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
   const inventoryItemId = orgItems.find((i) => i.name.toLowerCase() === name.toLowerCase())?.id ?? null;
 
   const treatment = await insertTreatmentAndDecrementStock(session.organizationId!, {

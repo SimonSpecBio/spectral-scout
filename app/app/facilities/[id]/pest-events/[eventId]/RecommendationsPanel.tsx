@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { matchInventoryStock, type StockStatus } from "@/lib/recommendations";
+import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { AGENTS, findPestProgram, PRODUCTS } from "@/lib/treatments-catalog";
 
 const STOCK_LABEL: Record<StockStatus, string> = { in_stock: "IN STOCK", low: "LOW STOCK", out: "OUT OF STOCK", unknown: "NOT IN INVENTORY" };
@@ -22,16 +23,19 @@ interface InventoryRow {
 }
 
 // The recommendation engine's UI (TREATMENTS.md/SCHEDULING.md): a Pest/
-// Disease Event's species matched against lib/treatments-catalog.ts's
-// real program data, one "Apply" action per option that logs the
-// treatment and auto-schedules the recheck/release follow-up in one call
-// (app/api/.../apply-program). Deliberately NOT wired to auto-run on
-// event creation -- always an explicit tap, and the restricted (chemical
-// last-resort) tier stays collapsed behind its own toggle with an
-// explicit warning rather than sitting level with everything else. No
-// jurisdiction/crop approved-list gate exists yet (see
-// lib/treatments-catalog.ts's comment) -- this is pre-launch, real
-// compliance work still needs to land before this is public.
+// Disease Event's species matched against lib/treatments-catalog.ts's real
+// program data. Per Simon's taxonomy decision (2026-08-21), options render
+// as exactly 3 outward categories -- Beneficials / Pesticides / Spectral --
+// rather than the earlier 4-way Primary-biocontrol/Biopesticide/
+// (collapsed) Chemical/Cultural split. Internally, Product.type and
+// Product.restricted still distinguish biopesticide vs. chemical -- that
+// keeps driving REI/PHI accuracy and the "verify legality" warning, it's
+// only the outward grouping that collapsed to one "Pesticides" list, sorted
+// with restricted/uncertain-legality items last and each carrying its own
+// inline warning rather than one banner behind a toggle. No jurisdiction/
+// crop approved-list gate exists yet (see lib/treatments-catalog.ts's
+// comment) -- this is pre-launch, real compliance work still needs to land
+// before this is public.
 export default function RecommendationsPanel({
   facilityId,
   eventId,
@@ -43,7 +47,6 @@ export default function RecommendationsPanel({
   pestSpecies: string;
   inventory: InventoryRow[];
 }) {
-  const [showRestricted, setShowRestricted] = useState(false);
   const [applying, setApplying] = useState<string | null>(null);
   const [applied, setApplied] = useState<Record<string, string>>({}); // name -> confirmation message
 
@@ -56,7 +59,7 @@ export default function RecommendationsPanel({
     );
   }
 
-  async function apply(kind: "biocontrol" | "biopesticide" | "chemical", name: string) {
+  async function apply(kind: "biocontrol" | "biopesticide" | "chemical" | "spectral", name: string) {
     setApplying(name);
     const res = await fetch(`/api/facilities/${facilityId}/pest-events/${eventId}/apply-program`, {
       method: "POST",
@@ -80,11 +83,16 @@ export default function RecommendationsPanel({
     name,
     sub,
     caution,
+    hideStock,
   }: {
-    kind: "biocontrol" | "biopesticide" | "chemical";
+    kind: "biocontrol" | "biopesticide" | "chemical" | "spectral";
     name: string;
     sub: string;
     caution?: string;
+    // Spectral's hardware is never an Inventory line item -- showing "NOT
+    // IN INVENTORY" next to it would read as a gap rather than what it
+    // actually is (nothing to stock in the first place).
+    hideStock?: boolean;
   }) {
     const stock = matchInventoryStock(name, inventory);
     return (
@@ -94,9 +102,11 @@ export default function RecommendationsPanel({
             <div className="text-sm">{name}</div>
             <div className="label-mono">{sub}</div>
           </div>
-          <span className="label-mono shrink-0" style={{ color: STOCK_COLOR[stock] }}>
-            {STOCK_LABEL[stock]}
-          </span>
+          {!hideStock && (
+            <span className="label-mono shrink-0" style={{ color: STOCK_COLOR[stock] }}>
+              {STOCK_LABEL[stock]}
+            </span>
+          )}
         </div>
         {caution && <div className="text-xs text-[var(--text-dim)]">{caution}</div>}
         {applied[name] ? (
@@ -116,12 +126,40 @@ export default function RecommendationsPanel({
     );
   }
 
-  const biocontrols = program.primaryBiocontrol.map((id) => AGENTS.find((a) => a.id === id)).filter((a) => !!a);
-  const biopesticides = program.biopesticideRotation.map((id) => PRODUCTS.find((p) => p.id === id)).filter((p) => !!p);
-  const chemicals = program.chemicalLastResort.map((id) => PRODUCTS.find((p) => p.id === id)).filter((p) => !!p);
+  const beneficials = program.primaryBiocontrol.map((id) => AGENTS.find((a) => a.id === id)).filter((a) => !!a);
+
+  // One merged "Pesticides" list -- biopesticideRotation first, then
+  // chemicalLastResort. Per Simon's explicit call, restricted means
+  // illegal here, not "usable with caution": these are filtered out
+  // entirely rather than shown de-emphasized/sorted-last. Never silently
+  // drop the whole tier though -- chemicalLastResort items only ever
+  // existed as a last-resort option anyway, and biopesticideRotation
+  // (never restricted) still renders normally.
+  const pesticides = [
+    ...program.biopesticideRotation.map((id) => PRODUCTS.find((p) => p.id === id)),
+    ...program.chemicalLastResort.map((id) => PRODUCTS.find((p) => p.id === id)),
+  ].filter((p): p is NonNullable<typeof p> => !!p && !p.restricted);
+
+  const lightProtocol = buildSpectralLightProtocol(program);
+  const SPECTRAL_LIGHT_NAME = "Spectral Pesticidal Light";
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
+        <div className="label-mono pb-1">Spectral</div>
+        {lightProtocol.applicability === "not_indicated" ? (
+          <div className="py-3 text-sm text-[var(--text-dim)]">{lightProtocol.summary}</div>
+        ) : (
+          <OptionRow
+            kind="spectral"
+            name={SPECTRAL_LIGHT_NAME}
+            sub={`REI 0h · PHI 0d · ${lightProtocol.schedule}`}
+            caution={`${lightProtocol.summary} No jurisdiction/legality gate applies -- it's a light fixture, not a registered pesticide.`}
+            hideStock
+          />
+        )}
+      </div>
+
       {program.preventive.length > 0 && (
         <div className="card flex flex-col gap-2 p-4">
           <div className="label-mono">Preventive</div>
@@ -133,20 +171,20 @@ export default function RecommendationsPanel({
         </div>
       )}
 
-      {biocontrols.length > 0 && (
+      {beneficials.length > 0 && (
         <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
-          <div className="label-mono pb-1">Primary biocontrol</div>
-          {biocontrols.map((a) => (
+          <div className="label-mono pb-1">Beneficials</div>
+          {beneficials.map((a) => (
             <OptionRow key={a!.id} kind="biocontrol" name={a!.name} sub={`${a!.typicalRate} · reintro every ${a!.reintroDays}d`} caution={a!.notes} />
           ))}
         </div>
       )}
 
-      {biopesticides.length > 0 && (
+      {pesticides.length > 0 && (
         <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
-          <div className="label-mono pb-1">Biopesticide rotation</div>
-          {biopesticides.map((p) => (
-            <OptionRow key={p!.id} kind="biopesticide" name={p!.name} sub={`REI ${p!.reiHours}h · PHI ${p!.phiDays}d`} caution={p!.cautions} />
+          <div className="label-mono pb-1">Pesticides</div>
+          {pesticides.map((p) => (
+            <OptionRow key={p.id} kind={p.type === "chemical" ? "chemical" : "biopesticide"} name={p.name} sub={`REI ${p.reiHours}h · PHI ${p.phiDays}d`} caution={p.cautions} />
           ))}
         </div>
       )}
@@ -159,27 +197,6 @@ export default function RecommendationsPanel({
               <li key={i}>• {c}</li>
             ))}
           </ul>
-        </div>
-      )}
-
-      {chemicals.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <button onClick={() => setShowRestricted((v) => !v)} className="self-start text-xs text-[var(--text-dim)]">
-            {showRestricted ? "Hide" : "Show"} restricted chemical options ({chemicals.length})
-          </button>
-          {showRestricted && (
-            <div className="flex flex-col gap-2">
-              <div className="rounded-md p-3 text-xs" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
-                Restricted or prohibited on cannabis in many markets -- verify legality in your jurisdiction before
-                use. Not a substitute for checking the current product label.
-              </div>
-              <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
-                {chemicals.map((p) => (
-                  <OptionRow key={p!.id} kind="chemical" name={p!.name} sub={`REI ${p!.reiHours}h · PHI ${p!.phiDays}d`} caution={p!.cautions} />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
