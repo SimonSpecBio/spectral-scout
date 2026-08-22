@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
@@ -10,6 +10,7 @@ import { Stepper } from "../Stepper";
 import SubmitButton from "../SubmitButton";
 
 const TYPES = ["biological", "pesticide", "spectral_light"] as const;
+const DRAFT_KEY = "scout-new-treatment-draft";
 
 export default function NewTreatmentForm({
   facilities,
@@ -19,15 +20,38 @@ export default function NewTreatmentForm({
   items: { id: string; name: string; unit: string; quantity: number }[];
 }) {
   const router = useRouter();
-  const [type, setType] = useState<(typeof TYPES)[number]>("biological");
-  const [inventoryItemId, setInventoryItemId] = useState("");
-  const [quantityUsed, setQuantityUsed] = useState(0);
-  const [targetPest, setTargetPest] = useState("");
-  const [minutesSpent, setMinutesSpent] = useState(0);
-  const [notes, setNotes] = useState("");
+
+  // Same draft-recovery pattern as NewEventForm/DiseaseEventForm -- an
+  // interrupted application-log entry (call, phone lock, backgrounded app)
+  // shouldn't lose everything typed so far.
+  const [draft] = useState(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [type, setType] = useState<(typeof TYPES)[number]>(
+    draft?.type && TYPES.includes(draft.type) ? draft.type : "biological"
+  );
+  const [inventoryItemId, setInventoryItemId] = useState(typeof draft?.inventoryItemId === "string" ? draft.inventoryItemId : "");
+  const [quantityUsed, setQuantityUsed] = useState(typeof draft?.quantityUsed === "number" ? draft.quantityUsed : 0);
+  const [targetPest, setTargetPest] = useState(typeof draft?.targetPest === "string" ? draft.targetPest : "");
+  const [minutesSpent, setMinutesSpent] = useState(typeof draft?.minutesSpent === "number" ? draft.minutesSpent : 0);
+  const [notes, setNotes] = useState(typeof draft?.notes === "string" ? draft.notes : "");
   const [placingLocation, setPlacingLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ type, inventoryItemId, quantityUsed, targetPest, minutesSpent, notes }));
+    } catch {
+      /* storage full or unavailable */
+    }
+  }, [type, inventoryItemId, quantityUsed, targetPest, minutesSpent, notes]);
 
   const selectedItem = items.find((i) => i.id === inventoryItemId);
 
@@ -51,6 +75,7 @@ export default function NewTreatmentForm({
     );
     if (result.ok) {
       markEngaged();
+      localStorage.removeItem(DRAFT_KEY);
       router.push("/app/rei-phi");
     } else {
       setSubmitting(false);
@@ -159,6 +184,7 @@ export default function NewTreatmentForm({
         <SubmitButton disabled={submitting || facilities.length === 0} variant="floating">
           {submitting ? "Logging…" : "Log location"}
         </SubmitButton>
+        <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
       </form>
     </div>
   );
