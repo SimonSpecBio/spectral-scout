@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { facilityAreas } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
-import { safeFileName, validateImageUpload } from "@/lib/validate-upload";
+import { safeFileName, stripImageMetadata, validateImageUpload } from "@/lib/validate-upload";
 
 // Uploads a blueprint photo (or, later, a satellite snapshot fetched by
 // address) as the area's background reference image -- same mechanism
@@ -31,8 +31,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const uploadError = validateImageUpload(file);
   if (uploadError) return NextResponse.json({ error: uploadError }, { status: 400 });
 
-  const blob = await put(`facility-areas/${areaId}/background-${Date.now()}-${safeFileName(file.name)}`, file, {
+  const stripped = await stripImageMetadata(Buffer.from(await file.arrayBuffer()), file.type);
+  const blob = await put(`facility-areas/${areaId}/background-${Date.now()}-${safeFileName(file.name)}`, stripped, {
     access: "public",
+    contentType: file.type,
   });
 
   const [row] = await db

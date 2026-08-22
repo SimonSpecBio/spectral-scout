@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { observationPhotos } from "@/db/schema";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
-import { safeFileName, validateImageUpload } from "@/lib/validate-upload";
+import { safeFileName, stripImageMetadata, validateImageUpload } from "@/lib/validate-upload";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string; eventId: string }> }) {
   const session = await requireGrowerSession();
@@ -33,7 +33,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const uploadError = validateImageUpload(file);
   if (uploadError) return NextResponse.json({ error: uploadError }, { status: 400 });
 
-  const blob = await put(`pest-events/${eventId}/${Date.now()}-${safeFileName(file.name)}`, file, { access: "public" });
+  const stripped = await stripImageMetadata(Buffer.from(await file.arrayBuffer()), file.type);
+  const blob = await put(`pest-events/${eventId}/${Date.now()}-${safeFileName(file.name)}`, stripped, {
+    access: "public",
+    contentType: file.type,
+  });
 
   const [row] = await db
     .insert(observationPhotos)

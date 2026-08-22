@@ -13,6 +13,25 @@ export function validateImageUpload(file: File): string | null {
   return null;
 }
 
+// Phone photos routinely embed GPS coordinates in EXIF -- for a cannabis/
+// crop-cultivation tool specifically, a photo's embedded location is a real
+// physical-security concern for a facility's exact address, and every blob
+// this app stores is served from a public (if unguessable) URL with no
+// app-layer gate on the raw file itself. Re-encoding through sharp with no
+// .withMetadata() call strips EXIF (GPS included) and most other metadata
+// by default -- .rotate() runs first so the EXIF orientation tag gets
+// baked into actual pixel data before it's gone, so a portrait photo
+// doesn't end up sideways once that tag is stripped. Both upload routes
+// (pest-event photos, area background images) call this before put().
+export async function stripImageMetadata(buffer: Buffer, mimeType: string): Promise<Buffer> {
+  const { default: sharp } = await import("sharp");
+  const pipeline = sharp(buffer).rotate();
+  if (mimeType === "image/png") return pipeline.png().toBuffer();
+  if (mimeType === "image/webp") return pipeline.webp().toBuffer();
+  if (mimeType === "image/gif") return pipeline.gif().toBuffer();
+  return pipeline.jpeg({ quality: 90 }).toBuffer();
+}
+
 // Blob keys interpolate the caller's original filename directly -- strips
 // it to a safe subset instead of trusting arbitrary client-supplied bytes
 // in a storage key.
