@@ -4,19 +4,23 @@ import { getOwnedFacility } from "@/lib/facilities";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
 import ScoutingCapture from "../../../../../ScoutingCapture";
+import type { ScoutingMethod } from "../../../../../MethodChoice";
+
+const VALID_METHODS: ScoutingMethod[] = ["plant_sampling", "counts"];
 
 export default async function MonitoringPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string; eventId: string }>;
-  searchParams: Promise<{ taskId?: string }>;
+  searchParams: Promise<{ taskId?: string; method?: string }>;
 }) {
   const session = await requireGrowerSession();
   if (!session) return null;
 
   const { id, eventId } = await params;
-  const { taskId } = await searchParams;
+  const { taskId, method } = await searchParams;
+  const initialMethod = VALID_METHODS.find((m) => m === method);
   const facility = await getOwnedFacility(id, session.organizationId!);
   if (!facility) notFound();
 
@@ -37,6 +41,7 @@ export default async function MonitoringPage({
       redirectHref={redirectHref}
       isPilotTier={session.accountTier === "pilot"}
       taskId={taskId}
+      initialMethod={initialMethod}
     />
   );
 }

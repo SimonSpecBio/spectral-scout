@@ -19,6 +19,7 @@ export default function ScoutingCapture({
   redirectHref,
   isPilotTier,
   taskId,
+  initialMethod,
 }: {
   header?: ReactNode;
   postUrl?: string;
@@ -26,11 +27,12 @@ export default function ScoutingCapture({
   redirectHref: string;
   isPilotTier: boolean;
   taskId?: string;
+  initialMethod?: ScoutingMethod;
 }) {
-  const [method, setMethod] = useState<ScoutingMethod | null>(null);
+  const [method, setMethod] = useState<ScoutingMethod | null>(initialMethod ?? null);
   const [mounted, setMounted] = useState<Record<ScoutingMethod, boolean>>({
-    plant_sampling: false,
-    counts: false,
+    plant_sampling: initialMethod === "plant_sampling",
+    counts: initialMethod === "counts",
   });
 
   function selectMethod(m: ScoutingMethod) {
