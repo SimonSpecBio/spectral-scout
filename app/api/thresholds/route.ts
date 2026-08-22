@@ -21,6 +21,11 @@ export async function GET() {
   return NextResponse.json(rows);
 }
 
+// Both fields are optional per-request -- an org can set just the
+// occupancy override, just the density override, or both in one call
+// (CatalogClient sends whichever field its form actually collected).
+// Whichever is omitted keeps its existing value on an update, or falls
+// back to the DEFAULT_* constant (lib/threshold-engine.ts) on a fresh row.
 export async function POST(request: NextRequest) {
   const session = await requireGrowerSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,10 +33,26 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const pestSpecies = typeof body.pestSpecies === "string" ? body.pestSpecies.trim() : "";
-  const infestedPctThreshold = Number(body.infestedPctThreshold);
   if (!pestSpecies) return NextResponse.json({ error: "pestSpecies is required" }, { status: 400 });
-  if (!Number.isFinite(infestedPctThreshold) || infestedPctThreshold <= 0 || infestedPctThreshold > 100) {
-    return NextResponse.json({ error: "infestedPctThreshold must be between 0 and 100" }, { status: 400 });
+
+  let infestedPctThreshold: number | null | undefined;
+  if (body.infestedPctThreshold !== undefined && body.infestedPctThreshold !== null && body.infestedPctThreshold !== "") {
+    infestedPctThreshold = Number(body.infestedPctThreshold);
+    if (!Number.isFinite(infestedPctThreshold) || infestedPctThreshold <= 0 || infestedPctThreshold > 100) {
+      return NextResponse.json({ error: "infestedPctThreshold must be between 0 and 100" }, { status: 400 });
+    }
+  }
+
+  let densityThreshold: number | null | undefined;
+  if (body.densityThreshold !== undefined && body.densityThreshold !== null && body.densityThreshold !== "") {
+    densityThreshold = Number(body.densityThreshold);
+    if (!Number.isFinite(densityThreshold) || densityThreshold <= 0) {
+      return NextResponse.json({ error: "densityThreshold must be a positive number" }, { status: 400 });
+    }
+  }
+
+  if (infestedPctThreshold === undefined && densityThreshold === undefined) {
+    return NextResponse.json({ error: "infestedPctThreshold or densityThreshold is required" }, { status: 400 });
   }
 
   const existing = await db
@@ -43,7 +64,10 @@ export async function POST(request: NextRequest) {
   if (match) {
     const [row] = await db
       .update(monitoringThresholds)
-      .set({ infestedPctThreshold })
+      .set({
+        ...(infestedPctThreshold !== undefined ? { infestedPctThreshold } : {}),
+        ...(densityThreshold !== undefined ? { densityThreshold } : {}),
+      })
       .where(eq(monitoringThresholds.id, match.id))
       .returning();
     return NextResponse.json(row);
@@ -51,7 +75,12 @@ export async function POST(request: NextRequest) {
 
   const [row] = await db
     .insert(monitoringThresholds)
-    .values({ organizationId: session.organizationId!, pestSpecies, infestedPctThreshold })
+    .values({
+      organizationId: session.organizationId!,
+      pestSpecies,
+      infestedPctThreshold: infestedPctThreshold ?? null,
+      densityThreshold: densityThreshold ?? null,
+    })
     .returning();
   return NextResponse.json(row);
 }

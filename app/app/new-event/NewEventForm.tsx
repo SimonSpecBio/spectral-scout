@@ -19,6 +19,7 @@ interface ScoutingHandoff {
   y: number | null;
   sampleSize: number;
   pestCount: number;
+  metricKind: "occupancy" | "density";
 }
 
 // A scouting alert that gets confirmed as a new event two things: don't
@@ -26,11 +27,23 @@ interface ScoutingHandoff {
 // originating session stranded unpromoted (it would otherwise keep
 // re-alerting on the same over-threshold data forever, see
 // lib/scouting-alerts.ts's comment). Severity defaults from the observed
-// infested % using the same rough bands the severity buttons already
-// imply, rather than always landing on "moderate" regardless of how bad
-// the handoff data actually looked.
+// reading using the same rough bands the severity buttons already imply,
+// rather than always landing on "moderate" regardless of how bad the
+// handoff data actually looked. Occupancy (a leaf-grid walk) bands on %
+// infested; density (a Counts tally) bands on mean pests/leaf instead --
+// same bands PestEventDetail's bandFromInfestedPct/bandFromDensity use for
+// trap/scouting alerts with no event yet, so a scout sees the same number
+// read the same way everywhere.
 function severityFromHandoff(h: ScoutingHandoff): Severity {
-  const pct = h.sampleSize > 0 ? (h.pestCount / h.sampleSize) * 100 : 0;
+  if (h.sampleSize <= 0) return "low";
+  if (h.metricKind === "density") {
+    const perLeaf = h.pestCount / h.sampleSize;
+    if (perLeaf >= 9) return "severe";
+    if (perLeaf >= 6) return "high";
+    if (perLeaf >= 3) return "moderate";
+    return "low";
+  }
+  const pct = (h.pestCount / h.sampleSize) * 100;
   if (pct >= 60) return "severe";
   if (pct >= 40) return "high";
   if (pct >= 20) return "moderate";
@@ -73,7 +86,9 @@ export default function NewEventForm({
     typeof draft?.notes === "string"
       ? draft.notes
       : handoff
-        ? `Scouting handoff: ${handoff.pestCount}/${handoff.sampleSize} checked over threshold.`
+        ? handoff.metricKind === "density"
+          ? `Scouting handoff: ${handoff.pestCount} pests across ${handoff.sampleSize} leaves checked, over threshold.`
+          : `Scouting handoff: ${handoff.pestCount}/${handoff.sampleSize} checked over threshold.`
         : ""
   );
   const [submitting, setSubmitting] = useState(false);

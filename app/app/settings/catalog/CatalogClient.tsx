@@ -12,7 +12,8 @@ interface SpeciesRow {
 interface ThresholdRow {
   id: string;
   pestSpecies: string;
-  infestedPctThreshold: number;
+  infestedPctThreshold: number | null;
+  densityThreshold: number | null;
   createdAt: string;
 }
 
@@ -20,12 +21,14 @@ export default function CatalogClient({
   isOwner,
   initialSpecies,
   initialThresholds,
-  defaultThreshold,
+  defaultPctThreshold,
+  defaultDensityThreshold,
 }: {
   isOwner: boolean;
   initialSpecies: SpeciesRow[];
   initialThresholds: ThresholdRow[];
-  defaultThreshold: number;
+  defaultPctThreshold: number;
+  defaultDensityThreshold: number;
 }) {
   const [species, setSpecies] = useState(initialSpecies);
   const [thresholds, setThresholds] = useState(initialThresholds);
@@ -38,6 +41,7 @@ export default function CatalogClient({
 
   const [thresholdName, setThresholdName] = useState("");
   const [thresholdPct, setThresholdPct] = useState("");
+  const [thresholdDensity, setThresholdDensity] = useState("");
   const [thresholdSubmitting, setThresholdSubmitting] = useState(false);
   const [thresholdError, setThresholdError] = useState<string | null>(null);
 
@@ -72,11 +76,14 @@ export default function CatalogClient({
     e.preventDefault();
     setThresholdSubmitting(true);
     setThresholdError(null);
-    const pct = Number(thresholdPct);
     const res = await fetch("/api/thresholds", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pestSpecies: thresholdName, infestedPctThreshold: pct }),
+      body: JSON.stringify({
+        pestSpecies: thresholdName,
+        infestedPctThreshold: thresholdPct || null,
+        densityThreshold: thresholdDensity || null,
+      }),
     });
     if (res.ok) {
       const row = await res.json();
@@ -86,6 +93,7 @@ export default function CatalogClient({
       });
       setThresholdName("");
       setThresholdPct("");
+      setThresholdDensity("");
     } else {
       const body = await res.json().catch(() => ({}));
       setThresholdError(body.error ?? "Couldn't save threshold.");
@@ -175,8 +183,9 @@ export default function CatalogClient({
         <div>
           <div className="text-sm font-medium">Monitoring thresholds</div>
           <p className="text-xs text-[var(--text-dim)]">
-            The % of infested plants that triggers a monitoring alert for a species. Anything not listed uses the default,{" "}
-            {defaultThreshold}%.
+            What triggers a monitoring alert for a species -- % infested for a Plant sampling leaf-by-leaf walk, mean pests/leaf for a
+            Counts tally (the two aren&apos;t the same scale, so each has its own threshold). Anything not listed uses the defaults,{" "}
+            {defaultPctThreshold}% / {defaultDensityThreshold} per leaf.
           </p>
         </div>
 
@@ -186,7 +195,9 @@ export default function CatalogClient({
               <div key={t.id} className="flex items-center justify-between gap-3 p-3.5">
                 <div className="text-sm">{t.pestSpecies}</div>
                 <div className="flex items-center gap-3">
-                  <span className="label-mono">{t.infestedPctThreshold}%</span>
+                  <span className="label-mono">
+                    {t.infestedPctThreshold ?? defaultPctThreshold}% &middot; {t.densityThreshold ?? defaultDensityThreshold}/leaf
+                  </span>
                   {isOwner && (
                     <button onClick={() => removeThreshold(t)} className="text-xs text-[var(--danger)]">
                       Remove
@@ -207,21 +218,35 @@ export default function CatalogClient({
               required
               className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
             />
-            <input
-              value={thresholdPct}
-              onChange={(e) => setThresholdPct(e.target.value)}
-              type="number"
-              min="0"
-              max="100"
-              step="0.1"
-              placeholder="Threshold %"
-              required
-              className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-            />
+            <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+              Occupancy threshold (Plant sampling)
+              <input
+                value={thresholdPct}
+                onChange={(e) => setThresholdPct(e.target.value)}
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                placeholder={`${defaultPctThreshold}%`}
+                className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+              Density threshold (Counts, pests/leaf)
+              <input
+                value={thresholdDensity}
+                onChange={(e) => setThresholdDensity(e.target.value)}
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder={`${defaultDensityThreshold}`}
+                className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
+              />
+            </label>
             {thresholdError && <div className="text-sm text-[var(--danger)]">{thresholdError}</div>}
             <button
               type="submit"
-              disabled={thresholdSubmitting || !thresholdName.trim() || !thresholdPct}
+              disabled={thresholdSubmitting || !thresholdName.trim() || (!thresholdPct && !thresholdDensity)}
               className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
             >
               {thresholdSubmitting ? "Saving…" : "Save threshold"}

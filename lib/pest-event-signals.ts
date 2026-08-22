@@ -1,6 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { scoutingObservations, treatments } from "@/db/schema";
+import { sessionMetric } from "@/lib/threshold-engine";
 
 export interface EventSignal {
   lastTreatedAt: string | null;
@@ -40,10 +41,13 @@ export async function computeEventSignals(eventIds: string[]): Promise<Map<strin
     if (evSessions.length >= 2) {
       const latest = evSessions[evSessions.length - 1];
       const prior = evSessions[evSessions.length - 2];
-      const latestDensity = latest.sampleSize ? (latest.pestCount ?? 0) / latest.sampleSize : null;
-      const priorDensity = prior.sampleSize ? (prior.pestCount ?? 0) / prior.sampleSize : null;
-      if (latestDensity != null && priorDensity != null) {
-        trend = latestDensity > priorDensity ? "up" : latestDensity < priorDensity ? "down" : "stable";
+      const latestMetric = sessionMetric(latest);
+      const priorMetric = sessionMetric(prior);
+      // Skip rather than compare across scales if the two sessions used
+      // different methods (occupancy % vs density pests/leaf) -- same rule
+      // computeEscalationAlerts applies.
+      if (latestMetric && priorMetric && latestMetric.kind === priorMetric.kind) {
+        trend = latestMetric.value > priorMetric.value ? "up" : latestMetric.value < priorMetric.value ? "down" : "stable";
       }
     }
     const treatedAt = lastTreatedMap.get(id);

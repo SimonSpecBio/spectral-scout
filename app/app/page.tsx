@@ -7,7 +7,7 @@ import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
 import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-alerts";
 import { taskActionHref, taskUrgency } from "@/lib/tasks";
-import { computeEscalationAlerts, computeMonitoringAlerts } from "@/lib/threshold-engine";
+import { computeEscalationAlerts, computeMonitoringAlerts, metricLabel, type MetricKind } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { requireGrowerSession } from "@/lib/session";
 import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
@@ -50,6 +50,18 @@ function bandFromInfestedPct(pct: number): Severity {
   if (pct >= 40) return "high";
   if (pct >= 20) return "moderate";
   return "low";
+}
+// Density's counterpart to bandFromInfestedPct -- same bands
+// NewEventForm's severityFromHandoff uses for a Counts-method handoff, so
+// a scout sees the same reading banded the same way everywhere.
+function bandFromDensity(perLeaf: number): Severity {
+  if (perLeaf >= 9) return "severe";
+  if (perLeaf >= 6) return "high";
+  if (perLeaf >= 3) return "moderate";
+  return "low";
+}
+function bandFromMetric(kind: MetricKind, value: number): Severity {
+  return kind === "density" ? bandFromDensity(value) : bandFromInfestedPct(value);
 }
 function bandFromRatio(ratio: number): Severity {
   if (ratio >= 3) return "severe";
@@ -448,12 +460,13 @@ export default async function HomePage({
                   >
                     <span
                       className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: SEVERITY_COLOR[bandFromInfestedPct(a.infestedPct)] }}
+                      style={{ background: SEVERITY_COLOR[bandFromMetric(a.metricKind, a.value)] }}
                     />
                     <div className="flex-1">
                       <div className="text-sm">Scouting log over threshold — confirm?</div>
                       <div className="label-mono">
-                        {(trapAreaNameById.get(a.facilityAreaId) ?? "").toUpperCase()} &middot; {a.infestedPct}% INFESTED
+                        {(trapAreaNameById.get(a.facilityAreaId) ?? "").toUpperCase()} &middot;{" "}
+                        {metricLabel({ kind: a.metricKind, value: a.value }).toUpperCase()}
                       </div>
                     </div>
                     <span className="text-[var(--text-faint)]">›</span>
@@ -470,12 +483,13 @@ export default async function HomePage({
                   >
                     <span
                       className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: SEVERITY_COLOR[eventSeverityById.get(a.eventId) ?? bandFromInfestedPct(a.infestedPct)] }}
+                      style={{ background: SEVERITY_COLOR[eventSeverityById.get(a.eventId) ?? bandFromMetric(a.metricKind, a.value)] }}
                     />
                     <div className="flex-1">
                       <div className="text-sm">{a.pestSpecies} over threshold</div>
                       <div className="label-mono">
-                        {a.infestedPct}% INFESTED &middot; THRESHOLD {a.threshold}%
+                        {metricLabel({ kind: a.metricKind, value: a.value }).toUpperCase()} &middot; THRESHOLD{" "}
+                        {a.metricKind === "occupancy" ? `${a.threshold}%` : `${a.threshold}/LEAF`}
                       </div>
                     </div>
                     <span className="text-[var(--text-faint)]">›</span>
@@ -492,12 +506,13 @@ export default async function HomePage({
                   >
                     <span
                       className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: SEVERITY_COLOR[eventSeverityById.get(a.eventId) ?? bandFromInfestedPct(a.latestPct)] }}
+                      style={{ background: SEVERITY_COLOR[eventSeverityById.get(a.eventId) ?? bandFromMetric(a.metricKind, a.latestValue)] }}
                     />
                     <div className="flex-1">
                       <div className="text-sm">{a.pestSpecies} not improving — try a different tier?</div>
                       <div className="label-mono">
-                        {a.baselinePct}% → {a.latestPct}% AFTER {a.daysSinceTreatment}D
+                        {metricLabel({ kind: a.metricKind, value: a.baselineValue }).toUpperCase()} →{" "}
+                        {metricLabel({ kind: a.metricKind, value: a.latestValue }).toUpperCase()} AFTER {a.daysSinceTreatment}D
                       </div>
                     </div>
                     <span className="text-[var(--text-faint)]">›</span>

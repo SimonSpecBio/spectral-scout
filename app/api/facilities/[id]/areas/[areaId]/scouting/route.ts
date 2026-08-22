@@ -2,9 +2,12 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { facilityAreas, scoutingObservations } from "@/db/schema";
+import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
 import { parseMonitoringPayload } from "@/lib/monitoring";
 import { requireGrowerSession } from "@/lib/session";
+import { maybeScheduleKeepAnEyeRecheck } from "@/lib/tasks";
+import { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, sessionMetric } from "@/lib/threshold-engine";
 
 // Routine scouting, independent of any Pest Event -- promotedPestEventId
 // stays null here (the general Scouting flow the schema's comment always
@@ -42,5 +45,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ...parsed,
     })
     .returning();
+
+  // No species yet on a general session (see scout_observation's schema
+  // comment), so only the generic defaults apply here -- same reasoning
+  // computeScoutingAlerts already uses for this flow.
+  const metric = sessionMetric(row);
+  if (metric) {
+    const threshold = metric.kind === "density" ? DEFAULT_DENSITY_THRESHOLD : DEFAULT_INFESTED_PCT_THRESHOLD;
+    await maybeScheduleKeepAnEyeRecheck({
+      organizationId: session.organizationId!,
+      facilityId: id,
+      facilityAreaId: areaId,
+      pestEventId: null,
+      pestSpecies: null,
+      locationLabel: row.x != null && row.y != null ? bayLabel(nearestBay(row.x, row.y)) : area.name,
+      metricKind: metric.kind,
+      value: metric.value,
+      threshold,
+      x: row.x,
+      y: row.y,
+    });
+  }
+
   return NextResponse.json(row);
 }

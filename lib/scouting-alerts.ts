@@ -1,19 +1,20 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, scoutingObservations } from "@/db/schema";
-import { DEFAULT_INFESTED_PCT_THRESHOLD } from "@/lib/threshold-engine";
+import { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, sessionMetric, type MetricKind } from "@/lib/threshold-engine";
 
 export interface ScoutingAlert {
   observationId: string;
   facilityId: string;
   facilityAreaId: string;
-  infestedPct: number;
+  metricKind: MetricKind;
+  value: number;
   threshold: number;
   at: Date;
   // Carried over so confirming into a New Pest Event doesn't make the
   // grower re-enter what was already observed -- the dropped pin (may be
   // null, same as any general session, see scout_observation's comment)
-  // and the raw tally behind infestedPct.
+  // and the raw tally behind value.
   x: number | null;
   y: number | null;
   sampleSize: number;
@@ -29,8 +30,9 @@ export interface ScoutingAlert {
 // file's comment) -- no species is known here at all, so there's nothing
 // to auto-create anyway; the confirm link hands off to New pest event with
 // the site/area preset and lets the scout name what they found. Generic
-// DEFAULT_INFESTED_PCT_THRESHOLD only (no per-species override makes sense
-// without a species).
+// defaults only (no per-species override makes sense without a species) --
+// which default depends on sessionMetric's read of this particular
+// session (occupancy % for a leaf-grid walk, density for a Counts tally).
 export async function computeScoutingAlerts(organizationId: string): Promise<ScoutingAlert[]> {
   const orgFacilities = await db.select().from(facilities).where(eq(facilities.organizationId, organizationId));
   if (orgFacilities.length === 0) return [];
@@ -63,22 +65,24 @@ export async function computeScoutingAlerts(organizationId: string): Promise<Sco
 
   const alerts: ScoutingAlert[] = [];
   for (const s of latestByArea.values()) {
-    if (!s.sampleSize) continue;
     const facilityId = facilityIdByArea.get(s.facilityAreaId);
     if (!facilityId) continue;
-    const infestedPct = Math.round(((s.pestCount ?? 0) / s.sampleSize) * 100);
-    if (infestedPct < DEFAULT_INFESTED_PCT_THRESHOLD) continue;
+    const metric = sessionMetric(s);
+    if (!metric) continue;
+    const threshold = metric.kind === "occupancy" ? DEFAULT_INFESTED_PCT_THRESHOLD : DEFAULT_DENSITY_THRESHOLD;
+    if (metric.value < threshold) continue;
 
     alerts.push({
       observationId: s.id,
       facilityId,
       facilityAreaId: s.facilityAreaId,
-      infestedPct,
-      threshold: DEFAULT_INFESTED_PCT_THRESHOLD,
+      metricKind: metric.kind,
+      value: metric.value,
+      threshold,
       at: s.createdAt,
       x: s.x,
       y: s.y,
-      sampleSize: s.sampleSize,
+      sampleSize: s.sampleSize!,
       pestCount: s.pestCount ?? 0,
     });
   }

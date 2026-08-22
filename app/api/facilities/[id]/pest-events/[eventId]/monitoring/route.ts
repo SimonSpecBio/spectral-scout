@@ -2,10 +2,12 @@ import { desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { scoutingObservations } from "@/db/schema";
+import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { parseMonitoringPayload } from "@/lib/monitoring";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
-import { maybeAutoResolve } from "@/lib/threshold-engine";
+import { maybeScheduleKeepAnEyeRecheck } from "@/lib/tasks";
+import { getSpeciesThresholds, maybeAutoResolve, sessionMetric } from "@/lib/threshold-engine";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string; eventId: string }> }) {
   const session = await requireGrowerSession();
@@ -66,6 +68,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // is included so the client can show an immediate confirmation instead
   // of the grower only finding out later via Notifications.
   const resolved = await maybeAutoResolve(eventId, session.organizationId!);
+
+  // A reading under threshold but still nonzero ("essentially nothing, but
+  // keep an eye on it") gets a low-urgency recheck on the schedule instead
+  // of just vanishing back into "no alert" -- see maybeScheduleKeepAnEyeRecheck.
+  if (!resolved) {
+    const metric = sessionMetric(row);
+    if (metric) {
+      const thresholds = await getSpeciesThresholds(session.organizationId!, event.pestSpecies);
+      const threshold = metric.kind === "density" ? thresholds.density : thresholds.pct;
+      await maybeScheduleKeepAnEyeRecheck({
+        organizationId: session.organizationId!,
+        facilityId: id,
+        facilityAreaId: event.facilityAreaId!,
+        pestEventId: eventId,
+        pestSpecies: event.pestSpecies,
+        locationLabel: event.x != null && event.y != null ? bayLabel(nearestBay(event.x, event.y)) : event.pestSpecies,
+        metricKind: metric.kind,
+        value: metric.value,
+        threshold,
+        x: event.x,
+        y: event.y,
+      });
+    }
+  }
 
   return NextResponse.json({ ...row, autoResolvedEvent: resolved });
 }

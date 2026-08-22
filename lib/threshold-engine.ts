@@ -2,22 +2,65 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, monitoringThresholds, pestEvents, scoutingObservations, treatments } from "@/db/schema";
 import { resolvePestEvent } from "@/lib/pest-events";
+import {
+  DEFAULT_DENSITY_THRESHOLD,
+  DEFAULT_INFESTED_PCT_THRESHOLD,
+  sessionMetric,
+  thresholdFor,
+  type MetricKind,
+  type SessionMetric,
+  type SpeciesThresholds,
+} from "@/lib/scout-metric";
 import { findPestProgram } from "@/lib/treatments-catalog";
 
-// Falls back to this whenever an org hasn't set a custom threshold for a
-// species -- lands near the middle of the real figures in
-// treatments.json's exampleThreshold text (TSSM "10-15%", aphid "5-10%
-// plants"), a reasonable general default across the catalog rather than a
-// number invented from nothing.
-export const DEFAULT_INFESTED_PCT_THRESHOLD = 15;
+// Re-exported so existing server-side callers (API routes, server
+// components, other lib modules) can keep importing everything from this
+// one module -- only PestEventDetail.tsx (a client component) needs to
+// import the pure pieces from lib/scout-metric.ts directly, since this
+// file's `db` import can't be bundled for the browser.
+export { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, sessionMetric, metricLabel } from "@/lib/scout-metric";
+export type { MetricKind, SessionMetric, SpeciesThresholds } from "@/lib/scout-metric";
+
+// Falls back to this before ever reaching the flat generic DEFAULT_*
+// constants -- lib/treatments-catalog.ts's PestProgram entries carry real,
+// sourced per-species thresholds (pest-threshold research pass, 2026-08-21)
+// for the handful of species where a defensible number actually exists.
+// Species with no PestProgram match, or no threshold field set on their
+// program, still land on the flat generic defaults -- unchanged behavior.
+function builtinThresholdsFor(pestSpecies: string): SpeciesThresholds {
+  const program = findPestProgram(pestSpecies);
+  return {
+    pct: program?.defaultOccupancyPctThreshold ?? DEFAULT_INFESTED_PCT_THRESHOLD,
+    density: program?.defaultDensityThreshold ?? DEFAULT_DENSITY_THRESHOLD,
+  };
+}
+
+// Batch lookup, both metrics at once -- every caller below needs whichever
+// one matches the session(s) it's looking at, and reads are cheap/already
+// org-scoped, so there's no reason to make callers pick up-front. An org
+// row that only overrides ONE of the two metrics (set a custom density
+// threshold but left occupancy untouched, say) still gets the real
+// per-species builtin for the other, not the flat generic -- a partial
+// override shouldn't silently degrade the metric the org didn't touch.
+async function getSpeciesThresholdsMap(organizationId: string): Promise<Map<string, SpeciesThresholds>> {
+  const rows = await db.select().from(monitoringThresholds).where(eq(monitoringThresholds.organizationId, organizationId));
+  const map = new Map<string, SpeciesThresholds>();
+  for (const row of rows) {
+    const builtin = builtinThresholdsFor(row.pestSpecies);
+    map.set(row.pestSpecies.toLowerCase(), {
+      pct: row.infestedPctThreshold ?? builtin.pct,
+      density: row.densityThreshold ?? builtin.density,
+    });
+  }
+  return map;
+}
 
 // Single-species lookup for a spot that already knows which event/species
 // it cares about (the pest-event detail page's pressure chart) instead of
 // computeMonitoringAlerts' batch pass over every active event.
-export async function getSpeciesThreshold(organizationId: string, pestSpecies: string): Promise<number> {
-  const rows = await db.select().from(monitoringThresholds).where(eq(monitoringThresholds.organizationId, organizationId));
-  const match = rows.find((t) => t.pestSpecies.toLowerCase() === pestSpecies.toLowerCase());
-  return match?.infestedPctThreshold ?? DEFAULT_INFESTED_PCT_THRESHOLD;
+export async function getSpeciesThresholds(organizationId: string, pestSpecies: string): Promise<SpeciesThresholds> {
+  const map = await getSpeciesThresholdsMap(organizationId);
+  return map.get(pestSpecies.toLowerCase()) ?? builtinThresholdsFor(pestSpecies);
 }
 
 export interface MonitoringAlert {
@@ -25,20 +68,20 @@ export interface MonitoringAlert {
   facilityId: string;
   facilityAreaId: string | null;
   pestSpecies: string;
-  infestedPct: number;
+  metricKind: MetricKind;
+  value: number;
   threshold: number;
   at: Date;
 }
 
 // The ThresholdEngine ARCHITECTURE.md ยง3 describes: "sample -> reduce to
 // metric -> compare to threshold -> status." Plant sampling, Counts, and
-// disease assessment all already converge on the same sampleSize/pestCount
-// shape (scoutingObservations), so the metric is the same one calculation
-// (pestCount/sampleSize) regardless of which method produced it -- method
-// never branches downstream of this function, per the convergence rule.
-// Complements the dashboard's existing trend-based "trending up" heuristic
-// (lib/pest-event-signals.ts) rather than replacing it: this is a real
-// configured numeric comparison, that one is a shape-of-the-curve signal.
+// disease assessment all converge on the same sampleSize/pestCount SHAPE
+// (scoutingObservations), but not the same metric or threshold -- see
+// sessionMetric's comment. Complements the dashboard's existing trend-
+// based "trending up" heuristic (lib/pest-event-signals.ts) rather than
+// replacing it: this is a real configured numeric comparison, that one is
+// a shape-of-the-curve signal.
 export async function computeMonitoringAlerts(organizationId: string): Promise<MonitoringAlert[]> {
   const orgFacilities = await db.select().from(facilities).where(eq(facilities.organizationId, organizationId));
   const facilityIds = orgFacilities.map((f) => f.id);
@@ -48,8 +91,7 @@ export async function computeMonitoringAlerts(organizationId: string): Promise<M
   const activeEvents = events.filter((e) => e.status === "active");
   if (activeEvents.length === 0) return [];
 
-  const thresholdRows = await db.select().from(monitoringThresholds).where(eq(monitoringThresholds.organizationId, organizationId));
-  const thresholdBySpecies = new Map(thresholdRows.map((t) => [t.pestSpecies.toLowerCase(), t.infestedPctThreshold]));
+  const thresholdsBySpecies = await getSpeciesThresholdsMap(organizationId);
 
   // Latest session per event, in one query rather than N -- pull every
   // session for these events, already newest-first, and keep the first one
@@ -69,18 +111,21 @@ export async function computeMonitoringAlerts(organizationId: string): Promise<M
   const alerts: MonitoringAlert[] = [];
   for (const event of activeEvents) {
     const latest = latestByEvent.get(event.id);
-    if (!latest || !latest.sampleSize) continue;
+    if (!latest) continue;
+    const metric = sessionMetric(latest);
+    if (!metric) continue;
 
-    const infestedPct = Math.round(((latest.pestCount ?? 0) / latest.sampleSize) * 100);
-    const threshold = thresholdBySpecies.get(event.pestSpecies.toLowerCase()) ?? DEFAULT_INFESTED_PCT_THRESHOLD;
-    if (infestedPct < threshold) continue;
+    const thresholds = thresholdsBySpecies.get(event.pestSpecies.toLowerCase()) ?? builtinThresholdsFor(event.pestSpecies);
+    const threshold = thresholdFor(metric, thresholds);
+    if (metric.value < threshold) continue;
 
     alerts.push({
       eventId: event.id,
       facilityId: event.facilityId,
       facilityAreaId: event.facilityAreaId,
       pestSpecies: event.pestSpecies,
-      infestedPct,
+      metricKind: metric.kind,
+      value: metric.value,
       threshold,
       at: latest.createdAt,
     });
@@ -111,10 +156,11 @@ export async function maybeAutoResolve(eventId: string, organizationId: string) 
     .limit(AUTO_RESOLVE_CONSECUTIVE_SESSIONS);
   if (sessions.length < AUTO_RESOLVE_CONSECUTIVE_SESSIONS) return null;
 
-  const threshold = await getSpeciesThreshold(organizationId, event.pestSpecies);
+  const thresholds = await getSpeciesThresholds(organizationId, event.pestSpecies);
   const allBelowThreshold = sessions.every((s) => {
-    if (!s.sampleSize) return false;
-    return ((s.pestCount ?? 0) / s.sampleSize) * 100 < threshold;
+    const metric = sessionMetric(s);
+    if (!metric) return false;
+    return metric.value < thresholdFor(metric, thresholds);
   });
   if (!allBelowThreshold) return null;
 
@@ -127,8 +173,9 @@ export interface EscalationAlert {
   facilityAreaId: string | null;
   pestSpecies: string;
   daysSinceTreatment: number;
-  baselinePct: number;
-  latestPct: number;
+  metricKind: MetricKind;
+  baselineValue: number;
+  latestValue: number;
   at: Date;
 }
 
@@ -140,9 +187,13 @@ export interface EscalationAlert {
 // around when that treatment happened, surfaces as an alert suggesting
 // the grower try a different tier -- never auto-escalates anything
 // itself, same "suggestion, not an automatic action" rule as trap/
-// scouting alerts. "Meaningful decline" is a >=25% relative drop in
-// infested % -- a deliberately loose bar so normal noisy fluctuation
-// doesn't get flagged, only a treatment that's genuinely not working.
+// scouting alerts. "Meaningful decline" is a >=25% relative drop in the
+// metric's own value -- a deliberately loose bar so normal noisy
+// fluctuation doesn't get flagged, only a treatment that's genuinely not
+// working. Works the same whether that value is occupancy % or density
+// (pests/leaf); baseline and latest must be the SAME metric kind to
+// compare at all (a grower switching methods mid-event is rare enough
+// that skipping the alert that one time beats comparing across scales).
 const MEANINGFUL_DECLINE_PCT = 25;
 
 export async function computeEscalationAlerts(organizationId: string): Promise<EscalationAlert[]> {
@@ -190,19 +241,19 @@ export async function computeEscalationAlerts(organizationId: string): Promise<E
     const postTreatment = sessions.filter((s) => s.createdAt.getTime() >= lastTreatment.appliedAt.getTime());
     if (postTreatment.length === 0) continue; // no fresh data to judge by yet
     const latest = postTreatment[0];
-    if (!latest.sampleSize) continue;
-    const latestPct = ((latest.pestCount ?? 0) / latest.sampleSize) * 100;
+    const latestMetric = sessionMetric(latest);
+    if (!latestMetric) continue;
 
     // Baseline: whichever session sat closest to the treatment (last one
     // before it), falling back to the event's earliest session if the
     // treatment was applied before any monitoring happened.
     const preTreatment = sessions.filter((s) => s.createdAt.getTime() < lastTreatment.appliedAt.getTime());
     const baseline = preTreatment[0] ?? sessions[sessions.length - 1];
-    if (!baseline || !baseline.sampleSize) continue;
-    const baselinePct = ((baseline.pestCount ?? 0) / baseline.sampleSize) * 100;
-    if (baselinePct <= 0) continue; // nothing to decline from
+    const baselineMetric = baseline ? sessionMetric(baseline) : null;
+    if (!baselineMetric || baselineMetric.kind !== latestMetric.kind) continue;
+    if (baselineMetric.value <= 0) continue; // nothing to decline from
 
-    const declinePct = ((baselinePct - latestPct) / baselinePct) * 100;
+    const declinePct = ((baselineMetric.value - latestMetric.value) / baselineMetric.value) * 100;
     if (declinePct >= MEANINGFUL_DECLINE_PCT) continue;
 
     alerts.push({
@@ -211,8 +262,9 @@ export async function computeEscalationAlerts(organizationId: string): Promise<E
       facilityAreaId: event.facilityAreaId,
       pestSpecies: event.pestSpecies,
       daysSinceTreatment: Math.round(daysSinceTreatment),
-      baselinePct: Math.round(baselinePct),
-      latestPct: Math.round(latestPct),
+      metricKind: latestMetric.kind,
+      baselineValue: baselineMetric.value,
+      latestValue: latestMetric.value,
       at: latest.createdAt,
     });
   }

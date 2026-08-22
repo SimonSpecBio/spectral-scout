@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { facilities, inventoryItems, inventoryOrders, pestEvents, tasks, treatments } from "@/db/schema";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-alerts";
-import { computeEscalationAlerts, computeMonitoringAlerts } from "@/lib/threshold-engine";
+import { computeEscalationAlerts, computeMonitoringAlerts, metricLabel } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { taskActionHref, taskUrgency } from "@/lib/tasks";
 
@@ -48,7 +48,7 @@ export async function computeNotifications(organizationId: string, userId: strin
       id: `threshold-${a.eventId}`,
       kind: "threshold",
       title: `${a.pestSpecies} over threshold`,
-      sub: `${a.infestedPct}% infested`,
+      sub: metricLabel({ kind: a.metricKind, value: a.value }),
       at: a.at,
       href: `/app/facilities/${a.facilityId}/pest-events/${a.eventId}`,
     });
@@ -72,7 +72,7 @@ export async function computeNotifications(organizationId: string, userId: strin
       id: `scouting-${a.observationId}`,
       kind: "scouting",
       title: `Scouting log over threshold — confirm?`,
-      sub: `${a.infestedPct}% infested`,
+      sub: metricLabel({ kind: a.metricKind, value: a.value }),
       at: a.at,
       href: scoutingAlertConfirmHref(a),
     });
@@ -84,7 +84,7 @@ export async function computeNotifications(organizationId: string, userId: strin
       id: `escalation-${a.eventId}`,
       kind: "escalation",
       title: `${a.pestSpecies} not improving — try a different tier?`,
-      sub: `${a.baselinePct}% → ${a.latestPct}% after ${a.daysSinceTreatment}d`,
+      sub: `${metricLabel({ kind: a.metricKind, value: a.baselineValue })} → ${metricLabel({ kind: a.metricKind, value: a.latestValue })} after ${a.daysSinceTreatment}d`,
       at: a.at,
       href: `/app/facilities/${a.facilityId}/pest-events/${a.eventId}?tab=recommended`,
     });

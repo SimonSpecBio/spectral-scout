@@ -45,6 +45,25 @@ export const organizations = pgTable("scout_organization", {
   // db/pilots-mirror.ts already uses -- only meaningful when
   // accountTier = 'pilot'.
   pilotKey: text("pilot_key"),
+  // 2-letter USPS code (lib/us-states.ts is the canonical list, validated
+  // at the API layer rather than a DB enum -- same freeform-text-plus-
+  // app-level-validation convention facilityAreas.cropType already uses).
+  // Null until the owner completes onboarding (proxy.ts gates on this).
+  // This is what makes cannabis-legal-status filtering
+  // (pesticides_inventory.json's per-state data) possible at all -- there
+  // was previously no jurisdiction field anywhere in the schema.
+  state: text("state"),
+  // Versioned rather than a boolean so a future material change to the
+  // agreement's copy (lib/consent.ts's CURRENT_CONSENT_VERSION) can force
+  // re-acceptance by everyone without a schema migration each time -- null
+  // means never accepted (pre-dates this feature, or mid-onboarding).
+  // Org-level, not per-user: an invited team member joins an org that
+  // already has this recorded, same convention as `state` above.
+  dataConsentVersion: text("data_consent_version"),
+  dataConsentAcceptedAt: timestamp("data_consent_accepted_at", { withTimezone: true }),
+  // Matched-by-value against scout_user.id, not a real FK -- same
+  // convention as scout_membership.userId.
+  dataConsentAcceptedByUserId: uuid("data_consent_accepted_by_user_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
@@ -588,13 +607,24 @@ export const tasks = pgTable(
 
 // Per-pest infested/incidence % threshold -- the ThresholdEngine's
 // non-trap counterpart to scout_trap_threshold (see that table's comment
-// for why per-pest, org-configurable, not a single global switch). Plant
-// sampling, Counts, and disease assessment all converge on the same
-// sampleSize/pestCount shape (ARCHITECTURE.md ยง3's "convergence rule"),
-// so one metric (infested % = pestCount/sampleSize) covers all three --
-// no separate metric-type column needed. DEFAULT_INFESTED_PCT_THRESHOLD
-// in lib/threshold-engine.ts covers any species with no row. Written from
-// /app/settings/catalog (owner role) -- getSpeciesThreshold,
+// for why per-pest, org-configurable, not a single global switch).
+// Sessions actually converge on the same sampleSize/pestCount SHAPE
+// (ARCHITECTURE.md ยง3's "convergence rule"), but NOT the same metric:
+// Plant sampling and disease assessment fill in leafGrid, so pestCount
+// there is a count of INFESTED LEAVES out of sampleSize checked -- a real
+// 0-100 occupancy percentage. Counts has no leafGrid; pestCount there is a
+// raw bug tally that can exceed sampleSize (3 aphids on 1 of 5 leaves is a
+// perfectly ordinary "60 pests/leaf" reading under the old pct formula,
+// and 2 aphids each on 3 leaves reads over 100%). Comparing that tally
+// against a percent threshold was a real bug (see the manager-persona
+// walkthrough, 2026-08-20): 5 total aphids across 5 leaves alarmed as
+// "100% infested" when the real read is a light, sub-threshold 1/leaf.
+// infestedPctThreshold still covers occupancy sessions (leafGrid present);
+// densityThreshold is the parallel per-species override for raw-tally
+// sessions (leafGrid null), in mean pests per sample unit (leaf/plant) --
+// see lib/threshold-engine.ts's sessionMetric for which one applies.
+// Nullable: an org can override just one of the two per species. Written
+// from /app/settings/catalog (owner role) -- getSpeciesThresholds,
 // computeMonitoringAlerts, maybeAutoResolve, and computeEscalationAlerts
 // all already read this table live, so a row written here takes effect
 // everywhere immediately, no other code changes needed.
@@ -606,7 +636,8 @@ export const monitoringThresholds = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     pestSpecies: text("pest_species").notNull(),
-    infestedPctThreshold: numeric("infested_pct_threshold", { mode: "number" }).notNull(),
+    infestedPctThreshold: numeric("infested_pct_threshold", { mode: "number" }),
+    densityThreshold: numeric("density_threshold", { mode: "number" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("scout_monitoring_threshold_organization_id_idx").on(table.organizationId)]

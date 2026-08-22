@@ -3,7 +3,7 @@ import Link from "next/link";
 import { db } from "@/db";
 import { customSpecies, monitoringThresholds } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
-import { DEFAULT_INFESTED_PCT_THRESHOLD } from "@/lib/threshold-engine";
+import { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD } from "@/lib/threshold-engine";
 import CatalogClient from "./CatalogClient";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,8 @@ export default async function CatalogSettingsPage() {
         isOwner={session.membershipRole === "owner"}
         initialSpecies={species.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))}
         initialThresholds={thresholds.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() }))}
-        defaultThreshold={DEFAULT_INFESTED_PCT_THRESHOLD}
+        defaultPctThreshold={DEFAULT_INFESTED_PCT_THRESHOLD}
+        defaultDensityThreshold={DEFAULT_DENSITY_THRESHOLD}
       />
     </div>
   );

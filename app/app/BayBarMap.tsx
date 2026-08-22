@@ -35,9 +35,9 @@ export default function BayBarMap({
         <svg viewBox="0 0 296 322" className="block w-full">
           <defs>
             <radialGradient id="heatGlow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.34" />
-              <stop offset="55%" stopColor="var(--accent)" stopOpacity="0.08" />
-              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--danger)" stopOpacity="0.34" />
+              <stop offset="55%" stopColor="var(--danger)" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="var(--danger)" stopOpacity="0" />
             </radialGradient>
           </defs>
           <g fontFamily="ui-monospace, monospace" fontSize="7.5" fill="var(--map-label)">

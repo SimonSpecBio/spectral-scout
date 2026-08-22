@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents, tasks } from "@/db/schema";
 import { getTeam } from "@/lib/team";
+import type { MetricKind } from "@/lib/threshold-engine";
 
 export type TaskUrgency = "overdue" | "due_soon" | "scheduled" | "done" | "snoozed";
 const DUE_SOON_MS = 24 * 60 * 60 * 1000;
@@ -112,4 +113,65 @@ export async function assignLeastLoadedWorker(organizationId: string): Promise<s
     }
   }
   return best;
+}
+
+const DAY_MS = 86_400_000;
+const KEEP_AN_EYE_RECHECK_DAYS = 7;
+
+// A reading that's nonzero but still under threshold ("5 pests is
+// essentially nothing, just keep an eye on it") shouldn't vanish with no
+// trace the moment the session is logged -- it should still put a
+// low-urgency recheck on the schedule so the area actually gets looked at
+// again, same spirit as the Severe-hotspot auto-recheck in
+// pest-events/route.ts but for the sub-threshold case that alerting
+// deliberately stays quiet about. Only fires on a real, positive reading
+// (a clean 0-count session needs no follow-up) and only when no open
+// auto-created recheck already exists for this exact area -- a grower
+// scouting the same bay every few days shouldn't accumulate a stack of
+// "keep an eye on" tasks for the same ongoing situation.
+export async function maybeScheduleKeepAnEyeRecheck(params: {
+  organizationId: string;
+  facilityId: string;
+  facilityAreaId: string;
+  pestEventId: string | null;
+  pestSpecies: string | null;
+  locationLabel: string;
+  metricKind: MetricKind;
+  value: number;
+  threshold: number;
+  x: number | null;
+  y: number | null;
+}): Promise<void> {
+  const { organizationId, facilityId, facilityAreaId, pestEventId, pestSpecies, locationLabel, value, threshold, x, y } = params;
+  if (value <= 0 || value >= threshold) return;
+
+  const existing = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.organizationId, organizationId),
+        eq(tasks.facilityAreaId, facilityAreaId),
+        eq(tasks.status, "open"),
+        eq(tasks.source, "auto_trigger"),
+        eq(tasks.type, "monitor")
+      )
+    )
+    .limit(1);
+  if (existing.length > 0) return;
+
+  const assigneeUserId = await assignLeastLoadedWorker(organizationId);
+  await db.insert(tasks).values({
+    organizationId,
+    title: pestSpecies ? `Keep an eye on ${pestSpecies} — ${locationLabel}` : `Keep an eye on ${locationLabel}`,
+    type: "monitor",
+    facilityId,
+    facilityAreaId,
+    pestEventId,
+    x,
+    y,
+    assigneeUserId,
+    source: "auto_trigger",
+    dueAt: new Date(Date.now() + KEEP_AN_EYE_RECHECK_DAYS * DAY_MS),
+  });
 }

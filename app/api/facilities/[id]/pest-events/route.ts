@@ -1,9 +1,12 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { eventKindEnum, facilityAreas, pestEvents, scoutingObservations, severityEnum } from "@/db/schema";
+import { eventKindEnum, facilityAreas, inventoryItems, pestEvents, scoutingObservations, severityEnum, tasks } from "@/db/schema";
+import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
+import { assignLeastLoadedWorker } from "@/lib/tasks";
+import { findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireGrowerSession();
@@ -83,7 +86,131 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           eq(scoutingObservations.facilityAreaId, facilityAreaId)
         )
       );
+  } else if (facilityAreaId) {
+    // A pest event created any other way (the generic "+New" flow, not the
+    // scouting alert's own confirm link) for an area that already has an
+    // unpromoted general scouting session sitting over threshold: link the
+    // latest one anyway. Without this fallback, a grower who reasonably
+    // used "+New" instead of chasing down that specific alert's confirm
+    // link left the origin observation stranded unpromoted forever -- it
+    // kept re-alerting on the same already-acted-on data (manager-persona
+    // walkthrough, 2026-08-20). Best-effort only: picks the latest
+    // unpromoted session for the area regardless of species, since general
+    // scouting never captures one to match against.
+    const [latestUnpromoted] = await db
+      .select({ id: scoutingObservations.id })
+      .from(scoutingObservations)
+      .where(and(eq(scoutingObservations.facilityAreaId, facilityAreaId), isNull(scoutingObservations.promotedPestEventId)))
+      .orderBy(desc(scoutingObservations.createdAt))
+      .limit(1);
+    if (latestUnpromoted) {
+      await db.update(scoutingObservations).set({ promotedPestEventId: row.id }).where(eq(scoutingObservations.id, latestUnpromoted.id));
+    }
   }
 
-  return NextResponse.json(row);
+  // A Severe hotspot shouldn't just sit there until someone remembers to
+  // check back on it -- auto-create the recheck (and, where possible, the
+  // treatment) tasks a grower would otherwise have to remember to schedule
+  // by hand. Mirrors apply-program/route.ts's recheck+release pattern, just
+  // triggered at event-creation time instead of at treatment time, since a
+  // Severe event needs a plan immediately, not only after something's
+  // already been applied.
+  const createdTasks: (typeof tasks.$inferSelect)[] = [];
+  if (severity === "severe" && facilityAreaId) {
+    const DAY_MS = 86_400_000;
+    const program = findPestProgram(pestSpecies);
+    const location = row.x != null && row.y != null ? bayLabel(nearestBay(row.x, row.y)) : pestSpecies;
+    const assigneeUserId = await assignLeastLoadedWorker(session.organizationId!);
+
+    const [recheckTask] = await db
+      .insert(tasks)
+      .values({
+        organizationId: session.organizationId!,
+        title: `Recheck ${pestSpecies} — ${location}`,
+        type: "monitor",
+        facilityId: id,
+        facilityAreaId,
+        pestEventId: row.id,
+        x: row.x,
+        y: row.y,
+        assigneeUserId,
+        createdByUserId: session.user!.id!,
+        source: "auto_trigger",
+        dueAt: new Date(Date.now() + (program?.followUp?.recheckDays ?? 3) * DAY_MS),
+      })
+      .returning();
+    createdTasks.push(recheckTask);
+
+    // Try to match the program's top recommended agent/product against
+    // stock the org already has, same name-match apply-program's route
+    // uses -- if it's in Inventory, schedule applying it instead of a
+    // vague placeholder. No program, or no matching stock: fall back to
+    // two generic placeholders (tomorrow, and a week out) the grower can
+    // use as-is and complete/delete whichever doesn't fit, rather than
+    // leaving Severe with nothing scheduled just because nothing matched.
+    const agent = program?.primaryBiocontrol[0] ? findAgent(program.primaryBiocontrol[0]) : undefined;
+    const productName = agent?.name ?? (program?.biopesticideRotation[0] ? findProduct(program.biopesticideRotation[0])?.name : undefined);
+    const orgItems = productName
+      ? await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!))
+      : [];
+    const matchedItem = productName ? orgItems.find((i) => i.name.toLowerCase() === productName.toLowerCase()) : undefined;
+
+    if (productName && matchedItem) {
+      const [treatmentTask] = await db
+        .insert(tasks)
+        .values({
+          organizationId: session.organizationId!,
+          title: `Apply ${productName} — ${location}`,
+          type: "treatment",
+          facilityId: id,
+          facilityAreaId,
+          pestEventId: row.id,
+          x: row.x,
+          y: row.y,
+          assigneeUserId,
+          createdByUserId: session.user!.id!,
+          source: "auto_trigger",
+          dueAt: new Date(Date.now() + DAY_MS),
+        })
+        .returning();
+      createdTasks.push(treatmentTask);
+    } else {
+      const [tomorrowTask, weekOutTask] = await db
+        .insert(tasks)
+        .values([
+          {
+            organizationId: session.organizationId!,
+            title: `Treat ${pestSpecies} — ${location}`,
+            type: "treatment",
+            facilityId: id,
+            facilityAreaId,
+            pestEventId: row.id,
+            x: row.x,
+            y: row.y,
+            assigneeUserId,
+            createdByUserId: session.user!.id!,
+            source: "auto_trigger",
+            dueAt: new Date(Date.now() + DAY_MS),
+          },
+          {
+            organizationId: session.organizationId!,
+            title: `Treat ${pestSpecies} — ${location}`,
+            type: "treatment",
+            facilityId: id,
+            facilityAreaId,
+            pestEventId: row.id,
+            x: row.x,
+            y: row.y,
+            assigneeUserId,
+            createdByUserId: session.user!.id!,
+            source: "auto_trigger",
+            dueAt: new Date(Date.now() + 7 * DAY_MS),
+          },
+        ])
+        .returning();
+      createdTasks.push(tomorrowTask, weekOutTask);
+    }
+  }
+
+  return NextResponse.json({ ...row, autoCreatedTasks: createdTasks });
 }

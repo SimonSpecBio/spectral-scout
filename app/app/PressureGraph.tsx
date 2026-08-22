@@ -62,7 +62,7 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
         <polyline
           points={sparkPoints(days, 226, 44, 4)}
           fill="none"
-          stroke="var(--accent)"
+          stroke="var(--danger)"
           strokeWidth="1"
           strokeLinecap="round"
           strokeLinejoin="round"

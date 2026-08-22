@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, scoutingObservations } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
+import { sessionMetric } from "@/lib/threshold-engine";
 import NewEventForm from "./NewEventForm";
 
 export default async function NewEventPage({
@@ -70,6 +71,7 @@ export default async function NewEventPage({
                 y: handoffObservation.y,
                 sampleSize: handoffObservation.sampleSize ?? 0,
                 pestCount: handoffObservation.pestCount ?? 0,
+                metricKind: sessionMetric(handoffObservation)?.kind ?? "occupancy",
               }
             : null
         }

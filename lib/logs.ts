@@ -1,6 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents, scoutingObservations, tasks, treatments, trapReadings, traps } from "@/db/schema";
+import { metricLabel, sessionMetric } from "@/lib/threshold-engine";
 
 export type LogKind = "finding" | "monitor" | "action" | "disease";
 const KIND_COLOR: Record<LogKind, string> = { finding: "#CE5D40", monitor: "#4E6280", action: "#4E9E86", disease: "#C79A3A" };
@@ -62,12 +63,12 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
 
   for (const s of sessions) {
     const loc = areaNameById.get(s.facilityAreaId) ?? "";
-    const pct = s.sampleSize ? Math.round(((s.pestCount ?? 0) / s.sampleSize) * 100) : null;
+    const metric = sessionMetric(s);
     entries.push({
       at: s.createdAt,
       kind: "monitor",
       label: "Monitoring session",
-      sub: [loc, pct != null ? `${pct}% INF` : null].filter(Boolean).join(" · ").toUpperCase(),
+      sub: [loc, metric ? metricLabel(metric) : null].filter(Boolean).join(" · ").toUpperCase(),
     });
   }
 
