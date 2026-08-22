@@ -1,0 +1,1 @@
+ALTER TABLE "scout_organization" ADD COLUMN "state" text;

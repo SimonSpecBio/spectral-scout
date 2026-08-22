@@ -23,6 +23,10 @@ export default async function SettingsPage() {
           Team
           <span className="text-[var(--text-faint)]">&rsaquo;</span>
         </Link>
+        <Link href="/app/settings/legal" className="flex items-center justify-between p-4 text-sm">
+          Data &amp; Privacy
+          <span className="text-[var(--text-faint)]">&rsaquo;</span>
+        </Link>
       </div>
     </div>
   );

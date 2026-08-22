@@ -140,6 +140,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.organizationId = null;
         session.accountTier = null;
         session.membershipRole = null;
+        session.organizationState = null;
+        session.organizationConsentVersion = null;
         return session;
       }
 
@@ -149,6 +151,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.organizationId = null;
         session.accountTier = null;
         session.membershipRole = null;
+        session.organizationState = null;
+        session.organizationConsentVersion = null;
         return session;
       }
 
@@ -162,6 +166,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.organizationId = membership.organizationId;
       session.accountTier = org?.accountTier ?? "general";
       session.membershipRole = membership.role;
+      session.organizationState = org?.state ?? null;
+      session.organizationConsentVersion = org?.dataConsentVersion ?? null;
       return session;
     },
   },
