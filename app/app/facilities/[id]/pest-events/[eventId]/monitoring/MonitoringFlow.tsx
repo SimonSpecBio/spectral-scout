@@ -35,6 +35,8 @@ export default function MonitoringFlow({
   redirectHref,
   isPilotTier,
   taskId,
+  presetFacilityId,
+  presetAreaId,
 }: {
   // Event-scoped monitoring inherits the parent event's own pin server-side
   // (the location is already known -- see the monitoring POST route), so
@@ -48,6 +50,10 @@ export default function MonitoringFlow({
   // Set when fulfilling a specific scheduled task (see CountsFlow's
   // comment) -- logging the session also completes that task.
   taskId?: string;
+  // A scout-type follow-up task's own site/area -- preset LocationPicker to
+  // it instead of making the grower re-pick a location already known.
+  presetFacilityId?: string;
+  presetAreaId?: string;
 }) {
   const router = useRouter();
   const draftKey = `scout-monitoring-draft:${postUrl ?? "new-observation"}`;
@@ -165,6 +171,8 @@ export default function MonitoringFlow({
     return (
       <LocationPicker
         facilities={facilities}
+        initialFacilityId={presetFacilityId}
+        initialAreaId={presetAreaId}
         onConfirm={(facilityId, areaId, x, y) => submitSession(`/api/facilities/${facilityId}/areas/${areaId}/scouting`, x, y)}
         onCancel={() => setPlacingLocation(false)}
         step={{ current: 2, total: 2 }}

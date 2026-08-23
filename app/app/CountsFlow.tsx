@@ -17,6 +17,8 @@ export default function CountsFlow({
   facilities,
   redirectHref,
   taskId,
+  presetFacilityId,
+  presetAreaId,
 }: {
   // Event-scoped monitoring passes a static postUrl (the event's own
   // pin is already known, nothing to place) -- exactly one of postUrl /
@@ -32,6 +34,10 @@ export default function CountsFlow({
   // cadence) -- logging the session also completes that task instead of
   // leaving it dangling open for the grower to separately go mark done.
   taskId?: string;
+  // A scout-type follow-up task's own site/area -- preset LocationPicker to
+  // it instead of making the grower re-pick a location already known.
+  presetFacilityId?: string;
+  presetAreaId?: string;
 }) {
   const router = useRouter();
   const draftKey = `scout-counts-draft:${postUrl ?? "new-observation"}`;
@@ -107,6 +113,8 @@ export default function CountsFlow({
     return (
       <LocationPicker
         facilities={facilities}
+        initialFacilityId={presetFacilityId}
+        initialAreaId={presetAreaId}
         onConfirm={(facilityId, areaId, x, y) => submitSession(`/api/facilities/${facilityId}/areas/${areaId}/scouting`, x, y)}
         onCancel={() => setPlacingLocation(false)}
         step={{ current: 2, total: 2 }}

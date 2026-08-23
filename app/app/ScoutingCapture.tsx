@@ -20,6 +20,8 @@ export default function ScoutingCapture({
   isPilotTier,
   taskId,
   initialMethod,
+  presetFacilityId,
+  presetAreaId,
 }: {
   header?: ReactNode;
   postUrl?: string;
@@ -28,6 +30,11 @@ export default function ScoutingCapture({
   isPilotTier: boolean;
   taskId?: string;
   initialMethod?: ScoutingMethod;
+  // A scout-type task's own site/area, so accepting it doesn't make the
+  // grower re-pick a location that's already known (lib/tasks.ts's
+  // taskActionHref comment).
+  presetFacilityId?: string;
+  presetAreaId?: string;
 }) {
   const [method, setMethod] = useState<ScoutingMethod | null>(initialMethod ?? null);
   const [mounted, setMounted] = useState<Record<ScoutingMethod, boolean>>({
@@ -51,7 +58,14 @@ export default function ScoutingCapture({
       {method === null && <MethodChoice onSelect={selectMethod} />}
       {mounted.counts && (
         <div hidden={method !== "counts"}>
-          <CountsFlow postUrl={postUrl} facilities={facilities} redirectHref={redirectHref} taskId={taskId} />
+          <CountsFlow
+            postUrl={postUrl}
+            facilities={facilities}
+            redirectHref={redirectHref}
+            taskId={taskId}
+            presetFacilityId={presetFacilityId}
+            presetAreaId={presetAreaId}
+          />
         </div>
       )}
       {mounted.plant_sampling && (
@@ -62,6 +76,8 @@ export default function ScoutingCapture({
             redirectHref={redirectHref}
             isPilotTier={isPilotTier}
             taskId={taskId}
+            presetFacilityId={presetFacilityId}
+            presetAreaId={presetAreaId}
           />
         </div>
       )}

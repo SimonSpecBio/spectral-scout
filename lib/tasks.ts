@@ -14,13 +14,29 @@ const DUE_SOON_MS = 24 * 60 * 60 * 1000;
 // action -- log the recheck -- so tapping it should land directly on the
 // plant-sampling grid (10 plants x top/mid/bottom leaf) instead of a task
 // detail page that just links onward to a Method Choice screen the answer
-// to which is already known. Other task types (release, treatment,
-// trap_read, ...) have no dedicated capture screen yet, so those still
-// land on task detail. Shared by the dashboard's Today's tasks, the
-// Schedule list, and Notifications so all three behave the same way.
-export function taskActionHref(task: { id: string; type: string; facilityId: string | null; pestEventId: string | null }): string {
+// to which is already known. A scout-type task (the "Weekly scouting
+// cadence" follow-up offered after a pest event resolves, lib/
+// recommendations.ts's computeFollowUpSuggestions) has no linked event --
+// it's about the area going forward, not that closed incident -- so it
+// lands on general scouting (/app/new-observation) instead, preset to the
+// same site/area rather than making the grower re-pick it. Other task
+// types (release, treatment, trap_read, ...) have no dedicated capture
+// screen yet, so those still land on task detail. Shared by the
+// dashboard's Today's tasks, the Schedule list, and Notifications so all
+// three behave the same way.
+export function taskActionHref(task: {
+  id: string;
+  type: string;
+  facilityId: string | null;
+  facilityAreaId: string | null;
+  pestEventId: string | null;
+}): string {
   if (task.type === "monitor" && task.facilityId && task.pestEventId) {
     return `/app/facilities/${task.facilityId}/pest-events/${task.pestEventId}/monitoring?taskId=${task.id}&method=plant_sampling`;
+  }
+  if (task.type === "scout" && task.facilityId) {
+    const area = task.facilityAreaId ? `&areaId=${task.facilityAreaId}` : "";
+    return `/app/new-observation?taskId=${task.id}&facilityId=${task.facilityId}${area}`;
   }
   return `/app/schedule/${task.id}`;
 }

@@ -10,9 +10,15 @@ import ScoutingCapture from "../ScoutingCapture";
 // everywhere else), then the form itself, then site + area + bay all get
 // picked together on one swipeable map screen -- no site/area list-picker
 // pages up front anymore.
-export default async function NewObservationPage() {
+export default async function NewObservationPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ taskId?: string; facilityId?: string; areaId?: string }>;
+}) {
   const session = await requireGrowerSession();
   if (!session) return null;
+
+  const { taskId, facilityId: presetFacilityId, areaId: presetAreaId } = await searchParams;
 
   const orgFacilities = await db
     .select()
@@ -47,6 +53,9 @@ export default async function NewObservationPage() {
       facilities={pickerFacilities}
       redirectHref="/app"
       isPilotTier={session.accountTier === "pilot"}
+      taskId={taskId}
+      presetFacilityId={presetFacilityId}
+      presetAreaId={presetAreaId}
     />
   );
 }
