@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       reiHours: typeof body.reiHours === "number" ? body.reiHours : null,
       phiDays: typeof body.phiDays === "number" ? body.phiDays : null,
       cautions: typeof body.cautions === "string" && body.cautions ? body.cautions : null,
+      unitCost: typeof body.unitCost === "number" && body.unitCost >= 0 ? body.unitCost : null,
     })
     .returning();
   return NextResponse.json(row);

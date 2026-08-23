@@ -239,6 +239,10 @@ export const inventoryItems = pgTable(
   // rather than discarded after the add flow, given how directly
   // treatments.json ties these to real application-safety risk.
   cautions: text("cautions"),
+  // Per-unit cost (same unit as `unit` above) -- nullable since a grower may
+  // not track cost at all; lets "what did we spend on pesticides this
+  // quarter" become answerable without forcing every item to have a price.
+  unitCost: numeric("unit_cost", { mode: "number" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("scout_inventory_item_organization_id_idx").on(table.organizationId)]
@@ -257,6 +261,12 @@ export const inventoryOrders = pgTable(
       .references(() => inventoryItems.id, { onDelete: "cascade" }),
     quantity: numeric("quantity", { mode: "number" }).notNull(),
     supplier: text("supplier"),
+    // Email/phone/contact-name freeform string -- a real scout_supplier
+    // table (reusable across orders, linked contacts) is the upgrade path
+    // if this needs to grow, not a day-one requirement.
+    supplierContact: text("supplier_contact"),
+    unitCost: numeric("unit_cost", { mode: "number" }),
+    totalCost: numeric("total_cost", { mode: "number" }),
     expectedAt: date("expected_at", { mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

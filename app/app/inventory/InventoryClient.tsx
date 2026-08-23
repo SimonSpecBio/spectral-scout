@@ -16,12 +16,16 @@ interface Item {
   reiHours: number | null;
   phiDays: number | null;
   cautions: string | null;
+  unitCost: number | null;
 }
 interface Order {
   id: string;
   itemId: string;
   quantity: number;
   supplier: string | null;
+  supplierContact: string | null;
+  unitCost: number | null;
+  totalCost: number | null;
   expectedAt: string | null;
 }
 
@@ -72,6 +76,25 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
       }
     } catch {
       setError("Couldn't update stock. Check your connection and try again.");
+    }
+  }
+
+  async function setUnitCost(itemId: string, cost: number | null) {
+    setError(null);
+    try {
+      const res = await fetch(`/api/inventory/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unitCost: cost }),
+      });
+      if (res.ok) {
+        const row = await res.json();
+        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, unitCost: row.unitCost == null ? null : Number(row.unitCost) } : i)));
+      } else {
+        setError("Couldn't save cost. Check your connection and try again.");
+      }
+    } catch {
+      setError("Couldn't save cost. Check your connection and try again.");
     }
   }
 
@@ -161,6 +184,7 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
                     {expanded === item.id && (
                       <div className="flex flex-col gap-3 border-t border-[var(--border)] bg-[var(--surface-raised)]/30 p-3.5">
                         {item.cautions && <div className="text-xs text-[var(--text-dim)]">{item.cautions}</div>}
+                        <UnitCostRow item={item} onSave={(cost) => setUnitCost(item.id, cost)} />
                         {itemOrders.length > 0 && (
                           <div className="flex flex-col gap-1.5">
                             <div className="label-mono">On order</div>
@@ -168,6 +192,8 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
                               <div key={o.id} className="flex items-center justify-between text-xs">
                                 <span className="text-[var(--text-dim)]">
                                   {o.quantity} {item.unit} {o.supplier ? `· ${o.supplier}` : ""} {o.expectedAt ? `· ETA ${o.expectedAt}` : ""}
+                                  {o.totalCost != null ? ` · $${o.totalCost.toFixed(2)}` : ""}
+                                  {o.supplierContact ? ` · ${o.supplierContact}` : ""}
                                 </span>
                                 <button onClick={() => receiveOrder(item.id, o.id)} className="text-[var(--accent)]">
                                   Mark received
@@ -176,7 +202,12 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
                             ))}
                           </div>
                         )}
-                        <RestockRow item={item} onRestock={(qty) => restock(item.id, qty)} />
+                        <RestockRow
+                          item={item}
+                          onRestock={(qty) => restock(item.id, qty)}
+                          onOrderPlaced={(order) => setOrders((prev) => [...prev, order])}
+                          onError={setError}
+                        />
                       </div>
                     )}
                   </div>
@@ -198,20 +229,85 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
   );
 }
 
-function RestockRow({ item, onRestock }: { item: Item; onRestock: (qty: number) => void }) {
+function UnitCostRow({ item, onSave }: { item: Item; onSave: (cost: number | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(item.unitCost != null ? String(item.unitCost) : "");
+
+  function save() {
+    const trimmed = value.trim();
+    const parsed = trimmed ? Number(trimmed) : null;
+    onSave(parsed != null && !Number.isNaN(parsed) ? parsed : null);
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return (
+      <button onClick={() => setEditing(true)} className="flex items-center justify-between text-xs text-[var(--text-dim)]">
+        <span>Cost per {item.unit}</span>
+        <span className="text-[var(--accent)]">{item.unitCost != null ? `$${item.unitCost.toFixed(2)}` : "Set cost"}</span>
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        inputMode="decimal"
+        placeholder={`Cost per ${item.unit}`}
+        autoFocus
+        className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs"
+      />
+      <button onClick={save} className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)]">
+        Save
+      </button>
+    </div>
+  );
+}
+
+function RestockRow({
+  item,
+  onRestock,
+  onOrderPlaced,
+  onError,
+}: {
+  item: Item;
+  onRestock: (qty: number) => void;
+  onOrderPlaced: (order: Order) => void;
+  onError: (message: string) => void;
+}) {
   const [qty, setQty] = useState(1);
   const [orderMode, setOrderMode] = useState(false);
   const [supplier, setSupplier] = useState("");
-  const router = useRouter();
+  const [supplierContact, setSupplierContact] = useState("");
+  const [unitCost, setUnitCost] = useState("");
 
   async function placeOrder() {
-    await fetch(`/api/inventory/${item.id}/orders`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quantity: qty, supplier: supplier || null }),
-    });
-    setOrderMode(false);
-    router.refresh();
+    const parsedUnitCost = unitCost.trim() ? Number(unitCost) : null;
+    try {
+      const res = await fetch(`/api/inventory/${item.id}/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quantity: qty,
+          supplier: supplier || null,
+          supplierContact: supplierContact || null,
+          unitCost: parsedUnitCost != null && !Number.isNaN(parsedUnitCost) ? parsedUnitCost : null,
+        }),
+      });
+      if (res.ok) {
+        const row = await res.json();
+        onOrderPlaced({ ...row, quantity: Number(row.quantity), unitCost: row.unitCost == null ? null : Number(row.unitCost), totalCost: row.totalCost == null ? null : Number(row.totalCost) });
+        setOrderMode(false);
+        setSupplier("");
+        setSupplierContact("");
+        setUnitCost("");
+      } else {
+        onError("Couldn't place this order. Check your connection and try again.");
+      }
+    } catch {
+      onError("Couldn't place this order. Check your connection and try again.");
+    }
   }
 
   return (
@@ -227,16 +323,31 @@ function RestockRow({ item, onRestock }: { item: Item; onRestock: (qty: number) 
         </button>
       </div>
       {orderMode && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2">
           <input
             value={supplier}
             onChange={(e) => setSupplier(e.target.value)}
-            placeholder="Supplier (optional)"
-            className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs"
+            placeholder="Supplier name (optional)"
+            className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs"
           />
-          <button onClick={placeOrder} className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)]">
-            Save
-          </button>
+          <input
+            value={supplierContact}
+            onChange={(e) => setSupplierContact(e.target.value)}
+            placeholder="Supplier contact -- email/phone (optional)"
+            className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs"
+          />
+          <div className="flex items-center gap-2">
+            <input
+              value={unitCost}
+              onChange={(e) => setUnitCost(e.target.value)}
+              inputMode="decimal"
+              placeholder={`Cost per ${item.unit} (optional)`}
+              className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs"
+            />
+            <button onClick={placeOrder} className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[var(--on-accent)]">
+              Save
+            </button>
+          </div>
         </div>
       )}
     </div>

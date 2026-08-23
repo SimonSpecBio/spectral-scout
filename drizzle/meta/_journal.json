@@ -127,6 +127,13 @@
       "when": 1787365438769,
       "tag": "0017_add_pest_event_comments",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787448986441,
+      "tag": "0018_medical_timeslip",
+      "breakpoints": true
     }
   ]
 }

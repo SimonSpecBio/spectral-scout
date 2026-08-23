@@ -19,12 +19,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const quantity = typeof body.quantity === "number" && body.quantity > 0 ? body.quantity : null;
   if (!quantity) return NextResponse.json({ error: "quantity is required" }, { status: 400 });
 
+  const unitCost = typeof body.unitCost === "number" && body.unitCost >= 0 ? body.unitCost : null;
+  // A grower may only know the total from a bulk invoice, not a clean
+  // per-unit price -- accept either and derive the other when possible
+  // rather than forcing both fields.
+  const totalCost = typeof body.totalCost === "number" && body.totalCost >= 0 ? body.totalCost : unitCost != null ? unitCost * quantity : null;
+
   const [row] = await db
     .insert(inventoryOrders)
     .values({
       itemId,
       quantity,
       supplier: typeof body.supplier === "string" && body.supplier ? body.supplier : null,
+      supplierContact: typeof body.supplierContact === "string" && body.supplierContact ? body.supplierContact : null,
+      unitCost,
+      totalCost,
       expectedAt: typeof body.expectedAt === "string" && body.expectedAt ? body.expectedAt : null,
     })
     .returning();

@@ -22,9 +22,16 @@ export default async function InventoryPage() {
           ...i,
           quantity: Number(i.quantity),
           reorderLevel: i.reorderLevel == null ? null : Number(i.reorderLevel),
+          unitCost: i.unitCost == null ? null : Number(i.unitCost),
           createdAt: i.createdAt.toISOString(),
         }))}
-        initialOrders={orders.map((o) => ({ ...o, quantity: Number(o.quantity), createdAt: o.createdAt.toISOString() }))}
+        initialOrders={orders.map((o) => ({
+          ...o,
+          quantity: Number(o.quantity),
+          unitCost: o.unitCost == null ? null : Number(o.unitCost),
+          totalCost: o.totalCost == null ? null : Number(o.totalCost),
+          createdAt: o.createdAt.toISOString(),
+        }))}
       />
     </div>
   );

@@ -22,6 +22,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const updates: Partial<typeof inventoryItems.$inferInsert> = {};
   if (typeof body.addQuantity === "number") updates.quantity = Number(item.quantity) + body.addQuantity;
   if (typeof body.reorderLevel === "number" || body.reorderLevel === null) updates.reorderLevel = body.reorderLevel;
+  if (typeof body.unitCost === "number" || body.unitCost === null) updates.unitCost = body.unitCost;
 
   const [row] = await db.update(inventoryItems).set(updates).where(eq(inventoryItems.id, itemId)).returning();
   return NextResponse.json(row);
