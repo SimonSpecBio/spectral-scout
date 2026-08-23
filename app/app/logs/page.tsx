@@ -24,13 +24,19 @@ function dayLabel(date: Date): string {
 // The filterable, bay-keyed compliance/audit record (13_logs_history.svg)
 // -- distinct from Timeline (19), which is a narrative feed. See
 // lib/logs.ts for how every capture surface merges into one list here.
-export default async function LogsPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
+export default async function LogsPage({ searchParams }: { searchParams: Promise<{ type?: string; from?: string; to?: string }> }) {
   const session = await requireGrowerSession();
   if (!session) return null;
 
-  const { type = "all" } = await searchParams;
+  const { type = "all", from, to } = await searchParams;
   const entries = await getOrgLogEntries(session.organizationId!);
-  const filtered = type === "all" ? entries : entries.filter((e) => e.kind === type);
+  let filtered = type === "all" ? entries : entries.filter((e) => e.kind === type);
+  if (from) filtered = filtered.filter((e) => e.at >= new Date(from + "T00:00:00"));
+  if (to) filtered = filtered.filter((e) => e.at <= new Date(to + "T23:59:59.999"));
+
+  const exportParams = new URLSearchParams({ type });
+  if (from) exportParams.set("from", from);
+  if (to) exportParams.set("to", to);
 
   const grouped = new Map<string, typeof filtered>();
   for (const e of filtered) {
@@ -49,7 +55,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
         {KINDS.map((k) => (
           <Link
             key={k.value}
-            href={`/app/logs?type=${k.value}`}
+            href={`/app/logs?type=${k.value}${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`}
             className={`rounded-full px-3 py-1.5 text-xs ${
               type === k.value ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
             }`}
@@ -58,6 +64,27 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
           </Link>
         ))}
       </div>
+
+      <form className="flex flex-wrap items-end gap-2" method="GET">
+        <input type="hidden" name="type" value={type} />
+        <label className="flex flex-col gap-1 text-xs text-[var(--text-dim)]">
+          From
+          <input type="date" name="from" defaultValue={from} className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm" />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-[var(--text-dim)]">
+          To
+          <input type="date" name="to" defaultValue={to} className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm" />
+        </label>
+        <button type="submit" className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
+          Apply
+        </button>
+        <a
+          href={`/api/logs/export?${exportParams.toString()}`}
+          className="ml-auto rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]"
+        >
+          Export CSV
+        </a>
+      </form>
 
       {grouped.size === 0 ? (
         <div className="card p-6 text-sm text-[var(--text-dim)]">Nothing logged yet.</div>
