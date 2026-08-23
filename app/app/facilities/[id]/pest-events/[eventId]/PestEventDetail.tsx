@@ -10,7 +10,6 @@ import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
 import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
-import { thresholdSourceFor } from "@/lib/threshold-sources";
 import { findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
 import RecommendationsPanel from "./RecommendationsPanel";
 
@@ -77,6 +76,7 @@ export default function PestEventDetail({
   thresholds,
   followUpSuggestions,
   initialTab,
+  isHomeGrower,
 }: {
   facilityId: string;
   event: Event;
@@ -92,6 +92,7 @@ export default function PestEventDetail({
   thresholds: SpeciesThresholds;
   followUpSuggestions: FollowUpSuggestion[];
   initialTab?: string;
+  isHomeGrower: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab && (TABS as readonly string[]).includes(initialTab) ? (initialTab as Tab) : "timeline");
@@ -429,19 +430,6 @@ export default function PestEventDetail({
         </div>
       )}
 
-      {(() => {
-        const source = thresholdSourceFor(event.pestSpecies);
-        if (!source) return null;
-        const confidenceLabel = source.confidence === "n/a" ? "no direct threshold" : `${source.confidence} confidence`;
-        return (
-          <div className="px-1 text-xs text-[var(--text-faint)]">
-            Threshold basis ({confidenceLabel}): {source.basis}{" "}
-            <a href={source.sourceUrl} target="_blank" rel="noreferrer" className="underline">
-              Source
-            </a>
-          </div>
-        );
-      })()}
 
       <div className="flex gap-4 overflow-x-auto border-b border-[var(--border)]">
         {TABS.map((t) => (
@@ -479,6 +467,7 @@ export default function PestEventDetail({
           eventId={event.id}
           pestSpecies={event.pestSpecies}
           inventory={inventoryItems.map((i) => ({ name: i.name, quantity: i.quantity, reorderLevel: i.reorderLevel ?? null, unit: i.unit, unitCost: i.unitCost }))}
+          isHomeGrower={isHomeGrower}
         />
       )}
 

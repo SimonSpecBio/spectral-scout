@@ -19,6 +19,9 @@ declare module "next-auth" {
     // "owner" doubles as SCHEDULING.md's "manager" role (team invites/removal,
     // task assignment); "member" as "scout". See scout_membership's comment.
     membershipRole: "owner" | "member" | null;
+    // Null = not yet set -- treated as "commercial" everywhere this gates
+    // copy/UI (db/schema.ts's growerTypeEnum comment).
+    growerType: "home_single_tent" | "home_multi_tent" | "home_room" | "commercial" | null;
     user: DefaultSession["user"];
   }
 }

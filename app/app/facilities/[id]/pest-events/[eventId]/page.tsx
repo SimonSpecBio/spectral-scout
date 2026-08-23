@@ -6,6 +6,7 @@ import { users as authUsers } from "@/db/auth-schema";
 import { facilityAreas, inventoryItems, observationPhotos, pestEventComments, scoutingObservations, treatments } from "@/db/schema";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { getOwnedFacility } from "@/lib/facilities";
+import { isHomeGrower } from "@/lib/grower-type";
 import { computeFollowUpSuggestions } from "@/lib/recommendations";
 import { requireGrowerSession } from "@/lib/session";
 import { getSpeciesThresholds, sessionMetric } from "@/lib/threshold-engine";
@@ -112,6 +113,7 @@ export default async function PestEventPage({
         initialPhotos={photos.map((p) => ({ id: p.id, blobUrl: p.blobUrl, caption: p.caption }))}
         initialComments={comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
         currentUserId={session.user!.id!}
+        isHomeGrower={isHomeGrower(session.growerType)}
         initialMonitoring={monitoringSessions.flatMap((s) => {
           const metric = sessionMetric(s);
           return metric ? [{ id: s.id, date: s.date, metricKind: metric.kind, value: metric.value }] : [];

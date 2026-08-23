@@ -25,6 +25,17 @@ import {
 // anonymized stats are the only thing staff ever see for 'general' orgs.
 export const accountTierEnum = pgEnum("scout_account_tier", ["general", "pilot"]);
 
+// Real-data finding (map-redesign-plan.md, 2026-08-21): the bulk of
+// Spectral's actual customer base is home growers running a handful of
+// light-treatment units, not commercial multi-bay operations -- the
+// original map-editor/recommendation copy assumed the opposite. Drives
+// which recommendation-copy style shows (plain-language for home_*, the
+// existing technical framing for commercial) and, later, which map-setup
+// preset an area defaults to. Null = not yet set (existing orgs, or a
+// grower who skipped it) -- treated the same as "commercial" everywhere
+// this is read, so nothing changes in behavior until a grower opts in.
+export const growerTypeEnum = pgEnum("scout_grower_type", ["home_single_tent", "home_multi_tent", "home_room", "commercial"]);
+
 // Every table in this file is .enableRLS() -- this app's Postgres instance
 // is shared with spectral-ops/spectral-pilot/spectral-rnd, and Supabase
 // auto-exposes every public-schema table via its REST API regardless of how
@@ -64,6 +75,14 @@ export const organizations = pgTable("scout_organization", {
   // Matched-by-value against scout_user.id, not a real FK -- same
   // convention as scout_membership.userId.
   dataConsentAcceptedByUserId: uuid("data_consent_accepted_by_user_id"),
+  growerType: growerTypeEnum("grower_type"),
+  // Freeform, not a parsed numeric sq-ft field -- per Simon's direct call
+  // (2026-08-22): asking home cannabis growers for an exact plant count
+  // risks making some uncomfortable given legal plant-count limits, so this
+  // captures size/dimensions in the grower's own words instead (e.g. "4x4
+  // ft tent", "~200 sq ft"), same "real data, not forced precision"
+  // approach as inventoryItems.unitCost.
+  growSizeLabel: text("grow_size_label"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 

@@ -27,6 +27,10 @@ export default async function SettingsPage() {
           Data &amp; Privacy
           <span className="text-[var(--text-faint)]">&rsaquo;</span>
         </Link>
+        <Link href="/app/settings/grow-setup" className="flex items-center justify-between p-4 text-sm">
+          About your grow
+          <span className="text-[var(--text-faint)]">&rsaquo;</span>
+        </Link>
       </div>
     </div>
   );

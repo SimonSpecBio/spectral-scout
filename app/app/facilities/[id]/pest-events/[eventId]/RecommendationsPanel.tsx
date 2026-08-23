@@ -43,11 +43,17 @@ export default function RecommendationsPanel({
   eventId,
   pestSpecies,
   inventory,
+  isHomeGrower,
 }: {
   facilityId: string;
   eventId: string;
   pestSpecies: string;
   inventory: InventoryRow[];
+  // Simon's direct call (2026-08-22): home-grower accounts (single tent/
+  // multiple tents/single room) get plain "do this now" action language
+  // instead of the REI/PHI-hours framing -- commercial accounts keep the
+  // existing technical copy as-is.
+  isHomeGrower: boolean;
 }) {
   const [applying, setApplying] = useState<string | null>(null);
   const [applied, setApplied] = useState<Record<string, string>>({}); // name -> confirmation message
@@ -178,7 +184,7 @@ export default function RecommendationsPanel({
           <OptionRow
             kind="spectral"
             name={SPECTRAL_LIGHT_NAME}
-            sub={`REI 0h · PHI 0d · ${lightProtocol.schedule}`}
+            sub={isHomeGrower ? lightProtocol.schedule : `REI 0h · PHI 0d · ${lightProtocol.schedule}`}
             caution={`${lightProtocol.summary} No jurisdiction/legality gate applies -- it's a light fixture, not a registered pesticide.`}
             hideStock
           />
@@ -200,7 +206,13 @@ export default function RecommendationsPanel({
         <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
           <div className="label-mono pb-1">Beneficials</div>
           {beneficials.map((a) => (
-            <OptionRow key={a!.id} kind="biocontrol" name={a!.name} sub={`${a!.typicalRate} · reintro every ${a!.reintroDays}d`} caution={a!.notes} />
+            <OptionRow
+              key={a!.id}
+              kind="biocontrol"
+              name={a!.name}
+              sub={isHomeGrower ? `Release now, then again every ${a!.reintroDays} days` : `${a!.typicalRate} · reintro every ${a!.reintroDays}d`}
+              caution={a!.notes}
+            />
           ))}
         </div>
       )}
@@ -209,7 +221,17 @@ export default function RecommendationsPanel({
         <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
           <div className="label-mono pb-1">Pesticides</div>
           {pesticides.map((p) => (
-            <OptionRow key={p.id} kind={p.type === "chemical" ? "chemical" : "biopesticide"} name={p.name} sub={`REI ${p.reiHours}h · PHI ${p.phiDays}d`} caution={p.cautions} />
+            <OptionRow
+              key={p.id}
+              kind={p.type === "chemical" ? "chemical" : "biopesticide"}
+              name={p.name}
+              sub={
+                isHomeGrower
+                  ? `Wait ${p.reiHours}h before going back in, ${p.phiDays}d before harvest`
+                  : `REI ${p.reiHours}h · PHI ${p.phiDays}d`
+              }
+              caution={p.cautions}
+            />
           ))}
         </div>
       )}
