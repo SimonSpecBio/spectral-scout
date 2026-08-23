@@ -172,6 +172,18 @@ export default async function HomePage({
     .filter((e) => e.status === "active")
     .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
 
+  // Week-over-week rather than "vs last grow cycle" -- there's no cycle-
+  // start-date concept in the schema to compute that honestly, and the
+  // ticket's own alternative framing (week-over-week) needs nothing new.
+  // A real sense of momentum, especially for home growers who might not
+  // otherwise notice it, without inventing a number the app can't back up.
+  const WEEK_MS = 7 * DAY_MS;
+  const outbreaksThisWeek = events.filter((e) => Date.now() - e.createdAt.getTime() < WEEK_MS).length;
+  const outbreaksLastWeek = events.filter((e) => {
+    const age = Date.now() - e.createdAt.getTime();
+    return age >= WEEK_MS && age < 2 * WEEK_MS;
+  }).length;
+
   const eventSeverityById = new Map(active.map((e) => [e.id, e.severity]));
   const todaysFollowUps = active.filter((e) => needsFollowUp(e.createdAt));
   const resolvedToday = events.filter((e) => e.status === "resolved" && e.resolvedAt && isToday(e.resolvedAt));
@@ -421,11 +433,22 @@ export default async function HomePage({
         <div className="hidden sm:block">{desktopMapSection}</div>
       </div>
 
-      {events.length === 0 && (
+      {events.length === 0 ? (
         <Link href="/app/preventive" className="card flex items-center justify-between gap-3 p-4 text-sm">
           <span>New here? See a preventive starter checklist before your first pest shows up.</span>
           <span className="shrink-0 text-[var(--accent)]">View →</span>
         </Link>
+      ) : (
+        (outbreaksThisWeek > 0 || outbreaksLastWeek > 0) && (
+          <div className="card flex items-center gap-2 p-4 text-sm">
+            <span
+              style={{ color: outbreaksThisWeek < outbreaksLastWeek ? "var(--success)" : "var(--text)" }}
+            >
+              {outbreaksThisWeek} new {outbreaksThisWeek === 1 ? "outbreak" : "outbreaks"} this week
+            </span>
+            <span className="text-[var(--text-dim)]">vs {outbreaksLastWeek} last week</span>
+          </div>
+        )
       )}
 
       <section className="flex flex-col gap-3">
