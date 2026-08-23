@@ -10,6 +10,7 @@ import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
 import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
+import { thresholdSourceFor } from "@/lib/threshold-sources";
 import { findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
 import RecommendationsPanel from "./RecommendationsPanel";
 
@@ -427,6 +428,20 @@ export default function PestEventDetail({
           </div>
         </div>
       )}
+
+      {(() => {
+        const source = thresholdSourceFor(event.pestSpecies);
+        if (!source) return null;
+        const confidenceLabel = source.confidence === "n/a" ? "no direct threshold" : `${source.confidence} confidence`;
+        return (
+          <div className="px-1 text-xs text-[var(--text-faint)]">
+            Threshold basis ({confidenceLabel}): {source.basis}{" "}
+            <a href={source.sourceUrl} target="_blank" rel="noreferrer" className="underline">
+              Source
+            </a>
+          </div>
+        );
+      })()}
 
       <div className="flex gap-4 overflow-x-auto border-b border-[var(--border)]">
         {TABS.map((t) => (
