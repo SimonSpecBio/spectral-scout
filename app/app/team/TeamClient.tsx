@@ -19,6 +19,11 @@ interface Invite {
   createdAt: string;
 }
 
+// Matches the invite form's own Manager/Scout language (below) -- the
+// member list and pending-invite chip used to show the raw "owner"/"member"
+// role instead.
+const ROLE_LABEL: Record<"owner" | "member", string> = { owner: "Manager", member: "Scout" };
+
 function Avatar({ name, email }: { name: string | null; email: string }) {
   return (
     <span
@@ -95,7 +100,7 @@ export default function TeamClient({
             <Avatar name={m.name} email={m.email} />
             <div className="flex-1">
               <div className="text-sm">{m.name ?? m.email}</div>
-              <div className="label-mono">{m.role.toUpperCase()}</div>
+              <div className="label-mono">{ROLE_LABEL[m.role]}</div>
             </div>
             {isOwner && m.userId !== currentUserId && (
               <button onClick={() => removeMember(m)} className="text-xs text-[var(--danger)]">
@@ -114,7 +119,7 @@ export default function TeamClient({
               <div key={i.id} className="flex items-center justify-between p-3.5 text-sm">
                 <div>
                   <div>{i.email}</div>
-                  <div className="label-mono">{i.role.toUpperCase()}</div>
+                  <div className="label-mono">{ROLE_LABEL[i.role]}</div>
                 </div>
                 {isOwner && (
                   <button onClick={() => cancelInvite(i)} className="text-xs text-[var(--text-dim)]">

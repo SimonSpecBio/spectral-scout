@@ -20,10 +20,10 @@ export default function SubmitButton({
 }) {
   const className =
     variant === "floating"
-      ? "btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
+      ? "btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs whitespace-nowrap rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
       : variant === "compact"
-        ? "rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
-        : "rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50";
+        ? "shrink-0 whitespace-nowrap rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
+        : "whitespace-nowrap rounded-md bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50";
 
   return (
     <button type={onClick ? "button" : "submit"} onClick={onClick} disabled={disabled} className={className}>
