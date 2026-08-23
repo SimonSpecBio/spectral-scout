@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { INVENTORY_CATALOG, type CatalogEntry, type InventoryCategory } from "@/lib/inventory-catalog";
+import { OptionalStepper, Stepper } from "../Stepper";
 
 interface Item {
   id: string;
@@ -216,14 +217,7 @@ function RestockRow({ item, onRestock }: { item: Item; onRestock: (qty: number) 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <input
-          type="number"
-          inputMode="numeric"
-          min={1}
-          value={qty}
-          onChange={(e) => setQty(Number(e.target.value))}
-          className="w-16 rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs"
-        />
+        <Stepper value={qty} onChange={setQty} min={1} />
         <span className="text-xs text-[var(--text-dim)]">{item.unit}</span>
         <button onClick={() => onRestock(qty)} className="ml-auto rounded-md border border-[var(--border)] px-2.5 py-1 text-xs text-[var(--text-dim)]">
           Restock now
@@ -407,14 +401,7 @@ function AddFromCatalog({
       <div className="flex gap-2">
         <label className="flex flex-1 flex-col gap-1 text-xs text-[var(--text-dim)]">
           Quantity
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
-          />
+          <Stepper value={quantity} onChange={setQuantity} min={0} />
         </label>
         <label className="flex flex-1 flex-col gap-1 text-xs text-[var(--text-dim)]">
           Unit
@@ -427,14 +414,7 @@ function AddFromCatalog({
       </div>
       <label className="flex flex-col gap-1 text-xs text-[var(--text-dim)]">
         Reorder below (optional)
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          value={reorderLevel}
-          onChange={(e) => setReorderLevel(e.target.value === "" ? "" : Number(e.target.value))}
-          className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
-        />
+        <OptionalStepper value={reorderLevel} onChange={setReorderLevel} start={1} min={0} />
       </label>
       <button
         type="submit"

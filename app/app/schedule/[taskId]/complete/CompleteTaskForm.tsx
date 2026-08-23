@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
+import { Stepper } from "../../../Stepper";
 import SubmitButton from "../../../SubmitButton";
 
 const PRESETS = [5, 15, 30, 60];
@@ -41,25 +42,9 @@ export default function CompleteTaskForm({
           <span className="label-mono">Time spent</span>
           <span className="label-mono text-[var(--text-faint)]">FOR LABOUR TRACKING</span>
         </div>
-        <div className="flex items-center justify-center gap-6">
-          <button
-            type="button"
-            onClick={() => setMinutes((m) => Math.max(0, m - 5))}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-dim)]"
-          >
-            −
-          </button>
-          <div className="text-center">
-            <div className="text-3xl font-semibold tabular-nums">{minutes}</div>
-            <div className="label-mono">MINUTES</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setMinutes((m) => m + 5)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] text-[var(--text-dim)]"
-          >
-            +
-          </button>
+        <div className="flex items-center justify-center gap-3">
+          <Stepper value={minutes} onChange={setMinutes} min={0} step={5} />
+          <span className="label-mono">MINUTES</span>
         </div>
         <div className="flex gap-2">
           {PRESETS.map((p) => (
