@@ -86,6 +86,22 @@ export function onQueueChanged(cb: () => void): () => void {
   return () => window.removeEventListener(CHANGE_EVENT, cb);
 }
 
+// Lets PwaRegister's controllerchange handler defer its forced reload while
+// a capture form is mid-submit, instead of truncating it -- see that file's
+// comment. Module-level count rather than a boolean: overlapping calls
+// (a fast double-tap, or two forms submitting in different tabs sharing this
+// module) must not have the first one's completion clear a still-in-flight
+// second one.
+let inFlightMutations = 0;
+const MUTATION_EVENT = "spectral-mutation-inflight-changed";
+export function isMutationInFlight(): boolean {
+  return inFlightMutations > 0;
+}
+export function onMutationSettled(cb: () => void): () => void {
+  window.addEventListener(MUTATION_EVENT, cb);
+  return () => window.removeEventListener(MUTATION_EVENT, cb);
+}
+
 // Tries a real POST first. Only queues on an actual network failure (a
 // thrown fetch error) or when the browser already knows it's offline --
 // a real HTTP error response (validation, auth, 500) is returned as a
@@ -97,18 +113,24 @@ export async function queuedFetch(
   body: unknown,
   label: string
 ): Promise<{ ok: boolean; queued: boolean; data?: unknown }> {
-  if (typeof navigator !== "undefined" && navigator.onLine) {
-    try {
-      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (res.ok) return { ok: true, queued: false, data: await res.json() };
-      return { ok: false, queued: false };
-    } catch {
-      // network failure while the browser thought it was online (flaky
-      // signal) -- fall through and queue instead of surfacing an error.
+  inFlightMutations++;
+  try {
+    if (typeof navigator !== "undefined" && navigator.onLine) {
+      try {
+        const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        if (res.ok) return { ok: true, queued: false, data: await res.json() };
+        return { ok: false, queued: false };
+      } catch {
+        // network failure while the browser thought it was online (flaky
+        // signal) -- fall through and queue instead of surfacing an error.
+      }
     }
+    await enqueue(url, body, label);
+    return { ok: true, queued: true };
+  } finally {
+    inFlightMutations = Math.max(0, inFlightMutations - 1);
+    window.dispatchEvent(new Event(MUTATION_EVENT));
   }
-  await enqueue(url, body, label);
-  return { ok: true, queued: true };
 }
 
 // Guards against two overlapping flush runs -- a flaky connection flapping

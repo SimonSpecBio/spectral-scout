@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isMutationInFlight, onMutationSettled } from "@/lib/offline-queue";
 import { useToastStackPosition } from "@/lib/toast-stack";
 
 // Registers the service worker (INSTALL_PWA.md ยง2) and surfaces the
@@ -35,14 +36,31 @@ export default function PwaRegister() {
     });
 
     let refreshing = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
+    function doReload() {
       if (refreshing) return;
       refreshing = true;
       window.location.reload();
-    });
+    }
+    function handleControllerChange() {
+      if (refreshing) return;
+      // Don't truncate an in-progress capture-form submission (queuedFetch)
+      // just because a new service worker version claimed control in the
+      // background -- wait for it to settle, then reload.
+      if (!isMutationInFlight()) {
+        doReload();
+        return;
+      }
+      const unsubscribe = onMutationSettled(() => {
+        if (isMutationInFlight()) return;
+        unsubscribe();
+        doReload();
+      });
+    }
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
 
     return () => {
       reg = null;
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
     };
   }, []);
 
