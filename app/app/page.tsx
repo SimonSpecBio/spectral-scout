@@ -421,6 +421,13 @@ export default async function HomePage({
         <div className="hidden sm:block">{desktopMapSection}</div>
       </div>
 
+      {events.length === 0 && (
+        <Link href="/app/preventive" className="card flex items-center justify-between gap-3 p-4 text-sm">
+          <span>New here? See a preventive starter checklist before your first pest shows up.</span>
+          <span className="shrink-0 text-[var(--accent)]">View →</span>
+        </Link>
+      )}
+
       <section className="flex flex-col gap-3">
         <span className="label-mono">Attention required</span>
         {attention.length === 0 ? (
