@@ -122,6 +122,7 @@ export default async function PestEventPage({
           unit: i.unit,
           quantity: Number(i.quantity),
           reorderLevel: i.reorderLevel == null ? null : Number(i.reorderLevel),
+          unitCost: i.unitCost == null ? null : Number(i.unitCost),
         }))}
         thresholds={thresholds}
       />

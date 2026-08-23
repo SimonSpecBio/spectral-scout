@@ -21,6 +21,21 @@ export function matchInventoryStock(
   return "in_stock";
 }
 
+// A budget-conscious grower deciding before buying, not after (theorizing
+// pass #3) -- only ever the grower's own real inventory cost, never a
+// fabricated catalog-wide default: prices vary too much by supplier/region/
+// bulk discount to responsibly invent one, and inventoryItems.unitCost is
+// already real, sourced data once a grower sets it (see the inventory cost
+// ticket). No data = no estimate shown, not a guessed number.
+export function costPerUnit(
+  name: string,
+  items: { name: string; unit: string; unitCost: number | null }[]
+): { unitCost: number; unit: string } | null {
+  const item = items.find((i) => i.name.toLowerCase() === name.toLowerCase());
+  if (!item || item.unitCost == null) return null;
+  return { unitCost: item.unitCost, unit: item.unit };
+}
+
 export interface FollowUpSuggestion {
   id: string;
   label: string;

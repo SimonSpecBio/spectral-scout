@@ -88,7 +88,7 @@ export default function PestEventDetail({
   initialMonitoring: MonitoringSession[];
   initialComments: Comment[];
   currentUserId: string;
-  inventoryItems: { id: string; name: string; unit: string; quantity: number; reorderLevel: number | null }[];
+  inventoryItems: { id: string; name: string; unit: string; quantity: number; reorderLevel: number | null; unitCost: number | null }[];
   thresholds: SpeciesThresholds;
   followUpSuggestions: FollowUpSuggestion[];
   initialTab?: string;
@@ -478,7 +478,7 @@ export default function PestEventDetail({
           facilityId={facilityId}
           eventId={event.id}
           pestSpecies={event.pestSpecies}
-          inventory={inventoryItems.map((i) => ({ name: i.name, quantity: i.quantity, reorderLevel: i.reorderLevel ?? null }))}
+          inventory={inventoryItems.map((i) => ({ name: i.name, quantity: i.quantity, reorderLevel: i.reorderLevel ?? null, unit: i.unit, unitCost: i.unitCost }))}
         />
       )}
 

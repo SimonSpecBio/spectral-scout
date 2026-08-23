@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { matchInventoryStock, type StockStatus } from "@/lib/recommendations";
+import { costPerUnit, matchInventoryStock, type StockStatus } from "@/lib/recommendations";
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { AGENTS, findPestProgram, PRODUCTS } from "@/lib/treatments-catalog";
 
@@ -20,6 +20,8 @@ interface InventoryRow {
   name: string;
   quantity: number;
   reorderLevel: number | null;
+  unit: string;
+  unitCost: number | null;
 }
 
 // The recommendation engine's UI (TREATMENTS.md/SCHEDULING.md): a Pest/
@@ -103,12 +105,16 @@ export default function RecommendationsPanel({
     hideStock?: boolean;
   }) {
     const stock = matchInventoryStock(name, inventory);
+    const cost = costPerUnit(name, inventory);
     return (
       <div className="flex flex-col gap-1.5 py-3">
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="text-sm">{name}</div>
-            <div className="label-mono">{sub}</div>
+            <div className="label-mono">
+              {sub}
+              {cost && ` · ~$${cost.unitCost.toFixed(2)}/${cost.unit}`}
+            </div>
           </div>
           {!hideStock && (
             <span className="label-mono shrink-0" style={{ color: STOCK_COLOR[stock] }}>
