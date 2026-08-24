@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { facilityAreas, taskTypeEnum, tasks } from "@/db/schema";
+import { facilityAreas, memberships, taskTypeEnum, tasks } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { getOwnedPestEvent } from "@/lib/pest-events";
@@ -75,6 +75,22 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Assigning to someone else is owner-only, same restriction the PATCH
+  // route already enforces for reassignment (ticket 99 -- this POST route
+  // hadn't been checking it at all). Also verify the assignee is actually a
+  // member of the caller's org, not just any user id -- neither route
+  // checked that before.
+  let assigneeUserId: string | null = null;
+  if (typeof body.assigneeUserId === "string") {
+    if (session.membershipRole !== "owner") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const [member] = await db
+      .select()
+      .from(memberships)
+      .where(and(eq(memberships.userId, body.assigneeUserId), eq(memberships.organizationId, session.organizationId!)));
+    if (!member) return NextResponse.json({ error: "assigneeUserId is not a member of this organization" }, { status: 400 });
+    assigneeUserId = body.assigneeUserId;
+  }
+
   const [row] = await db
     .insert(tasks)
     .values({
@@ -86,7 +102,7 @@ export async function POST(request: NextRequest) {
       pestEventId,
       x,
       y,
-      assigneeUserId: typeof body.assigneeUserId === "string" ? body.assigneeUserId : null,
+      assigneeUserId,
       createdByUserId: session.user!.id!,
       source: "manual",
       dueAt,

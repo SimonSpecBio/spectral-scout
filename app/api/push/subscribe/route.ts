@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { pushSubscriptions } from "@/db/schema";
@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
 
 // Unsubscribing (permission revoked, or the user toggled it off) removes
 // this device's row outright -- there's no "disabled but remembered" state,
-// since re-enabling just re-subscribes and upserts fresh.
+// since re-enabling just re-subscribes and upserts fresh. Scoped to the
+// caller's own userId (ticket 100 -- this previously deleted by endpoint
+// alone with no ownership check at all).
 export async function DELETE(request: NextRequest) {
   const session = await requireGrowerSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,6 +37,6 @@ export async function DELETE(request: NextRequest) {
   const endpoint = typeof body.endpoint === "string" ? body.endpoint : null;
   if (!endpoint) return NextResponse.json({ error: "endpoint is required" }, { status: 400 });
 
-  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.endpoint, endpoint), eq(pushSubscriptions.userId, session.user!.id!)));
   return NextResponse.json({ ok: true });
 }

@@ -1,7 +1,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { eventKindEnum, facilityAreas, inventoryItems, pestEvents, scoutingObservations, severityEnum, tasks } from "@/db/schema";
+import { eventKindEnum, facilityAreas, facilityMapObjects, inventoryItems, pestEvents, scoutingObservations, severityEnum, tasks } from "@/db/schema";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
@@ -53,12 +53,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (area) facilityAreaId = area.id;
   }
 
+  // Same re-verification as facilityAreaId above (ticket 101 -- this
+  // previously trusted the client-supplied id with only a type check).
+  // facilityMapObjects belongs to an area, not the facility directly, so
+  // it's only ever trusted once facilityAreaId itself has already been
+  // confirmed to belong to this facility.
+  let mapObjectId: string | null = null;
+  if (typeof body.mapObjectId === "string" && facilityAreaId) {
+    const [mapObject] = await db
+      .select()
+      .from(facilityMapObjects)
+      .where(and(eq(facilityMapObjects.id, body.mapObjectId), eq(facilityMapObjects.facilityAreaId, facilityAreaId)));
+    if (mapObject) mapObjectId = mapObject.id;
+  }
+
   const [row] = await db
     .insert(pestEvents)
     .values({
       facilityId: id,
       facilityAreaId,
-      mapObjectId: typeof body.mapObjectId === "string" ? body.mapObjectId : null,
+      mapObjectId,
       x: typeof body.x === "number" ? body.x : null,
       y: typeof body.y === "number" ? body.y : null,
       kind,
