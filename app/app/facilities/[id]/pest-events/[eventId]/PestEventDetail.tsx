@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
@@ -78,6 +78,7 @@ export default function PestEventDetail({
   initialTab,
   isHomeGrower,
   orgState,
+  isPilotTier,
 }: {
   facilityId: string;
   event: Event;
@@ -95,6 +96,10 @@ export default function PestEventDetail({
   initialTab?: string;
   isHomeGrower: boolean;
   orgState: string | null;
+  // "Ask a person" (ticket 96) is pilot-tier only -- lib/consent.ts's
+  // free-tier promise means staff never see a general-tier event, so the
+  // button itself is hidden rather than shown-then-rejected.
+  isPilotTier: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab && (TABS as readonly string[]).includes(initialTab) ? (initialTab as Tab) : "timeline");
@@ -103,6 +108,11 @@ export default function PestEventDetail({
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [escalation, setEscalation] = useState<{ note: string | null; createdAt: string; resolvedAt: string | null; staffResponse: string | null } | null>(null);
+  const [showEscalateConfirm, setShowEscalateConfirm] = useState(false);
+  const [escalateNote, setEscalateNote] = useState("");
+  const [escalating, setEscalating] = useState(false);
+  const [escalateError, setEscalateError] = useState<string | null>(null);
   const [treatmentsList, setTreatmentsList] = useState(initialTreatments);
   const [photos, setPhotos] = useState(initialPhotos);
   const [comments, setComments] = useState(initialComments);
@@ -232,6 +242,39 @@ export default function PestEventDetail({
   async function revokeShareLinks() {
     await fetch(`${base}/share-links`, { method: "DELETE" });
     setShareLink(null);
+  }
+
+  useEffect(() => {
+    if (!isPilotTier) return;
+    fetch(`${base}/escalate`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setEscalation(data?.escalation ?? null))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPilotTier]);
+
+  async function submitEscalation() {
+    setEscalating(true);
+    setEscalateError(null);
+    try {
+      const res = await fetch(`${base}/escalate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: escalateNote.trim() || null }),
+      });
+      if (res.ok) {
+        const row = await res.json();
+        setEscalation(row);
+        setShowEscalateConfirm(false);
+        setEscalateNote("");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setEscalateError(data.error ?? "Couldn't send this to our team. Check your connection and try again.");
+      }
+    } catch {
+      setEscalateError("Couldn't send this to our team. Check your connection and try again.");
+    }
+    setEscalating(false);
   }
 
   async function copyShareLink() {
@@ -368,8 +411,60 @@ export default function PestEventDetail({
           <button onClick={createShareLink} disabled={sharing} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)] disabled:opacity-50">
             {sharing ? "…" : "Share"}
           </button>
+          {isPilotTier && !escalation && (
+            <button
+              onClick={() => setShowEscalateConfirm(true)}
+              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]"
+            >
+              Ask a person
+            </button>
+          )}
         </div>
       </div>
+
+      {showEscalateConfirm && (
+        <div className="card flex flex-col gap-3 p-3.5">
+          <div className="text-sm">
+            This shares this event -- species, severity, photos, and notes -- with Spectral&rsquo;s team for review. They&rsquo;ll follow up here once
+            they&rsquo;ve looked at it.
+          </div>
+          <textarea
+            value={escalateNote}
+            onChange={(e) => setEscalateNote(e.target.value)}
+            placeholder="What would you like a person to weigh in on? (optional)"
+            rows={2}
+            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={submitEscalation}
+              disabled={escalating}
+              className="rounded-md border border-[var(--accent)] px-3 py-1.5 text-sm text-[var(--accent)] disabled:opacity-50"
+            >
+              {escalating ? "Sending…" : "Send to Spectral"}
+            </button>
+            <button onClick={() => setShowEscalateConfirm(false)} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {escalateError && (
+        <div className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
+          {escalateError}
+          <button type="button" onClick={() => setEscalateError(null)} className="shrink-0 text-[var(--text-dim)]">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {escalation && (
+        <div className="card flex flex-col gap-1 p-3.5">
+          <div className="label-mono">{escalation.resolvedAt ? "Reviewed by Spectral" : "Flagged for review -- Spectral will follow up here"}</div>
+          {escalation.staffResponse && <div className="text-sm">{escalation.staffResponse}</div>}
+        </div>
+      )}
 
       {shareError && (
         <div

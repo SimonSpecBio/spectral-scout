@@ -386,6 +386,48 @@ export const shareLinks = pgTable(
   ]
 ).enableRLS();
 
+// "Ask a person" (ticket 96) -- a grower flags one pest event for a human
+// Spectral agronomist to look at, instead of relying only on the app's own
+// recommendation engine. PILOT-TIER ORGS ONLY (enforced in the API route,
+// not just here): lib/consent.ts's free-tier promise is explicit and
+// absolute -- "staff-facing screens never surface your organization-
+// identifiable data" -- and pilot is the tier where staff already have a
+// consented full-data relationship (same lib/session.ts's
+// canStaffViewOrgDetail() gate app/staff/page.tsx already enforces). Giving
+// general-tier growers this button too would mean either quietly breaking
+// that promise or bolting on a new per-action consent flow -- a real
+// product/legal call for Simon to make deliberately, not something to
+// invent a workaround for here. This table has no tier column of its own on
+// purpose: every read path re-derives eligibility from the organization's
+// current accountTier via a join, so a tier ever changing later is
+// reflected automatically rather than needing a backfill.
+export const escalations = pgTable(
+  "scout_escalation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    pestEventId: uuid("pest_event_id")
+      .notNull()
+      .references(() => pestEvents.id, { onDelete: "cascade" }),
+    requestedByUserId: uuid("requested_by_user_id").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    // The resolving staff member's own auth user id (session.user.id) --
+    // staff sign in through the same scout_user table as growers (auth.ts,
+    // role decided by email allowlist), so this is scout_user.id, not
+    // scout_staff.id, matched-by-value same as every other *UserId column.
+    resolvedByStaffId: uuid("resolved_by_staff_id"),
+    staffResponse: text("staff_response"),
+  },
+  (table) => [
+    index("scout_escalation_pest_event_id_idx").on(table.pestEventId),
+    index("scout_escalation_organization_id_idx").on(table.organizationId),
+  ]
+).enableRLS();
+
 // A browser's Web Push subscription (ticket 91) -- one row per device a
 // user has enabled notifications on, not per user (the same person can
 // subscribe from a phone and a laptop). Matched-by-value against

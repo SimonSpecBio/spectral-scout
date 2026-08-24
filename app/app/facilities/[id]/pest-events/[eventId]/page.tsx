@@ -115,6 +115,7 @@ export default async function PestEventPage({
         currentUserId={session.user!.id!}
         isHomeGrower={isHomeGrower(session.growerType)}
         orgState={session.organizationState}
+        isPilotTier={session.accountTier === "pilot"}
         initialMonitoring={monitoringSessions.flatMap((s) => {
           const metric = sessionMetric(s);
           return metric ? [{ id: s.id, date: s.date, metricKind: metric.kind, value: metric.value }] : [];

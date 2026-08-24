@@ -13,7 +13,7 @@
 // the offline capture queue (lib/offline-queue.ts, app-layer IndexedDB,
 // not this file) is what actually guarantees "nothing is lost in a dead
 // zone" for scouting/trap/treatment submissions.
-const VERSION = "v2";
+const VERSION = "v3";
 const CACHE_NAME = `spectral-scout-${VERSION}`;
 const APP_SHELL = ["/offline", "/manifest.webmanifest", "/favicon.png", "/icons/icon-192.png", "/icons/icon-512.png"];
 
@@ -86,6 +86,18 @@ self.addEventListener("fetch", (event) => {
   // these never change without a deploy.
   if (url.pathname.startsWith("/icons/") || url.pathname === "/manifest.webmanifest" || url.pathname === "/favicon.png") {
     event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
+    return;
+  }
+
+  // Escalation status (ticket 96) is a one-shot "did a person get back to
+  // me yet" check -- stale-while-revalidate's whole point is fine staleness
+  // for map/events/tasks data, but here it actively lies (a grower reloading
+  // right after staff resolves their request would still see "pending" from
+  // the stale cache entry, with no second trigger to ever re-check). Always
+  // go to the network for this one path instead of the generic /api/ branch
+  // below.
+  if (url.pathname.endsWith("/escalate")) {
+    event.respondWith(fetch(request));
     return;
   }
 
