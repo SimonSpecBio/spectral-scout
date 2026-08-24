@@ -37,10 +37,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     contentType: file.type,
   });
 
-  const [row] = await db
-    .update(facilityAreas)
-    .set({ backgroundImageUrl: blob.url, updatedAt: new Date() })
-    .where(eq(facilityAreas.id, areaId))
-    .returning();
-  return NextResponse.json(row);
+  await db.update(facilityAreas).set({ backgroundImageUrl: blob.url, updatedAt: new Date() }).where(eq(facilityAreas.id, areaId));
+  // Neither caller (MapEditor's own upload button, LayoutPicker's Tier-2
+  // option) reads the response body, only res.ok -- returning the full
+  // updated row was throwing "Value is not JSON serializable" in dev for
+  // reasons unrelated to the actual row content (the DB write itself always
+  // succeeded), so this returns the minimum both callers actually need.
+  return NextResponse.json({ backgroundImageUrl: blob.url });
 }

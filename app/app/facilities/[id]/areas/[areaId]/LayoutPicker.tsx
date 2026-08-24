@@ -54,7 +54,34 @@ export default function LayoutPicker({ facilityId, areaId }: { facilityId: strin
   const [count, setCount] = useState(2);
   const [secondary, setSecondary] = useState(4);
   const [generating, setGenerating] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tier 2: a real photo/floor-plan/satellite image with pins dropped
+  // directly on it, no preset grid at all -- reuses the same background-
+  // upload endpoint MapEditor's "edit" mode already has, just reachable
+  // before any zones exist too, since the old gate (objects.length === 0)
+  // would otherwise force every area through a Tier-1 preset first even
+  // for a grower who has a real photo ready to go.
+  async function uploadPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const res = await fetch(`/api/facilities/${facilityId}/areas/${areaId}/background`, { method: "POST", body: form });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        setError("Couldn't upload that photo. Check your connection and try again.");
+      }
+    } catch {
+      setError("Couldn't upload that photo. Check your connection and try again.");
+    }
+    setUploading(false);
+  }
 
   async function generate() {
     if (!preset) return;
@@ -164,6 +191,17 @@ export default function LayoutPicker({ facilityId, areaId }: { facilityId: strin
       <SubmitButton disabled={!preset || generating} onClick={generate} variant="compact">
         {generating ? "Setting up…" : "Generate layout"}
       </SubmitButton>
+
+      <div className="flex items-center gap-3 text-xs text-[var(--text-dim)]">
+        <div className="h-px flex-1 bg-[var(--border)]" />
+        or
+        <div className="h-px flex-1 bg-[var(--border)]" />
+      </div>
+
+      <label className="cursor-pointer self-start rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--text-dim)]">
+        {uploading ? "Uploading…" : "Upload a real photo or floor plan instead"}
+        <input type="file" accept="image/*" className="hidden" onChange={uploadPhoto} disabled={uploading} />
+      </label>
     </div>
   );
 }

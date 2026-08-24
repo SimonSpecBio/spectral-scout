@@ -40,7 +40,7 @@ export default async function AreaMapPage({ params }: { params: Promise<{ id: st
         <h1 className="text-2xl font-semibold">{area.name}</h1>
       </div>
 
-      {objects.length === 0 ? (
+      {objects.length === 0 && !area.backgroundImageUrl ? (
         <LayoutPicker facilityId={id} areaId={area.id} />
       ) : (
       <MapEditor
