@@ -347,6 +347,38 @@ export const pestEvents = pgTable(
   ]
 ).enableRLS();
 
+// A scoped, read-only public link -- "gives pilot-tier orgs a clean way to
+// loop in a Spectral consultant without a full account" (product feature
+// plan, standard-build tier), scoped to a single pest event for v1 (a
+// date-range digest is a reasonable v2, not built here). token is a
+// separate unguessable value from `id` specifically so the id can stay a
+// normal sequential-lookup UUID without doubling as the secret in a public
+// URL. Resolved by a route outside proxy.ts's /app/* gate entirely
+// (app/share/[token]/page.tsx at the root, not under /app) rather than
+// carving an exception into that gate -- simpler and harder to accidentally
+// widen later. Expires by default (30 days) -- never a forever-live link.
+export const shareLinks = pgTable(
+  "scout_share_link",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    pestEventId: uuid("pest_event_id")
+      .notNull()
+      .references(() => pestEvents.id, { onDelete: "cascade" }),
+    createdByUserId: uuid("created_by_user_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("scout_share_link_pest_event_id_idx").on(table.pestEventId),
+    index("scout_share_link_token_idx").on(table.token),
+  ]
+).enableRLS();
+
 // Replaces the single shared freeform `notes` field above with a real,
 // append-only thread -- a multi-person crew working the same event over
 // days previously had no way to tell who said what, when. `notes` itself

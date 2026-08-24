@@ -97,6 +97,10 @@ export default function PestEventDetail({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab && (TABS as readonly string[]).includes(initialTab) ? (initialTab as Tab) : "timeline");
   const [status, setStatus] = useState(event.status);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [treatmentsList, setTreatmentsList] = useState(initialTreatments);
   const [photos, setPhotos] = useState(initialPhotos);
   const [comments, setComments] = useState(initialComments);
@@ -202,6 +206,39 @@ export default function PestEventDetail({
     if (res.ok) {
       setStatus(next);
       router.refresh();
+    }
+  }
+
+  async function createShareLink() {
+    setSharing(true);
+    setShareError(null);
+    try {
+      const res = await fetch(`${base}/share-links`, { method: "POST" });
+      if (res.ok) {
+        const row = await res.json();
+        setShareLink(`${window.location.origin}/share/${row.token}`);
+        setCopied(false);
+      } else {
+        setShareError("Couldn't create a share link. Check your connection and try again.");
+      }
+    } catch {
+      setShareError("Couldn't create a share link. Check your connection and try again.");
+    }
+    setSharing(false);
+  }
+
+  async function revokeShareLinks() {
+    await fetch(`${base}/share-links`, { method: "DELETE" });
+    setShareLink(null);
+  }
+
+  async function copyShareLink() {
+    if (!shareLink) return;
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setCopied(true);
+    } catch {
+      /* clipboard unavailable -- the link is still shown for manual copy */
     }
   }
 
@@ -326,8 +363,38 @@ export default function PestEventDetail({
           >
             {status === "active" ? "Mark resolved" : "Reopen"}
           </button>
+          <button onClick={createShareLink} disabled={sharing} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)] disabled:opacity-50">
+            {sharing ? "…" : "Share"}
+          </button>
         </div>
       </div>
+
+      {shareError && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
+          style={{ background: "var(--danger-bg)", color: "var(--danger)" }}
+        >
+          {shareError}
+          <button type="button" onClick={() => setShareError(null)} className="shrink-0 text-[var(--text-dim)]">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {shareLink && (
+        <div className="card flex flex-col gap-2 p-3.5">
+          <div className="label-mono">Read-only link -- expires in 30 days</div>
+          <div className="flex items-center gap-2">
+            <input readOnly value={shareLink} className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-xs" />
+            <button onClick={copyShareLink} className="shrink-0 rounded-md border border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--text-dim)]">
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <button onClick={revokeShareLinks} className="self-start text-xs text-[var(--danger)]">
+            Revoke access
+          </button>
+        </div>
+      )}
 
       {status === "active" && quickLog && (
         <button
