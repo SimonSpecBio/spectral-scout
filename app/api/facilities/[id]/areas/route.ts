@@ -1,34 +1,9 @@
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { areaKindEnum, facilityAreas, facilityMapObjects } from "@/db/schema";
+import { areaKindEnum, facilityAreas } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
-
-// Same 900x600 canvas MapEditor.tsx uses -- a fresh area starts with a 2x2
-// grid of default zones instead of a blank canvas, so there's something to
-// rename/resize immediately rather than nothing at all.
-const CANVAS_WIDTH = 900;
-const CANVAS_HEIGHT = 600;
-function defaultZones(areaId: string) {
-  const margin = 20;
-  const gap = 20;
-  const w = (CANVAS_WIDTH - margin * 2 - gap) / 2;
-  const h = (CANVAS_HEIGHT - margin * 2 - gap) / 2;
-  const positions = [
-    { x: margin, y: margin },
-    { x: margin + w + gap, y: margin },
-    { x: margin, y: margin + h + gap },
-    { x: margin + w + gap, y: margin + h + gap },
-  ];
-  return positions.map((pos, i) => ({
-    facilityAreaId: areaId,
-    shapeType: "rect" as const,
-    geometry: { x: pos.x, y: pos.y, width: w, height: h },
-    label: `Zone ${i + 1}`,
-    zIndex: 0,
-  }));
-}
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireGrowerSession();
@@ -55,6 +30,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
   const kind = areaKindEnum.enumValues.includes(body.kind) ? body.kind : "other";
 
+  // A fresh area starts with zero map objects on purpose (ticket 102,
+  // reverting the old pre-map-redesign default-2x2-grid behavior) -- Tier 1
+  // of the map redesign (LayoutPicker.tsx) only renders its preset picker
+  // and photo/floor-plan upload option when objects.length === 0, so
+  // pre-populating zones here made that entire feature unreachable.
   const [row] = await db
     .insert(facilityAreas)
     .values({
@@ -64,8 +44,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       cropType: typeof body.cropType === "string" && body.cropType ? body.cropType : null,
     })
     .returning();
-
-  await db.insert(facilityMapObjects).values(defaultZones(row.id));
 
   return NextResponse.json(row);
 }

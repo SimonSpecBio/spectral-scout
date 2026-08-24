@@ -235,7 +235,7 @@ export const PRODUCTS: Product[] = [
 export const PESTS: PestProgram[] = [
   {
     id: "pest_tssm", commonName: "Two-spotted spider mite", latin: "Tetranychus urticae", kind: "pest",
-    preventive: ["Scout undersides weekly (hand lens)", "Keep humidity up / avoid hot-dry stress", "Release ag_californicus or ag_andersoni preventively"],
+    preventive: ["Scout undersides weekly (hand lens)", "Keep humidity up / avoid hot-dry stress", "Release Neoseiulus californicus or Amblyseius andersoni preventively"],
     primaryBiocontrol: ["ag_persimilis", "ag_feltiella"],
     biopesticideRotation: ["pr_insecticidal_soap", "pr_hort_oil", "pr_beauveria"],
     cultural: ["Remove/bag heavily webbed leaves", "Spot-isolate hotspots"],
@@ -252,7 +252,7 @@ export const PESTS: PestProgram[] = [
   },
   {
     id: "pest_broadmite", commonName: "Broad / hemp russet mite", latin: "Polyphagotarsonemus latus / Aculops cannabicola", kind: "pest",
-    preventive: ["Inspect new growth (30-60x scope)", "Quarantine incoming clones", "Preventive ag_swirskii / ag_andersoni"],
+    preventive: ["Inspect new growth (30-60x scope)", "Quarantine incoming clones", "Preventive Amblyseius swirskii / Amblyseius andersoni"],
     primaryBiocontrol: ["ag_swirskii", "ag_cucumeris"],
     biopesticideRotation: ["pr_sulfur", "pr_hort_oil", "pr_isaria"],
     cultural: ["Cull severely distorted tips", "Isolate infested plants"],
@@ -262,7 +262,7 @@ export const PESTS: PestProgram[] = [
   },
   {
     id: "pest_thrips", commonName: "Western flower thrips", latin: "Frankliniella occidentalis", kind: "pest",
-    preventive: ["Blue sticky cards for monitoring", "Preventive ag_cucumeris / ag_swirskii sachets", "ag_steinernema or ag_stratiolaelaps for soil pupae"],
+    preventive: ["Blue sticky cards for monitoring", "Preventive Neoseiulus cucumeris / Amblyseius swirskii sachets", "Steinernema feltiae or Stratiolaelaps scimitus for soil pupae"],
     primaryBiocontrol: ["ag_swirskii", "ag_orius", "ag_cucumeris"],
     biopesticideRotation: ["pr_beauveria", "pr_spinosad", "pr_insecticidal_soap"],
     cultural: ["Mass-trap with blue cards", "Remove weeds/flowering hosts"],
@@ -272,7 +272,7 @@ export const PESTS: PestProgram[] = [
   },
   {
     id: "pest_aphid", commonName: "Aphids (green peach / cannabis aphid)", latin: "Myzus persicae / Phorodon cannabis", kind: "pest",
-    preventive: ["Yellow cards", "Banker plants for ag_aphidius_col", "Scout growing tips + undersides"],
+    preventive: ["Yellow cards", "Banker plants for Aphidius colemani", "Scout growing tips + undersides"],
     primaryBiocontrol: ["ag_aphidius_col", "ag_aphidoletes", "ag_lacewing"],
     biopesticideRotation: ["pr_insecticidal_soap", "pr_hort_oil", "pr_beauveria"],
     cultural: ["Squash/prune hotspot colonies", "Remove alate sources"],
@@ -282,7 +282,7 @@ export const PESTS: PestProgram[] = [
   },
   {
     id: "pest_whitefly", commonName: "Whitefly", latin: "Trialeurodes vaporariorum / Bemisia tabaci", kind: "pest",
-    preventive: ["Yellow cards", "Preventive ag_encarsia / ag_swirskii", "Screen intakes; inspect clones"],
+    preventive: ["Yellow cards", "Preventive Encarsia formosa / Amblyseius swirskii", "Screen intakes; inspect clones"],
     primaryBiocontrol: ["ag_encarsia", "ag_eretmocerus", "ag_delphastus", "ag_swirskii"],
     biopesticideRotation: ["pr_beauveria", "pr_isaria", "pr_insecticidal_soap", "pr_hort_oil"],
     cultural: ["Remove heavily infested lower leaves", "Mass-trap"],
@@ -300,7 +300,7 @@ export const PESTS: PestProgram[] = [
   },
   {
     id: "pest_fungusgnat", commonName: "Fungus gnats", latin: "Bradysia spp.", kind: "pest",
-    preventive: ["Yellow cards at media level", "Avoid overwatering / allow dry-back", "Preventive ag_stratiolaelaps + ag_steinernema"],
+    preventive: ["Yellow cards at media level", "Avoid overwatering / allow dry-back", "Preventive Stratiolaelaps scimitus + Steinernema feltiae"],
     primaryBiocontrol: ["ag_stratiolaelaps", "ag_steinernema", "ag_dalotia"],
     biopesticideRotation: ["pr_bti"],
     cultural: ["Dry media surface", "Fix leaks/algae", "Cover drains"],
@@ -320,7 +320,7 @@ export const PESTS: PestProgram[] = [
   },
   {
     id: "path_pm", commonName: "Powdery mildew", latin: "Golovinomyces / Podosphaera spp.", kind: "pathogen",
-    preventive: ["Airflow + VPD/humidity control", "Resistant genetics", "Preventive pr_bacillus_sub or pr_sulfur (veg only)"],
+    preventive: ["Airflow + VPD/humidity control", "Resistant genetics", "Preventive Bacillus subtilis / amyloliquefaciens or sulfur (veg only)"],
     primaryBiocontrol: [],
     biopesticideRotation: ["pr_kbicarb", "pr_bacillus_sub", "pr_sulfur", "pr_hort_oil"],
     cultural: ["Remove/bag infected leaves", "Increase spacing/airflow", "Lower RH"],
@@ -337,7 +337,7 @@ export const PESTS: PestProgram[] = [
   },
   {
     id: "path_botrytis", commonName: "Botrytis / gray mold (bud rot)", latin: "Botrytis cinerea", kind: "pathogen",
-    preventive: ["RH <50% in flower + airflow", "Defoliate/open canopy", "Preventive pr_bacillus_sub or ag_clonostachys"],
+    preventive: ["RH <50% in flower + airflow", "Defoliate/open canopy", "Preventive Bacillus subtilis / amyloliquefaciens or Clonostachys rosea"],
     primaryBiocontrol: ["ag_clonostachys"],
     biopesticideRotation: ["pr_bacillus_sub"],
     cultural: ["Remove + bag infected buds immediately (don't shake spores)", "Drop RH", "Increase airflow", "Reduce wounding"],
@@ -361,7 +361,7 @@ export const PESTS: PestProgram[] = [
   },
   {
     id: "path_rootrot", commonName: "Root rot complex (Pythium / Fusarium)", latin: "Pythium spp. / Fusarium spp.", kind: "pathogen",
-    preventive: ["Root-zone O2 + temp control (<22C res)", "Clean water (UV/filtration)", "Preventive ag_trichoderma / Bacillus inoculant", "Sanitation of media/tools/reservoirs"],
+    preventive: ["Root-zone O2 + temp control (<22C res)", "Clean water (UV/filtration)", "Preventive Trichoderma harzianum/atroviride / Bacillus inoculant", "Sanitation of media/tools/reservoirs"],
     primaryBiocontrol: ["ag_trichoderma"],
     biopesticideRotation: ["pr_bacillus_sub", "pr_h2o2"],
     cultural: ["Isolate/cull collapsed plants", "Sanitize reservoir + lines", "Correct overwatering/low O2"],
