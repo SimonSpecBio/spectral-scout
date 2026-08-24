@@ -6,6 +6,7 @@ import { facilityAreas, facilityMapObjects, pestEvents } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
 import { computeEventSignals } from "@/lib/pest-event-signals";
 import { requireGrowerSession } from "@/lib/session";
+import LayoutPicker from "./LayoutPicker";
 import MapEditor from "./MapEditorClient";
 
 export default async function AreaMapPage({ params }: { params: Promise<{ id: string; areaId: string }> }) {
@@ -39,6 +40,9 @@ export default async function AreaMapPage({ params }: { params: Promise<{ id: st
         <h1 className="text-2xl font-semibold">{area.name}</h1>
       </div>
 
+      {objects.length === 0 ? (
+        <LayoutPicker facilityId={id} areaId={area.id} />
+      ) : (
       <MapEditor
         facilityId={id}
         area={{
@@ -68,6 +72,7 @@ export default async function AreaMapPage({ params }: { params: Promise<{ id: st
           trend: signals.get(ev.id)?.trend ?? null,
         }))}
       />
+      )}
     </div>
   );
 }
