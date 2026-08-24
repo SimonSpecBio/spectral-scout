@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { costPerUnit, matchInventoryStock, type StockStatus } from "@/lib/recommendations";
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
-import { AGENTS, findPestProgram, PRODUCTS } from "@/lib/treatments-catalog";
+import { AGENTS, findPestProgram, legalityFor, PRODUCTS } from "@/lib/treatments-catalog";
 
 const STOCK_LABEL: Record<StockStatus, string> = { in_stock: "IN STOCK", low: "LOW STOCK", out: "OUT OF STOCK", unknown: "NOT IN INVENTORY" };
 const STOCK_COLOR: Record<StockStatus, string> = {
@@ -34,16 +34,22 @@ interface InventoryRow {
 // keeps driving REI/PHI accuracy and the "verify legality" warning, it's
 // only the outward grouping that collapsed to one "Pesticides" list, sorted
 // with restricted/uncertain-legality items last and each carrying its own
-// inline warning rather than one banner behind a toggle. No jurisdiction/
-// crop approved-list gate exists yet (see lib/treatments-catalog.ts's
-// comment) -- this is pre-launch, real compliance work still needs to land
-// before this is public.
+// inline warning rather than one banner behind a toggle. A real per-state
+// (CO/CA/OR) legality gate now exists (ticket 68, lib/treatments-catalog.ts's
+// legalityFor()) for the subset of products with sourced per-state research
+// -- a confirmed "not_legal" hides the option outright, same as `restricted`;
+// "unclear"/"not_confirmed" surface as an inline caution instead of a block,
+// since those mean "not yet confirmed," not "banned." Products with no
+// cannabisLegalStatus data at all (the original 12) are ungated by this and
+// keep relying on `restricted` alone -- this is pre-launch, real compliance
+// work still needs to land before this is public.
 export default function RecommendationsPanel({
   facilityId,
   eventId,
   pestSpecies,
   inventory,
   isHomeGrower,
+  orgState,
 }: {
   facilityId: string;
   eventId: string;
@@ -54,6 +60,10 @@ export default function RecommendationsPanel({
   // instead of the REI/PHI-hours framing -- commercial accounts keep the
   // existing technical copy as-is.
   isHomeGrower: boolean;
+  // 2-letter USPS code or null (pre-onboarding / unset). Only CO/CA/OR have
+  // sourced legality data today -- legalityFor() returns null for any other
+  // state, so the gate simply doesn't apply rather than guessing.
+  orgState: string | null;
 }) {
   const [applying, setApplying] = useState<string | null>(null);
   const [applied, setApplied] = useState<Record<string, string>>({}); // name -> confirmation message
@@ -154,11 +164,13 @@ export default function RecommendationsPanel({
   // entirely rather than shown de-emphasized/sorted-last. Never silently
   // drop the whole tier though -- chemicalLastResort items only ever
   // existed as a last-resort option anyway, and biopesticideRotation
-  // (never restricted) still renders normally.
+  // (never restricted) still renders normally. A confirmed per-state
+  // "not_legal" (legalityFor()) is the same hard block as `restricted`;
+  // "unclear"/"not_confirmed" pass through but get an inline note below.
   const pesticides = [
     ...program.biopesticideRotation.map((id) => PRODUCTS.find((p) => p.id === id)),
     ...program.chemicalLastResort.map((id) => PRODUCTS.find((p) => p.id === id)),
-  ].filter((p): p is NonNullable<typeof p> => !!p && !p.restricted);
+  ].filter((p): p is NonNullable<typeof p> => !!p && !p.restricted && legalityFor(p, orgState)?.status !== "not_legal");
 
   const lightProtocol = buildSpectralLightProtocol(program);
   const SPECTRAL_LIGHT_NAME = "Spectral Pesticidal Light";
@@ -220,19 +232,26 @@ export default function RecommendationsPanel({
       {pesticides.length > 0 && (
         <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
           <div className="label-mono pb-1">Pesticides</div>
-          {pesticides.map((p) => (
-            <OptionRow
-              key={p.id}
-              kind={p.type === "chemical" ? "chemical" : "biopesticide"}
-              name={p.name}
-              sub={
-                isHomeGrower
-                  ? `Wait ${p.reiHours}h before going back in, ${p.phiDays}d before harvest`
-                  : `REI ${p.reiHours}h · PHI ${p.phiDays}d`
-              }
-              caution={p.cautions}
-            />
-          ))}
+          {pesticides.map((p) => {
+            const legality = legalityFor(p, orgState);
+            const legalityNote =
+              legality && legality.status !== "legal"
+                ? `Legality in ${orgState}: ${legality.status === "unclear" ? "unclear" : "not confirmed"}${legality.note ? ` -- ${legality.note}` : ""}. Verify before use.`
+                : null;
+            return (
+              <OptionRow
+                key={p.id}
+                kind={p.type === "chemical" ? "chemical" : "biopesticide"}
+                name={p.name}
+                sub={
+                  isHomeGrower
+                    ? `Wait ${p.reiHours}h before going back in, ${p.phiDays}d before harvest`
+                    : `REI ${p.reiHours}h · PHI ${p.phiDays}d`
+                }
+                caution={legalityNote ? `${p.cautions} ${legalityNote}` : p.cautions}
+              />
+            );
+          })}
         </div>
       )}
 

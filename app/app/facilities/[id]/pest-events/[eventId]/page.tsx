@@ -114,6 +114,7 @@ export default async function PestEventPage({
         initialComments={comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
         currentUserId={session.user!.id!}
         isHomeGrower={isHomeGrower(session.growerType)}
+        orgState={session.organizationState}
         initialMonitoring={monitoringSessions.flatMap((s) => {
           const metric = sessionMetric(s);
           return metric ? [{ id: s.id, date: s.date, metricKind: metric.kind, value: metric.value }] : [];

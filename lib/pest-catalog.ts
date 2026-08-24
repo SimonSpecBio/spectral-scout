@@ -108,4 +108,20 @@ export const PEST_CATALOG: CatalogPest[] = [
     monitoringMethod: null,
     exampleThreshold: "test mothers + symptomatic plants (stunting/brittle, 'dudding')",
   },
+  {
+    id: "pest_caterpillar",
+    commonName: "Caterpillars / loopers (budworms, armyworms)",
+    latin: "Spodoptera spp. / Trichoplusia ni / Helicoverpa spp.",
+    kind: "pest",
+    monitoringMethod: "plant_sampling",
+    exampleThreshold: "act on first frass/entry-hole sighting -- damage is usually found before the caterpillar itself",
+  },
+  {
+    id: "pest_rootaphid",
+    commonName: "Root aphids",
+    latin: "Rhopalosiphum spp. / Pemphigus spp.",
+    kind: "pest",
+    monitoringMethod: "plant_sampling",
+    exampleThreshold: "act on first root-zone sighting in a wilting/stunted plant with no foliar pest signs",
+  },
 ];

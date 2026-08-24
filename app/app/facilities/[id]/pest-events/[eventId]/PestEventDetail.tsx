@@ -77,6 +77,7 @@ export default function PestEventDetail({
   followUpSuggestions,
   initialTab,
   isHomeGrower,
+  orgState,
 }: {
   facilityId: string;
   event: Event;
@@ -93,6 +94,7 @@ export default function PestEventDetail({
   followUpSuggestions: FollowUpSuggestion[];
   initialTab?: string;
   isHomeGrower: boolean;
+  orgState: string | null;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab && (TABS as readonly string[]).includes(initialTab) ? (initialTab as Tab) : "timeline");
@@ -535,6 +537,7 @@ export default function PestEventDetail({
           pestSpecies={event.pestSpecies}
           inventory={inventoryItems.map((i) => ({ name: i.name, quantity: i.quantity, reorderLevel: i.reorderLevel ?? null, unit: i.unit, unitCost: i.unitCost }))}
           isHomeGrower={isHomeGrower}
+          orgState={orgState}
         />
       )}
 

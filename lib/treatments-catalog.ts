@@ -24,6 +24,16 @@ export interface Agent {
   notes: string;
 }
 
+// Per-state legality (pest-research handoff, 2026-08-21, catalog-expansion.ts):
+// "legal" only when confirmed on that state's official cannabis-pesticide
+// list; "not_confirmed" when the product simply isn't listed anywhere yet
+// found (not the same as banned); "unclear" when sources conflict or hedge
+// ("likely legal, not directly confirmed"); "not_legal" reserved for a
+// confirmed ban (no NEW_PRODUCTS entry uses it yet, but myclobutanil below
+// is exactly this case, which is why it's hard-excluded rather than ever
+// entered here as "not_legal").
+export type LegalityStatus = "legal" | "not_legal" | "unclear" | "not_confirmed";
+
 export interface Product {
   id: string;
   name: string;
@@ -34,7 +44,26 @@ export interface Product {
   phiDays: number;
   cautions: string;
   restricted?: boolean; // chemicalLastResort tier -- cannabis-restricted in many markets
+  // Per-state cannabis legality (CO/CA/OR only -- the three states with
+  // captured research so far). Absent entirely on the original 12 products,
+  // which predate this field and have no sourced per-state research; do not
+  // backfill those with a guess. lib/legality.ts's isLegalInState() is the
+  // single place that should read this.
+  cannabisLegalStatus?: Record<"CO" | "CA" | "OR", { status: LegalityStatus; note?: string }>;
+  // Links a named-brand SKU to the generic active-ingredient Product id it
+  // supplements (e.g. Serenade -> pr_bacillus_sub), so inventory/recs can
+  // recognize both without duplicating the underlying chemistry entry.
+  brandOf?: string;
 }
+
+// MYCLOBUTANIL HARD-BLOCK (pest-research handoff, 2026-08-21): never add
+// myclobutanil (Eagle 20EW / Systhane) to PRODUCTS. It forms hydrogen
+// cyanide gas when combusted/vaped and is explicitly banned in every
+// cannabis-legal state -- not "restricted," banned outright. It is the
+// active ingredient most associated with real cannabis pesticide-residue
+// recalls. If a generic powdery-mildew fungicide from a non-cannabis-
+// specific source is ever proposed for this catalog, check it isn't this
+// one before adding it.
 
 export interface PestProgram {
   id: string;
@@ -71,16 +100,24 @@ export const AGENTS: Agent[] = [
   { id: "ag_feltiella", name: "Feltiella acarisuga", role: "predatory midge", targets: ["pest_tssm"], typicalRate: "supplemental to persimilis", reintroDays: 14, notes: "Finds hotspots well; humidity-dependent." },
   { id: "ag_aphidius_col", name: "Aphidius colemani", role: "parasitoid wasp", targets: ["pest_aphid"], typicalRate: "0.5-3 /m2; use banker plants", reintroDays: 7, notes: "For small aphids (green peach). A. ervi for larger aphids." },
   { id: "ag_aphidoletes", name: "Aphidoletes aphidimyza", role: "predatory midge", targets: ["pest_aphid"], typicalRate: "1-4 /m2 on hotspots", reintroDays: 7, notes: "Larvae eat aphids; adults need dark/humidity; can diapause short days." },
-  { id: "ag_lacewing", name: "Chrysoperla carnea", role: "generalist predator (larvae)", targets: ["pest_aphid", "pest_mealybug", "pest_whitefly"], typicalRate: "5-10 larvae /m2 hotspot", reintroDays: 10, notes: "Voracious generalist; good clean-up on hotspots." },
+  { id: "ag_lacewing", name: "Chrysoperla carnea", role: "generalist predator (larvae)", targets: ["pest_aphid", "pest_mealybug", "pest_whitefly", "pest_caterpillar"], typicalRate: "5-10 larvae /m2 hotspot", reintroDays: 10, notes: "Voracious generalist; good clean-up on hotspots. Also eats moth eggs/small caterpillars (Koppert)." },
   { id: "ag_encarsia", name: "Encarsia formosa", role: "parasitoid wasp", targets: ["pest_whitefly"], typicalRate: "cards 1-3 /m2 weekly", reintroDays: 7, notes: "Best on greenhouse whitefly (Trialeurodes); warm + good light." },
   { id: "ag_eretmocerus", name: "Eretmocerus eremicus", role: "parasitoid wasp", targets: ["pest_whitefly"], typicalRate: "cards 1-3 /m2 weekly", reintroDays: 7, notes: "Better on Bemisia and at higher temps; often mixed with Encarsia." },
   { id: "ag_delphastus", name: "Delphastus catalinae", role: "predatory beetle", targets: ["pest_whitefly"], typicalRate: "0.25-1 /m2 on hotspots", reintroDays: 14, notes: "Curative on heavy whitefly; eats eggs." },
-  { id: "ag_stratiolaelaps", name: "Stratiolaelaps scimitus", role: "soil predatory mite", targets: ["pest_fungusgnat", "pest_thrips"], typicalRate: "125-250 /m2 media surface", reintroDays: 28, notes: "Eats fungus gnat larvae + thrips pupae in soil." },
+  { id: "ag_stratiolaelaps", name: "Stratiolaelaps scimitus", role: "soil predatory mite", targets: ["pest_fungusgnat", "pest_thrips", "pest_rootaphid"], typicalRate: "125-250 /m2 media surface", reintroDays: 28, notes: "Eats fungus gnat larvae + thrips pupae in soil. Some root aphid suppression too (Koppert/Arbico)." },
   { id: "ag_steinernema", name: "Steinernema feltiae", role: "entomopathogenic nematode", targets: ["pest_fungusgnat", "pest_thrips"], typicalRate: "0.5M /m2 drench", reintroDays: 7, notes: "Media drench; keep media moist; reapply." },
   { id: "ag_dalotia", name: "Dalotia (Atheta) coriaria", role: "rove beetle", targets: ["pest_fungusgnat", "pest_thrips"], typicalRate: "establish colony on media", reintroDays: 28, notes: "Soil-dwelling generalist; good with Stratiolaelaps." },
   { id: "ag_cryptolaemus", name: "Cryptolaemus montrouzieri", role: "mealybug destroyer beetle", targets: ["pest_mealybug"], typicalRate: "1-5 /m2 on hotspots", reintroDays: 21, notes: "Curative on mealybug colonies; warm-loving." },
   { id: "ag_trichoderma", name: "Trichoderma harzianum/atroviride", role: "antagonistic fungus (root)", targets: ["path_rootrot"], typicalRate: "media inoculant per label", reintroDays: 30, notes: "Preventive root colonizer vs Pythium/Fusarium." },
   { id: "ag_clonostachys", name: "Clonostachys rosea", role: "antagonistic fungus (foliar/wound)", targets: ["path_botrytis"], typicalRate: "foliar per label", reintroDays: 14, notes: "Preventive vs Botrytis on senescing tissue/wounds." },
+
+  // Added from the pest-research handoff (2026-08-21, catalog-expansion.ts)
+  // to give the two new zero-coverage programs below (caterpillars, root
+  // aphids) a real primaryBiocontrol option. Sourced from supplier technical
+  // sheets (Koppert/Certis) -- see catalog-expansion.ts's header comment.
+  { id: "ag_hb_nematode", name: "Heterorhabditis bacteriophora", role: "entomopathogenic nematode (root-zone)", targets: ["pest_rootaphid"], typicalRate: "250,000-500,000/m2 soil drench (light-moderate); 1x 50M pack per 30-50gal water per 1,000 sq ft for root aphid specifically", reintroDays: 21, notes: "Direct soil drench, not foliar -- infects root aphids in the root zone where H. bacteriophora actively hunts (unlike S. feltiae, which is more surface/shallow-dwelling). Keep media moist 3-4wk after application. Water temp <=25C, soil temp 19-33C optimal. Source: Koppert/Natural Enemies Larvanem root-aphid guide." },
+  { id: "ag_metarhizium", name: "Metarhizium anisopliae / M. brunneum", role: "entomopathogenic fungus (soil + foliar)", targets: ["pest_rootaphid", "pest_fungusgnat", "pest_thrips"], typicalRate: "indoor/greenhouse 4-16oz/50gal water soil drench; repeat every 5-10 days", reintroDays: 7, notes: "Alternative to Beauveria/Isaria for root-zone pests specifically -- Met52/Lalguard-brand products are the commercial source. Does not harm most beneficials. Sensitive to UV/heat -- soil drench use avoids that exposure. Source: Cornell IPM Metarhizium fact sheet." },
+  { id: "ag_steinernema_carp", name: "Steinernema carpocapsae", role: "entomopathogenic nematode (foliar + soil)", targets: ["pest_caterpillar", "pest_fungusgnat"], typicalRate: "soil 250,000-500,000/m2; foliar 1-3M/liter to runoff", reintroDays: 10, notes: "The one beneficial-nematode species with real documented efficacy against caterpillars (cutworms and other Lepidoptera larvae), distinct from S. feltiae (fungus-gnat/thrips-focused). UV/desiccation sensitive -- apply evening/early morning only. Source: Koppert Capsanem." },
 ];
 
 export const PRODUCTS: Product[] = [
@@ -91,11 +128,108 @@ export const PRODUCTS: Product[] = [
   { id: "pr_bacillus_sub", name: "Bacillus subtilis / amyloliquefaciens", class: "microbial-fungicide", type: "biopesticide", targets: ["path_pm", "path_botrytis"], reiHours: 4, phiDays: 0, cautions: "Preventive/early; needs good coverage and repeat." },
   { id: "pr_bti", name: "Bacillus thuringiensis israelensis (Bti)", class: "microbial-insecticide", type: "biopesticide", targets: ["pest_fungusgnat"], reiHours: 4, phiDays: 0, cautions: "Larval drench; reapply; pair with dry-back + nematodes." },
   { id: "pr_beauveria", name: "Beauveria bassiana", class: "entomopathogenic-fungus", type: "biopesticide", targets: ["pest_whitefly", "pest_thrips", "pest_aphid", "pest_tssm", "pest_mealybug"], reiHours: 4, phiDays: 0, cautions: "Needs humidity to infect; can harm some beneficials -- separate applications." },
-  { id: "pr_isaria", name: "Cordyceps (Isaria) fumosorosea", class: "entomopathogenic-fungus", type: "biopesticide", targets: ["pest_whitefly", "pest_thrips", "pest_broadmite"], reiHours: 4, phiDays: 0, cautions: "As Beauveria; humidity-dependent." },
+  { id: "pr_isaria", name: "Cordyceps (Isaria) fumosorosea", class: "entomopathogenic-fungus", type: "biopesticide", targets: ["pest_whitefly", "pest_thrips", "pest_broadmite", "pest_rootaphid"], reiHours: 4, phiDays: 0, cautions: "As Beauveria; humidity-dependent. Also labeled for root aphids incl. rice root aphid on cannabis (Certis PFR-97 label / CSU Extension)." },
   { id: "pr_spinosad", name: "Spinosad", class: "spinosyn", type: "biopesticide-derived", targets: ["pest_thrips"], reiHours: 4, phiDays: 3, cautions: "Rotate/limited uses (resistance). Toxic to bees + some beneficials when wet. Check cannabis legality." },
   { id: "pr_abamectin", name: "Abamectin", class: "avermectin", type: "chemical", targets: ["pest_tssm", "pest_broadmite", "pest_thrips"], reiHours: 12, phiDays: 7, cautions: "RESTRICTED / often PROHIBITED on cannabis. Translaminar miticide. Resistance mgmt. Verify legality + label.", restricted: true },
   { id: "pr_flonicamid", name: "Flonicamid", class: "feeding-blocker", type: "chemical", targets: ["pest_aphid", "pest_whitefly"], reiHours: 12, phiDays: 7, cautions: "RESTRICTED on cannabis in many markets. Verify legality + label.", restricted: true },
   { id: "pr_h2o2", name: "Hydrogen peroxide / root-zone oxygenation", class: "oxidizer/cultural", type: "cultural", targets: ["path_rootrot"], reiHours: 0, phiDays: 0, cautions: "Root-zone sanitation in hydro; can harm beneficial microbes -- reinoculate." },
+
+  // Added from the pest-research handoff (2026-08-21, catalog-expansion.ts).
+  // Sourced from EPA product labels / state cannabis-pesticide lists (CO
+  // CDA, CA CDPR, OR ODA) -- see that file's header for full citations.
+  // Only pr_dipel/pr_xentari/pr_met52 are wired into a pest program's
+  // rotation below (the two real zero-coverage gaps this pass targeted);
+  // the rest fill out the catalog/inventory for named-brand recognition and
+  // are deliberately not inserted into existing programs' rotation order --
+  // that's an editorial call on rotation sequencing the source research
+  // didn't make, so it isn't invented here either.
+  {
+    id: "pr_grandevo", name: "Grandevo (Chromobacterium subtsugae)", class: "microbial", type: "biopesticide",
+    targets: ["pest_broadmite", "pest_tssm", "pest_aphid", "pest_whitefly", "pest_thrips"], reiHours: 4, phiDays: 0,
+    cautions: "One of the few biopesticides with explicit named cannabis-use approval in all three target states (CDPR approved it by name in July 2018). Good first-choice broad-mite option -- current catalog only has sulfur/oil/Isaria for broad mite.",
+    cannabisLegalStatus: { CO: { status: "legal", note: "Confirmed on CDA list" }, CA: { status: "legal", note: "CDPR specifically approved (July 2018)" }, OR: { status: "legal", note: "Confirmed on Oregon ODA list" } },
+  },
+  {
+    id: "pr_venerate", name: "Venerate (heat-killed Burkholderia spp.)", class: "biochemical/microbial-derived", type: "biopesticide",
+    targets: ["pest_aphid", "pest_thrips", "pest_tssm", "pest_whitefly", "pest_mealybug"], reiHours: 4, phiDays: 0,
+    cautions: "Broad-spectrum, legal in all three target states. Good rotation partner with Grandevo to avoid resistance.",
+    cannabisLegalStatus: { CO: { status: "legal", note: "Confirmed on CDA list" }, CA: { status: "legal", note: "Approved by early 2019" }, OR: { status: "legal", note: "Confirmed on Oregon ODA list" } },
+  },
+  {
+    id: "pr_pyganic", name: "PyGanic Crop Protection EC 1.4 II (Pyrethrins 1.4%)", class: "botanical", type: "biopesticide",
+    targets: ["pest_aphid", "pest_thrips", "pest_whitefly", "pest_tssm", "pest_fungusgnat"], reiHours: 12, phiDays: 0,
+    cautions: "REI is 12h, not the 4h typical of most biopesticides here -- do not assume 4h when scheduling re-entry. CA legality not confirmed against CDPR's list; use CO/OR only until CA is verified.",
+    cannabisLegalStatus: { CO: { status: "legal", note: "Confirmed on CDA list" }, CA: { status: "unclear", note: "Not confirmed against CDPR's list" }, OR: { status: "legal", note: "Confirmed on Oregon ODA list" } },
+  },
+  {
+    id: "pr_azaguard", name: "AzaGuard / Molt-X (Azadirachtin 3%)", class: "biochemical (botanical IGR)", type: "biopesticide",
+    targets: ["pest_aphid", "pest_whitefly", "pest_thrips", "pest_fungusgnat", "pest_mealybug"], reiHours: 4, phiDays: 0,
+    cautions: "IGR (growth regulator) mode of action -- slower acting than a contact product, best used preventively or on early-instar populations, not as a knockdown for a severe active infestation.",
+    cannabisLegalStatus: { CO: { status: "legal", note: "Confirmed on CDA list" }, CA: { status: "unclear", note: "Likely legal (azadirachtin tolerance-exempt); not directly confirmed against CDPR list" }, OR: { status: "legal", note: "Confirmed on Oregon ODA list" } },
+  },
+  {
+    id: "pr_neemix", name: "Neemix 4.5 (Azadirachtin 4.5%)", class: "biochemical (botanical IGR)", type: "biopesticide",
+    targets: ["pest_aphid", "pest_whitefly", "pest_thrips", "pest_fungusgnat"], reiHours: 4, phiDays: 0,
+    cautions: "Not found on Oregon's official list despite AzaGuard/Molt-X (same active ingredient, different registrant) being OR-legal -- legality is registration-specific, not just active-ingredient-specific. Do not treat as interchangeable with AzaGuard for OR compliance purposes.",
+    cannabisLegalStatus: { CO: { status: "legal", note: "Confirmed on CDA list" }, CA: { status: "unclear", note: "Likely legal but verify current status" }, OR: { status: "not_confirmed", note: "Not found on Oregon ODA list -- use AzaGuard/Molt-X instead for OR" } },
+  },
+  {
+    id: "pr_regalia", name: "Regalia CG (Reynoutria sachalinensis extract 5%)", class: "biochemical (plant extract)", type: "biopesticide",
+    targets: ["path_pm", "path_botrytis"], reiHours: 4, phiDays: 0,
+    cautions: "Explicit named cannabis-use approval in all three states (same as Grandevo). Induces the plant's own systemic defense response rather than killing the pathogen directly -- best as a preventive/early-stage rotation partner, not a curative eradicant like potassium bicarbonate.",
+    cannabisLegalStatus: { CO: { status: "legal", note: "Confirmed on CDA list" }, CA: { status: "legal", note: "CDPR specifically approved (July 2018)" }, OR: { status: "legal", note: "Confirmed on Oregon ODA list" } },
+  },
+  {
+    id: "pr_serenade", name: "Serenade ASO (Bacillus subtilis strain QST 713)", class: "microbial fungicide", type: "biopesticide",
+    targets: ["path_pm", "path_botrytis"], reiHours: 4, phiDays: 0,
+    cautions: "Named brand of the same active ingredient already generically listed as pr_bacillus_sub -- add this SKU so growers can match what's on their actual product label/invoice.",
+    brandOf: "pr_bacillus_sub",
+    cannabisLegalStatus: { CO: { status: "legal", note: "'Serenade Garden' confirmed on CDA list" }, CA: { status: "unclear", note: "Likely legal (tolerance-exempt strain); not directly confirmed against CDPR list" }, OR: { status: "legal", note: "Confirmed on Oregon ODA list" } },
+  },
+  {
+    id: "pr_doublenickel", name: "Double Nickel 55 / LC (Bacillus amyloliquefaciens strain D747)", class: "microbial fungicide/bactericide", type: "biopesticide",
+    targets: ["path_pm", "path_botrytis", "path_rootrot"], reiHours: 4, phiDays: 0,
+    cautions: "Broader label than Serenade -- also suppresses Fusarium/bacterial disease, useful as a rotation option for root-rot-adjacent prevention as well as foliar PM/Botrytis.",
+    cannabisLegalStatus: { CO: { status: "legal", note: "Confirmed on CDA list" }, CA: { status: "unclear", note: "Likely legal (tolerance-exempt strain); not directly confirmed against CDPR list" }, OR: { status: "legal", note: "Confirmed on Oregon ODA list" } },
+  },
+  {
+    id: "pr_mpede", name: "M-Pede (Potassium salts of fatty acids 49%)", class: "soap", type: "biopesticide-minrisk",
+    targets: ["pest_aphid", "pest_whitefly", "pest_tssm", "path_pm"], reiHours: 12, phiDays: 0,
+    cautions: "Named brand of the same chemistry already generically listed as pr_insecticidal_soap -- REI is 12h on this specific label (longer than the generic soap entry's 0h), so use THIS entry's REI when the product on hand is specifically M-Pede.",
+    brandOf: "pr_insecticidal_soap",
+    cannabisLegalStatus: { CO: { status: "legal", note: "Confirmed on CDA list" }, CA: { status: "unclear", note: "0-day PHI, soap actives generally tolerance-exempt; not directly confirmed" }, OR: { status: "legal", note: "Confirmed on Oregon ODA list" } },
+  },
+  {
+    id: "pr_rootshield", name: "RootShield WP (Trichoderma harzianum strain T-22)", class: "microbial fungicide", type: "biopesticide",
+    targets: ["path_rootrot"], reiHours: 4, phiDays: 0,
+    cautions: "Named brand of the same species already generically listed as agent ag_trichoderma -- this is the product/drench form vs. the living-organism release. Not found on Oregon's list under this brand name -- verify before OR use even though the active organism itself is common.",
+    brandOf: "ag_trichoderma",
+    cannabisLegalStatus: { CO: { status: "not_confirmed", note: "Verify" }, CA: { status: "unclear", note: "Likely legal (T. harzianum tolerance-exempt); not directly confirmed against CDPR list" }, OR: { status: "not_confirmed", note: "Not found on Oregon ODA list -- verify" } },
+  },
+  {
+    id: "pr_actinovate", name: "Actinovate AG (Streptomyces lydicus strain WYEC 108)", class: "microbial fungicide", type: "biopesticide",
+    targets: ["path_rootrot", "path_pm"], reiHours: 1, phiDays: 0,
+    cautions: "Genuinely unresolved legality -- widely used in cannabis root-disease management on the ground, but not confirmed on any of CO/CA/OR's official cannabis-pesticide lists under this name. Flag to the grower as 'verify with your state before use' rather than presenting as cleared.",
+    cannabisLegalStatus: { CO: { status: "not_confirmed", note: "Verify" }, CA: { status: "unclear", note: "Not found on OR/CO lists under this exact name" }, OR: { status: "not_confirmed", note: "Not found on Oregon ODA list" } },
+  },
+  {
+    id: "pr_dipel", name: "Dipel DF (Bacillus thuringiensis subsp. kurstaki 54%)", class: "microbial insecticide", type: "biopesticide",
+    targets: ["pest_caterpillar"], reiHours: 4, phiDays: 0,
+    cautions: "Standard-of-care caterpillar (budworm/looper/armyworm) control with zero prior catalog coverage for this pest. Colorado restricts to hemp-in-greenhouse-settings per CDA guidance -- verify current CO guidance before outdoor cannabis use.",
+    cannabisLegalStatus: { CO: { status: "legal", note: "Restricted -- hemp only, greenhouse settings per CDA guidance" }, CA: { status: "unclear", note: "Likely legal (Bt kurstaki tolerance-exempt); not directly confirmed against CDPR list" }, OR: { status: "legal", note: "Confirmed on Oregon ODA list" } },
+  },
+  {
+    id: "pr_xentari", name: "Xentari (Bacillus thuringiensis subsp. aizawai)", class: "microbial insecticide", type: "biopesticide",
+    targets: ["pest_caterpillar"], reiHours: 4, phiDays: 0,
+    cautions: "Rotation partner for Dipel -- effective against some Bt-kurstaki-resistant Lepidoptera, so alternating the two slows resistance development. CO legality not separately confirmed (only found under the kurstaki category) -- verify before CO use.",
+    cannabisLegalStatus: { CO: { status: "not_confirmed", note: "Only found under the kurstaki category -- verify" }, CA: { status: "unclear", note: "Likely legal (Bt tolerance-exempt); not directly confirmed against CDPR list" }, OR: { status: "legal", note: "Confirmed on Oregon ODA list" } },
+  },
+  {
+    id: "pr_met52", name: "Met52 EC (Metarhizium anisopliae strain F52 11%)", class: "entomopathogenic fungus", type: "biopesticide",
+    targets: ["pest_rootaphid", "pest_fungusgnat"], reiHours: 4, phiDays: 0,
+    cautions: "Do NOT treat as interchangeable with 'Lalguard M52 OD' for legality purposes -- that is a different registrant/strain (M. brunneum) that IS on the Oregon list, while Met52 EC itself was not found there. Confirm the exact brand on the product label before relying on this entry's legality column.",
+    cannabisLegalStatus: { CO: { status: "not_confirmed", note: "Verify" }, CA: { status: "unclear", note: "Not found on OR/CO lists; do not assume equivalence to Lalguard M52 OD" }, OR: { status: "not_confirmed", note: "Not found under Met52 brand specifically" } },
+  },
 ];
 
 export const PESTS: PestProgram[] = [
@@ -245,6 +379,54 @@ export const PESTS: PestProgram[] = [
     followUp: null, // no treatment program -- monitor + sanitation only, see TREATMENTS.md
     cautions: ["NO chemical/biological cure -- management is testing + sanitation + clean stock only", "Mechanically transmitted via tools/handling"],
   },
+
+  // Added from the pest-research handoff (2026-08-21, catalog-expansion.ts)
+  // -- these are the two real, zero-coverage gaps that pass found (no
+  // program existed for either pest before this). No defaultDensityThreshold/
+  // defaultOccupancyPctThreshold given, same as aphids/broad mite/thrips-on-
+  // leaves/root rot above -- no defensible sourced number was found, so
+  // both correctly fall back to threshold-engine.ts's generic defaults
+  // rather than a fabricated one.
+  {
+    id: "pest_caterpillar",
+    commonName: "Caterpillars / loopers (budworms, armyworms)",
+    latin: "Spodoptera spp. / Trichoplusia ni / Helicoverpa spp.",
+    kind: "pest",
+    preventive: [
+      "Scout for frass (droppings) and bud entry holes -- damage is often found before the caterpillar itself is seen",
+      "Pheromone traps for early adult-moth detection where available",
+    ],
+    primaryBiocontrol: ["ag_lacewing", "ag_steinernema_carp"],
+    biopesticideRotation: ["pr_dipel", "pr_xentari", "pr_spinosad"],
+    cultural: ["Hand-pick/remove visibly infested buds", "Reduce canopy density to expose larvae to predators/scouting"],
+    chemicalLastResort: [],
+    followUp: { recheckDays: 5, releaseIntervalDays: 7, escalateIfNoDeclineDays: 14 },
+    cautions: [
+      "Bud-feeding caterpillars are a real cannabis-specific concern (yield + mold entry point via frass/damage) with no prior catalog coverage at all -- this is a genuinely new program, not a refinement of an existing one.",
+      "No chemicalLastResort entry currently has confirmed cannabis legality for this pest -- Bt kurstaki/aizawai rotation is the realistic primary control, not a biopesticide-then-chemical-backup pattern like the other programs.",
+      "Rotate Dipel/Xentari to manage resistance -- do not use the same Bt subspecies every application.",
+    ],
+  },
+  {
+    id: "pest_rootaphid",
+    commonName: "Root aphids",
+    latin: "Rhopalosiphum spp. / Pemphigus spp.",
+    kind: "pest",
+    preventive: [
+      "Inspect root zone of any wilting/stunted plant that shows no foliar pest signs -- root aphids are easy to miss because damage presents as generic nutrient/water stress",
+      "Quarantine incoming clones -- root aphids travel on plant material, not by flight, in early colonization",
+    ],
+    primaryBiocontrol: ["ag_hb_nematode", "ag_stratiolaelaps", "ag_metarhizium"],
+    biopesticideRotation: ["pr_met52"],
+    cultural: ["Isolate affected containers/rows to slow spread", "Sanitize tools between plants once confirmed"],
+    chemicalLastResort: [],
+    followUp: { recheckDays: 7, releaseIntervalDays: 14, escalateIfNoDeclineDays: 21 },
+    cautions: [
+      "Distinct pest from foliar aphids (pest_aphid) -- soil/root-zone dwelling, requires drench application and root-zone-active biocontrol, not the foliar Aphidius/Aphidoletes program.",
+      "No prior catalog coverage at all for this pest despite it being a well-documented cannabis-specific issue (rice root aphid).",
+      "Confirmed legality is thin across all three states for every option here -- present these as 'best available, verify current label/state list' rather than a fully cleared program.",
+    ],
+  },
 ];
 
 export function findPestProgram(pestSpecies: string): PestProgram | null {
@@ -256,4 +438,20 @@ export function findAgent(id: string): Agent | undefined {
 }
 export function findProduct(id: string): Product | undefined {
   return PRODUCTS.find((p) => p.id === id);
+}
+
+const LEGALITY_STATES = ["CO", "CA", "OR"] as const;
+type LegalityState = (typeof LEGALITY_STATES)[number];
+
+// Per-state cannabis legality gate (ticket 68). Returns null whenever no
+// gate should apply -- the product carries no per-state research at all, or
+// the org's state isn't one of the three researched so far -- so callers
+// fall back to today's behavior (Product.restricted only) rather than
+// guessing. Only a real "not_legal" entry should ever be used to hide an
+// option outright; "unclear"/"not_confirmed" are surfaced as a caution, not
+// a block, since they mean "not yet confirmed either way," not "banned."
+export function legalityFor(product: Product, orgState: string | null): { status: LegalityStatus; note?: string } | null {
+  if (!product.cannabisLegalStatus || !orgState) return null;
+  if (!(LEGALITY_STATES as readonly string[]).includes(orgState)) return null;
+  return product.cannabisLegalStatus[orgState as LegalityState];
 }
