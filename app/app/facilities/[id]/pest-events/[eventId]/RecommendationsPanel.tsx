@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { ProductBenchmark } from "@/lib/benchmarks";
 import { costPerUnit, matchInventoryStock, type StockStatus } from "@/lib/recommendations";
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { AGENTS, findPestProgram, legalityFor, PRODUCTS } from "@/lib/treatments-catalog";
@@ -43,6 +44,12 @@ interface InventoryRow {
 // cannabisLegalStatus data at all (the original 12) are ungated by this and
 // keep relying on `restricted` alone -- this is pre-launch, real compliance
 // work still needs to land before this is public.
+//
+// Also fetches a cross-org anonymized efficacy benchmark (ticket 83,
+// lib/benchmarks.ts) for whichever two of this pest's pesticide options have
+// enough pooled free-tier resolution-time data to compare honestly -- shown
+// as a single "BENCHMARK" line above the Pesticides list, or nothing at all
+// when there isn't yet enough data (never a fabricated/estimated number).
 export default function RecommendationsPanel({
   facilityId,
   eventId,
@@ -68,6 +75,41 @@ export default function RecommendationsPanel({
   const [applying, setApplying] = useState<string | null>(null);
   const [applied, setApplied] = useState<Record<string, string>>({}); // name -> confirmation message
   const [error, setError] = useState<string | null>(null);
+  const [benchmark, setBenchmark] = useState<ProductBenchmark | null>(null);
+
+  // Cross-org anonymized efficacy benchmarking (ticket 83) -- fetched
+  // separately from apply-program's own facility/event-scoped calls since
+  // this is a pooled, aggregate-only read with no facility/org scoping at
+  // all (lib/benchmarks.ts). Declared before the `!program` early return
+  // below so hook order stays stable across renders regardless of whether
+  // this species has a preset program.
+  useEffect(() => {
+    const prog = findPestProgram(pestSpecies);
+    const names = prog
+      ? [...prog.biopesticideRotation, ...prog.chemicalLastResort]
+          .map((id) => PRODUCTS.find((p) => p.id === id))
+          .filter((p): p is NonNullable<typeof p> => !!p && !p.restricted)
+          .map((p) => p.name)
+      : [];
+    if (names.length < 2) {
+      setBenchmark(null);
+      return;
+    }
+    const params = new URLSearchParams({ pest: pestSpecies });
+    names.forEach((n) => params.append("product", n));
+    let cancelled = false;
+    fetch(`/api/benchmarks/efficacy?${params}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setBenchmark(data?.benchmark ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setBenchmark(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pestSpecies]);
 
   const program = findPestProgram(pestSpecies);
   if (!program) {
@@ -232,6 +274,16 @@ export default function RecommendationsPanel({
       {pesticides.length > 0 && (
         <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
           <div className="label-mono pb-1">Pesticides</div>
+          {benchmark && (
+            <div className="py-2 text-xs text-[var(--text-dim)]">
+              <span className="label-mono mr-1.5" style={{ color: "var(--success)" }}>
+                BENCHMARK
+              </span>
+              Across {benchmark.faster.orgCount}+ free-tier growers, {benchmark.faster.product} resolved this pest {benchmark.pctFaster}% faster on
+              average than {benchmark.slower.product} ({Math.round(benchmark.faster.avgDays)}d vs {Math.round(benchmark.slower.avgDays)}d to
+              resolution).
+            </div>
+          )}
           {pesticides.map((p) => {
             const legality = legalityFor(p, orgState);
             const legalityNote =

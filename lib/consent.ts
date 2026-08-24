@@ -2,7 +2,13 @@
 // who can see it -- proxy.ts sends every org whose dataConsentVersion
 // doesn't match this back through onboarding's consent step, without
 // touching their already-saved name/state.
-export const CURRENT_CONSENT_VERSION = "1.0";
+//
+// 1.0 -> 1.1 (ticket 83): added the "Anonymized benchmarking" bullet below.
+// Free-tier resolution-time/product data can now surface as a pooled,
+// aggregate-only comparison to OTHER growers inside the app (not just to
+// Spectral staff, which 1.0 already covered) -- a genuinely new "who can
+// see derived-from-your-data stats" story, so this counts as material.
+export const CURRENT_CONSENT_VERSION = "1.1";
 
 export interface ConsentSection {
   heading: string;
@@ -41,6 +47,12 @@ export const CONSENT_SECTIONS: ConsentSection[] = [
       "If your organization has a paid pilot/partnership relationship with Spectral Biocontrol (\"pilot\" accounts): Spectral staff can see your organization's full data, the same way they would for any customer relationship where we're actively supporting your operation.",
       "If you signed up for the free, self-serve version (\"general\" accounts) -- the default for anyone who just creates an account without a separate agreement: our application is built so staff-facing screens never surface your organization-identifiable data. The only thing Spectral staff see from free-tier usage through the app is aggregated, anonymized statistics across all free-tier users combined -- never anything traceable back to your account. (This describes what our software shows staff, not a claim about every possible way our systems could technically be accessed -- see our security practices for more.)",
       "If your account's tier ever changes, we'll tell you before that changes what Spectral staff can see.",
+    ],
+  },
+  {
+    heading: "Anonymized benchmarking",
+    paragraphs: [
+      "If you're on the free, self-serve tier: we may show you pooled, aggregate statistics computed across all free-tier growers combined -- for example, whether growers who used one product against a given pest tended to resolve it faster than growers who used another. These comparisons are never shown unless enough different growers' outcomes are behind each side of the comparison, specifically so no single grower's own result can be picked out of it. This never includes labor/time-tracking data, and it works the same way as the staff-visible aggregates described above: pooled and anonymous, never traceable back to your account.",
     ],
   },
   {
