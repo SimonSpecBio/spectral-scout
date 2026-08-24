@@ -19,7 +19,11 @@ const DUE_SOON_MS = 24 * 60 * 60 * 1000;
 // recommendations.ts's computeFollowUpSuggestions) has no linked event --
 // it's about the area going forward, not that closed incident -- so it
 // lands on general scouting (/app/new-observation) instead, preset to the
-// same site/area rather than making the grower re-pick it. Other task
+// same site/area rather than making the grower re-pick it. An
+// establishment_check task (auto-created alongside every biological
+// treatment, lib/apply-treatment.ts) has its own yes/no + notes capture
+// page instead of the generic "Mark done" flow, since its whole point is
+// recording a real outcome, not just logging minutes spent. Other task
 // types (release, treatment, trap_read, ...) have no dedicated capture
 // screen yet, so those still land on task detail. Shared by the
 // dashboard's Today's tasks, the Schedule list, and Notifications so all
@@ -37,6 +41,9 @@ export function taskActionHref(task: {
   if (task.type === "scout" && task.facilityId) {
     const area = task.facilityAreaId ? `&areaId=${task.facilityAreaId}` : "";
     return `/app/new-observation?taskId=${task.id}&facilityId=${task.facilityId}${area}`;
+  }
+  if (task.type === "establishment_check") {
+    return `/app/schedule/${task.id}/establishment-check`;
   }
   return `/app/schedule/${task.id}`;
 }

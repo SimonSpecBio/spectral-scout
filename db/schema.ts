@@ -595,6 +595,7 @@ export const taskTypeEnum = pgEnum("scout_task_type", [
   "sanitation",
   "test",
   "other",
+  "establishment_check",
 ]);
 // manual (a person created it) | auto_program (generated from a treatment
 // program's follow-up cadence) | auto_trigger (e.g. a trap-spike watchdog).
@@ -656,6 +657,42 @@ export const tasks = pgTable(
     index("scout_task_pest_event_id_idx").on(table.pestEventId),
     index("scout_task_assignee_user_id_idx").on(table.assigneeUserId),
     index("scout_task_status_idx").on(table.status),
+  ]
+).enableRLS();
+
+// A quiet, common way growers lose money: a beneficial release that never
+// actually established (wrong humidity, bad timing, prey already crashed)
+// looks identical to a successful one until pest pressure comes back --
+// no competitor tracks this, only pest counts (FUTURE_FEATURES_THEORIZING.md
+// #4). One row per biological-type treatment, auto-created alongside its
+// establishment_check task (lib/apply-treatment.ts) so the check surfaces
+// through the same dashboard/Schedule/notification paths every other task
+// already does, while still keeping structured per-product/per-facility
+// outcome history for later analysis (e.g. ticket 83's aggregate
+// benchmarking) that a plain task-completion record wouldn't capture.
+export const establishmentChecks = pgTable(
+  "scout_establishment_check",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    treatmentId: uuid("treatment_id")
+      .notNull()
+      .references(() => treatments.id, { onDelete: "cascade" }),
+    agentName: text("agent_name").notNull(),
+    established: boolean("established"), // null = not yet checked
+    notes: text("notes"),
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+    checkedByUserId: uuid("checked_by_user_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("scout_establishment_check_organization_id_idx").on(table.organizationId),
+    index("scout_establishment_check_task_id_idx").on(table.taskId),
   ]
 ).enableRLS();
 
