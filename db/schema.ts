@@ -161,6 +161,13 @@ export const facilities = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Set by the daily re-engagement cron (ticket 91, app/api/cron/
+    // reengagement) the moment it sends an inactivity push for this
+    // facility -- not bumped again until a new scoutingObservations row
+    // lands for one of its areas, which is what makes this "nudge once per
+    // quiet period" rather than a daily repeat for someone who's already
+    // seen it and hasn't come back.
+    lastNudgedAt: timestamp("last_nudged_at", { withTimezone: true }),
   },
   (table) => [index("scout_facility_organization_id_idx").on(table.organizationId)]
 ).enableRLS();
@@ -377,6 +384,26 @@ export const shareLinks = pgTable(
     index("scout_share_link_pest_event_id_idx").on(table.pestEventId),
     index("scout_share_link_token_idx").on(table.token),
   ]
+).enableRLS();
+
+// A browser's Web Push subscription (ticket 91) -- one row per device a
+// user has enabled notifications on, not per user (the same person can
+// subscribe from a phone and a laptop). Matched-by-value against
+// scout_user.id, same convention as scout_membership.userId, not a real FK.
+// endpoint is unique because re-subscribing the same device/browser
+// (permission re-granted, SW re-registered) returns the same push service
+// URL -- upserting on it avoids piling up dead duplicate subscriptions.
+export const pushSubscriptions = pgTable(
+  "scout_push_subscription",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("scout_push_subscription_user_id_idx").on(table.userId)]
 ).enableRLS();
 
 // Replaces the single shared freeform `notes` field above with a real,

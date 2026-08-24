@@ -13,7 +13,7 @@
 // the offline capture queue (lib/offline-queue.ts, app-layer IndexedDB,
 // not this file) is what actually guarantees "nothing is lost in a dead
 // zone" for scouting/trap/treatment submissions.
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE_NAME = `spectral-scout-${VERSION}`;
 const APP_SHELL = ["/offline", "/manifest.webmanifest", "/favicon.png", "/icons/icon-192.png", "/icons/icon-512.png"];
 
@@ -34,6 +34,29 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+});
+
+// Web Push (ticket 91) -- payload is always our own JSON shape
+// ({title, body, url}, see lib/push.ts), never third-party/untrusted, since
+// it only ever comes from our own VAPID-signed sends.
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  const { title, body, url } = event.data.json();
+  event.waitUntil(
+    self.registration.showNotification(title, { body, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png", data: { url } })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/app";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      const existing = clients.find((c) => c.url.includes(url));
+      if (existing) return existing.focus();
+      return self.clients.openWindow(url);
+    })
+  );
 });
 
 self.addEventListener("fetch", (event) => {

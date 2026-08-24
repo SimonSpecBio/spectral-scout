@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireGrowerSession } from "@/lib/session";
+import NotificationsToggle from "./NotificationsToggle";
 import ThemeToggle from "./ThemeToggle";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export default async function SettingsPage() {
       <h1 className="text-2xl font-semibold">Settings</h1>
 
       <ThemeToggle />
+      <NotificationsToggle />
 
       <div className="card flex flex-col divide-y divide-[var(--border)]">
         <Link href="/app/settings/catalog" className="flex items-center justify-between p-4 text-sm">
