@@ -2,14 +2,15 @@ import webpush from "web-push";
 import { db } from "@/db";
 import { pushSubscriptions } from "@/db/schema";
 
-// Self-hosted Web Push (VAPID) rather than a third-party email/SMS provider
-// -- ticket 91 needed SOME out-of-band channel to reach a grower who's
-// inactive enough to not be looking at the app's own Notifications feed
-// (lib/notifications.ts), and this is the one option that needed no new
-// paid account/API key: just a self-generated key pair, using the browser's
-// own push service. EMAIL_FROM/EMAIL_SERVER in .env.local are placeholder
-// values (never wired to a real provider), so email wasn't actually a live
-// option today without first standing up that infra.
+// Self-hosted Web Push (VAPID), alongside email (lib/email.ts) rather than
+// instead of it -- ticket 91 needed SOME out-of-band channel to reach a
+// grower who's inactive enough to not be looking at the app's own
+// Notifications feed (lib/notifications.ts). Push needed no new paid
+// account/API key (a self-generated key pair, the browser's own push
+// service) but does need an explicit opt-in toggle in Settings most people
+// will never find -- email is the higher-reach channel of the two (real
+// Resend SMTP already live in production via auth.ts's magic-link sign-in),
+// so both fire together rather than picking one.
 let configured = false;
 function ensureConfigured() {
   if (configured) return;

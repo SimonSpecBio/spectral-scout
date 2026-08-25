@@ -1,7 +1,9 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
+import { users } from "@/db/auth-schema";
 import { facilities, facilityAreas, memberships, scoutingObservations } from "@/db/schema";
+import { sendEmail } from "@/lib/email";
 import { sendPushToUser } from "@/lib/push";
 
 // Daily re-engagement nudge (ticket 91) -- applies to every account, not
@@ -16,6 +18,13 @@ const DAY_MS = 86_400_000;
 // days") -- using that number as the real threshold rather than picking a
 // different one from the ticket's "10-14" range.
 const INACTIVITY_THRESHOLD_DAYS = 10;
+
+// VERCEL_PROJECT_PRODUCTION_URL is Vercel's own env var for this project's
+// stable production domain (no scheme, no per-deploy hash) -- more reliable
+// than guessing a custom domain that may not be attached yet.
+function appUrl(): string {
+  return process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000";
+}
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -50,16 +59,28 @@ export async function GET(request: NextRequest) {
     if (facility.lastNudgedAt && facility.lastNudgedAt >= referenceDate) continue;
 
     const members = await db.select().from(memberships).where(eq(memberships.organizationId, facility.organizationId));
+    const memberUsers = members.length ? await db.select().from(users).where(inArray(users.id, members.map((m) => m.userId))) : [];
     const days = Math.floor(daysSince);
-    await Promise.all(
-      members.map((m) =>
-        sendPushToUser(m.userId, {
-          title: "Time to go scout",
-          body: `${facility.name} hasn't been scouted in ${days} days.`,
-          url: `/app/facilities/${facility.id}`,
-        })
-      )
-    );
+    const title = "Time to go scout";
+    const body = `${facility.name} hasn't been scouted in ${days} days.`;
+    await Promise.all([
+      ...members.map((m) => sendPushToUser(m.userId, { title, body, url: `/app/facilities/${facility.id}` })),
+      // Email alongside push, not instead of it -- push needs an explicit
+      // opt-in toggle in Settings that most people will never find, while
+      // magic-link sign-in already proves this app's email delivery
+      // (auth.ts's Nodemailer provider, real Resend SMTP in production) is
+      // a channel every grower already receives from. An earlier version of
+      // this ticket wrongly assumed EMAIL_SERVER/EMAIL_FROM were dev-only
+      // placeholders (true of .env.local, not of the real Vercel env) and
+      // shipped push-only on that mistaken basis.
+      ...memberUsers
+        .filter((u) => u.email)
+        .map((u) =>
+          sendEmail({ to: u.email!, subject: title, text: `${body}\n\nOpen Spectral Scout: ${appUrl()}/app/facilities/${facility.id}` }).catch(() => {
+            // Best-effort, same spirit as sendPushToUser's own per-subscription catch -- one bad address shouldn't block the rest of this run.
+          })
+        ),
+    ]);
     await db.update(facilities).set({ lastNudgedAt: now }).where(eq(facilities.id, facility.id));
     facilitiesNudged++;
   }
