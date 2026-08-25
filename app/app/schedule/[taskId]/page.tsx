@@ -17,7 +17,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tas
   const row = await getTask(session.organizationId!, taskId);
   if (!row) {
     return (
-      <div className="mx-auto flex max-w-md flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
         <div className="card p-6 text-sm text-[var(--text-dim)]">Task not found.</div>
       </div>
     );
@@ -27,7 +27,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tas
   const urgency = taskUrgency(task);
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <div className="flex items-center justify-between">
         <Link href="/app/schedule" className="text-sm text-[var(--text-dim)]">
           ← Schedule

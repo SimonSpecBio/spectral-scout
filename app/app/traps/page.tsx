@@ -54,7 +54,7 @@ export default async function TrapsPage({
   const overCount = statuses.filter((s) => s.overThreshold).length;
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Sticky traps</h1>
         <Link

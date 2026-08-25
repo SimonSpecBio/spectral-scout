@@ -141,7 +141,7 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-5 pb-24">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-5 pb-24">
       <div className="flex items-center justify-between">
         <button onClick={() => router.back()} className="text-sm text-[var(--text-dim)]">
           Cancel

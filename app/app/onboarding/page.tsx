@@ -26,7 +26,7 @@ export default async function OnboardingPage() {
   const needsProfile = !org.state;
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">{needsProfile ? "Welcome to Spectral Scout" : "One more thing"}</h1>
         <p className="mt-1 text-sm text-[var(--text-dim)]">

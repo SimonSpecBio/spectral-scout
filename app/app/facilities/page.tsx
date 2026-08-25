@@ -15,7 +15,7 @@ export default async function FacilitiesPage() {
     .where(eq(facilities.organizationId, session.organizationId!));
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">Sites</h1>
       <NewFacilityForm />
       {rows.length === 0 ? (

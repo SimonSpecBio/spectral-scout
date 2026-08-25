@@ -22,7 +22,7 @@ export default async function EstablishmentCheckPage({ params }: { params: Promi
   const daysSinceApplied = Math.max(0, Math.round((Date.now() - row.task.createdAt.getTime()) / 86_400_000));
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">Establishment check</h1>
       <EstablishmentCheckForm
         taskId={taskId}

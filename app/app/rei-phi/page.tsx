@@ -54,7 +54,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
   const clearRestricted = restrictions.filter((r) => !r.reiActive && !r.phiActive);
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">Re-entry &amp; harvest</h1>
 
       {orgFacilities.length > 1 && (

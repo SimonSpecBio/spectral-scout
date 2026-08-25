@@ -41,7 +41,7 @@ export default async function LogTrapReadingsPage({
 
   if (!facilityId) {
     return (
-      <div className="mx-auto flex max-w-md flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
         <h1 className="text-2xl font-semibold">Log trap readings</h1>
         <div className="text-sm text-[var(--text-dim)]">Which site?</div>
         {orgFacilities.map((f) => (
@@ -58,7 +58,7 @@ export default async function LogTrapReadingsPage({
   if (!areaId) {
     if (areas.length === 0) {
       return (
-        <div className="mx-auto flex max-w-md flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4">
           <h1 className="text-2xl font-semibold">Log trap readings</h1>
           <div className="card p-6 text-sm text-[var(--text-dim)]">
             This site has no areas yet.{" "}
@@ -71,7 +71,7 @@ export default async function LogTrapReadingsPage({
       );
     }
     return (
-      <div className="mx-auto flex max-w-md flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
         <h1 className="text-2xl font-semibold">Log trap readings</h1>
         <div className="text-sm text-[var(--text-dim)]">Which area?</div>
         {areas.map((a) => (
@@ -91,7 +91,7 @@ export default async function LogTrapReadingsPage({
 
   if (areaTraps.length === 0) {
     return (
-      <div className="mx-auto flex max-w-md flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
         <h1 className="text-2xl font-semibold">Log trap readings</h1>
         <div className="card p-6 text-sm text-[var(--text-dim)]">
           This area has no traps yet.{" "}
@@ -105,7 +105,7 @@ export default async function LogTrapReadingsPage({
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">Log trap readings</h1>
       <LogTrapReadingsForm
         facilityId={facilityId}

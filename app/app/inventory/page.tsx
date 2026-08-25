@@ -15,7 +15,7 @@ export default async function InventoryPage() {
   const orders = itemIds.length ? await db.select().from(inventoryOrders).where(inArray(inventoryOrders.itemId, itemIds)) : [];
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold">Inventory</h1>
       <InventoryClient
         initialItems={items.map((i) => ({

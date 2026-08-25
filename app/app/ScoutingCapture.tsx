@@ -48,7 +48,7 @@ export default function ScoutingCapture({
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       {header}
       {method !== null && (
         <button type="button" onClick={() => setMethod(null)} className="self-start text-sm text-[var(--text-dim)]">

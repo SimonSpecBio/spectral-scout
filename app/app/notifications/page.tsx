@@ -11,7 +11,7 @@ export default async function NotificationsPage() {
   const notifications = await computeNotifications(session.organizationId!, session.user!.id!);
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <NotificationsClient notifications={notifications.map((n) => ({ ...n, at: n.at.toISOString() }))} />
     </div>
   );

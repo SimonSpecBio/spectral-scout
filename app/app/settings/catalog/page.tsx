@@ -31,7 +31,7 @@ export default async function CatalogSettingsPage() {
   ]);
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <Link href="/app/settings" className="text-sm text-[var(--text-dim)]">
         &lsaquo; Settings
       </Link>

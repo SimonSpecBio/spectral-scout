@@ -18,7 +18,7 @@ export default async function FacilityDetailPage({ params }: { params: Promise<{
   const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, id));
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <div>
         <Link href="/app/facilities" className="text-sm text-[var(--text-dim)]">
           ← Sites

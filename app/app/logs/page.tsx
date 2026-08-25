@@ -45,7 +45,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">Logs</h1>
         <p className="text-xs text-[var(--text-dim)]">The filterable audit record, for compliance and record-keeping.</p>
