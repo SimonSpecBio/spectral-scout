@@ -16,7 +16,11 @@
 // what's collected, but both are new, real disclosures about rights and
 // third parties that weren't stated anywhere before -- material under this
 // file's own "who can see it" standard.
-export const CURRENT_CONSENT_VERSION = "1.2";
+//
+// 1.2 -> 1.3 (same audit, follow-up): added a "How long we keep it"
+// section -- CCPA/CPRA and the Colorado Privacy Act both expect a stated
+// retention policy, not just a way to ask for early deletion.
+export const CURRENT_CONSENT_VERSION = "1.3";
 
 export interface ConsentSection {
   heading: string;
@@ -82,6 +86,12 @@ export const CONSENT_SECTIONS: ConsentSection[] = [
     paragraphs: [
       "We use a small number of infrastructure providers to run the app -- they process your data on our behalf, never for their own purposes: Vercel (hosting, and photo storage via Vercel Blob), Supabase (our database, hosted in the United States), and Resend (delivering sign-in and notification emails). If you enable push notifications, your device's browser/OS push service (e.g. Google, Apple, or Mozilla) relays those.",
       "Your data is processed and stored in the United States. If you're located outside the US, that means it crosses a border to get there.",
+    ],
+  },
+  {
+    heading: "How long we keep it",
+    paragraphs: [
+      "We keep your data for as long as your account is active. Deleting your account removes it immediately -- there's no separate retention period after that, beyond what a backup system takes to fully purge on its own schedule.",
     ],
   },
   {
