@@ -7,6 +7,7 @@ import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transforme
 import type Konva from "konva";
 import { CANVAS_TEXT } from "@/lib/canvas-text-scale";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
+import { queuedFetch } from "@/lib/offline-queue";
 import { useTheme } from "@/app/app/ThemeProvider";
 
 // Freehand shape creation (rect/circle/polygon/label draw tools) was
@@ -208,11 +209,7 @@ export default function MapEditor({
 
   async function updateGeometry(id: string, geometry: Geometry) {
     setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, geometry } : o)));
-    await fetch(`${base}/objects/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ geometry }),
-    });
+    await queuedFetch(`${base}/objects/${id}`, { geometry }, "Map edit", "PATCH");
   }
 
   async function deleteSelected() {

@@ -75,6 +75,12 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
   async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
     setError(null);
+    // The leaf-severity grid rides along in this same request (as
+    // initialMonitoring) instead of a second dependent POST that would need
+    // this event's server-generated id -- queuedFetch only handles
+    // independent requests, so a second call would have nothing to attach
+    // to if this whole submission queues offline. The API creates both rows
+    // atomically when initialMonitoring is present.
     const eventResult = await queuedFetch(
       `/api/facilities/${facilityId}/pest-events`,
       {
@@ -86,6 +92,10 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
         notes: notes || null,
         x,
         y,
+        initialMonitoring:
+          agg.leavesAssessed > 0
+            ? { sampleSize: agg.leavesAssessed, pestCount: agg.leavesInfected, assessmentType: "disease_severity", leafGrid: grid }
+            : undefined,
       },
       "Disease event"
     );
@@ -96,13 +106,9 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
       return;
     }
 
-    // Queued (offline): the event itself is safely queued for sync, but the
-    // leaf-grid assessment is a second request that needs the server-
-    // generated event id from the first -- there's no id yet to attach it
-    // to, and this queue only handles independent POSTs, not a dependent
-    // chain. The assessment grid is dropped rather than silently held
-    // somewhere it can't actually be synced; land on the facility instead
-    // of a not-yet-existing detail page, same as NewEventForm.
+    // Queued (offline): both rows are safely queued together for sync --
+    // land on the facility instead of a not-yet-existing detail page, same
+    // as NewEventForm.
     if (eventResult.queued) {
       markEngaged();
       localStorage.removeItem(DRAFT_KEY);
@@ -111,19 +117,6 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
     }
 
     const event = eventResult.data as { id: string };
-    if (agg.leavesAssessed > 0) {
-      await fetch(`/api/facilities/${facilityId}/pest-events/${event.id}/monitoring`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sampleSize: agg.leavesAssessed,
-          pestCount: agg.leavesInfected,
-          assessmentType: "disease_severity",
-          leafGrid: grid,
-        }),
-      });
-    }
-
     markEngaged();
     localStorage.removeItem(DRAFT_KEY);
     router.push(`/app/facilities/${facilityId}/pest-events/${event.id}`);

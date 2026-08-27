@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { eventKindEnum, facilityAreas, facilityMapObjects, inventoryItems, pestEvents, scoutingObservations, severityEnum, tasks } from "@/db/schema";
 import { locationLabel } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
+import { parseMonitoringPayload } from "@/lib/monitoring";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
 import { findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
@@ -82,6 +83,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       notes: typeof body.notes === "string" && body.notes ? body.notes : null,
     })
     .returning();
+
+  // An initial assessment (e.g. the disease-event form's leaf-severity grid)
+  // taken at creation time, folded into this same request instead of a
+  // second dependent POST that needs this event's just-generated id --
+  // queuedFetch only handles independent requests, so a second call here
+  // would have nothing to attach to if this whole request queues offline
+  // (ticket: disease-event severity grid silently dropped when the parent
+  // submission queues offline). Same parseMonitoringPayload the two
+  // monitoring routes already use, so this stays one validated shape.
+  let initialMonitoring = null;
+  if (facilityAreaId && body.initialMonitoring) {
+    const parsed = parseMonitoringPayload(body.initialMonitoring);
+    if (parsed) {
+      [initialMonitoring] = await db
+        .insert(scoutingObservations)
+        .values({
+          organizationId: session.organizationId!,
+          facilityAreaId,
+          x: row.x,
+          y: row.y,
+          submittedByUserId: session.user!.id!,
+          date: new Date().toISOString().slice(0, 10),
+          promotedPestEventId: row.id,
+          ...parsed,
+        })
+        .returning();
+    }
+  }
 
   // Confirming a scouting alert into an event (lib/scouting-alerts.ts)
   // links the originating session as this event's first monitoring
@@ -233,5 +262,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
-  return NextResponse.json({ ...row, autoCreatedTasks: createdTasks });
+  return NextResponse.json({ ...row, autoCreatedTasks: createdTasks, initialMonitoring });
 }

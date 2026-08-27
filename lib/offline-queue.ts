@@ -29,7 +29,13 @@ const STORE = "pending";
 interface PendingRequest {
   id: number;
   url: string;
+  method: string;
   body: unknown;
+  // A queued photo upload stores the raw File as `body` instead of a JSON
+  // value (IndexedDB structured-clones Blob/File natively) and replays it
+  // as multipart form data under `fileFieldName` instead of a JSON body.
+  isFile?: boolean;
+  fileFieldName?: string;
   createdAt: number;
   label: string; // human-readable, shown in the pending-sync indicator
 }
@@ -47,11 +53,18 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-async function enqueue(url: string, body: unknown, label: string): Promise<void> {
+async function enqueue(
+  url: string,
+  method: string,
+  body: unknown,
+  label: string,
+  isFile?: boolean,
+  fileFieldName?: string
+): Promise<void> {
   const db = await openDB();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).add({ url, body, createdAt: Date.now(), label });
+    tx.objectStore(STORE).add({ url, method, body, isFile, fileFieldName, createdAt: Date.now(), label });
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -111,13 +124,14 @@ export function onMutationSettled(cb: () => void): () => void {
 export async function queuedFetch(
   url: string,
   body: unknown,
-  label: string
+  label: string,
+  method: string = "POST"
 ): Promise<{ ok: boolean; queued: boolean; data?: unknown }> {
   inFlightMutations++;
   try {
     if (typeof navigator !== "undefined" && navigator.onLine) {
       try {
-        const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         if (res.ok) return { ok: true, queued: false, data: await res.json() };
         return { ok: false, queued: false };
       } catch {
@@ -125,7 +139,37 @@ export async function queuedFetch(
         // signal) -- fall through and queue instead of surfacing an error.
       }
     }
-    await enqueue(url, body, label);
+    await enqueue(url, method, body, label);
+    return { ok: true, queued: true };
+  } finally {
+    inFlightMutations = Math.max(0, inFlightMutations - 1);
+    window.dispatchEvent(new Event(MUTATION_EVENT));
+  }
+}
+
+// Same contract as queuedFetch, for a file upload (multipart, not JSON) --
+// a queued photo's File is stored as-is (IndexedDB structured-clones
+// Blob/File) and replayed as form data on the next flush.
+export async function queuedFileFetch(
+  url: string,
+  file: File,
+  fieldName: string,
+  label: string
+): Promise<{ ok: boolean; queued: boolean; data?: unknown }> {
+  inFlightMutations++;
+  try {
+    if (typeof navigator !== "undefined" && navigator.onLine) {
+      try {
+        const form = new FormData();
+        form.append(fieldName, file);
+        const res = await fetch(url, { method: "POST", body: form });
+        if (res.ok) return { ok: true, queued: false, data: await res.json() };
+        return { ok: false, queued: false };
+      } catch {
+        // see queuedFetch above
+      }
+    }
+    await enqueue(url, "POST", file, label, true, fieldName);
     return { ok: true, queued: true };
   } finally {
     inFlightMutations = Math.max(0, inFlightMutations - 1);
@@ -148,11 +192,15 @@ export async function flushQueue(): Promise<void> {
     const pending = await getPending();
     for (const item of pending) {
       try {
-        const res = await fetch(item.url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(item.body),
-        });
+        const method = item.method ?? "POST";
+        let res: Response;
+        if (item.isFile) {
+          const form = new FormData();
+          form.append(item.fileFieldName!, item.body as Blob);
+          res = await fetch(item.url, { method, body: form });
+        } else {
+          res = await fetch(item.url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(item.body) });
+        }
         if (res.ok) {
           await removePending(item.id);
           continue;

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { scaledPoints } from "@/lib/density";
-import { queuedFetch } from "@/lib/offline-queue";
+import { queuedFetch, queuedFileFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
 import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
@@ -115,9 +115,13 @@ export default function PestEventDetail({
   const [escalateError, setEscalateError] = useState<string | null>(null);
   const [treatmentsList, setTreatmentsList] = useState(initialTreatments);
   const [photos, setPhotos] = useState(initialPhotos);
+  const [photoQueued, setPhotoQueued] = useState(false);
   const [comments, setComments] = useState(initialComments);
   const [newComment, setNewComment] = useState("");
   const [postingComment, setPostingComment] = useState(false);
+  const [commentQueued, setCommentQueued] = useState(false);
+  const [statusQueued, setStatusQueued] = useState(false);
+  const [escalationQueued, setEscalationQueued] = useState(false);
 
   const [treatmentType, setTreatmentType] = useState<TreatmentType>("biological");
   const [inventoryItemId, setInventoryItemId] = useState("");
@@ -210,14 +214,11 @@ export default function PestEventDetail({
 
   async function toggleStatus() {
     const next = status === "active" ? "resolved" : "active";
-    const res = await fetch(base, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: next }),
-    });
-    if (res.ok) {
+    const result = await queuedFetch(base, { status: next }, "Status", "PATCH");
+    if (result.ok) {
       setStatus(next);
-      router.refresh();
+      if (result.queued) setStatusQueued(true);
+      else router.refresh();
     }
   }
 
@@ -256,22 +257,13 @@ export default function PestEventDetail({
   async function submitEscalation() {
     setEscalating(true);
     setEscalateError(null);
-    try {
-      const res = await fetch(`${base}/escalate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note: escalateNote.trim() || null }),
-      });
-      if (res.ok) {
-        const row = await res.json();
-        setEscalation(row);
-        setShowEscalateConfirm(false);
-        setEscalateNote("");
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setEscalateError(data.error ?? "Couldn't send this to our team. Check your connection and try again.");
-      }
-    } catch {
+    const result = await queuedFetch(`${base}/escalate`, { note: escalateNote.trim() || null }, "Escalation");
+    if (result.ok) {
+      setShowEscalateConfirm(false);
+      setEscalateNote("");
+      if (result.queued) setEscalationQueued(true);
+      else if (result.data) setEscalation(result.data as typeof escalation);
+    } else {
       setEscalateError("Couldn't send this to our team. Check your connection and try again.");
     }
     setEscalating(false);
@@ -292,14 +284,10 @@ export default function PestEventDetail({
     const body = newComment.trim();
     if (!body) return;
     setPostingComment(true);
-    const res = await fetch(`${base}/comments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body }),
-    });
-    if (res.ok) {
-      const row = await res.json();
-      setComments((prev) => [...prev, row]);
+    const result = await queuedFetch(`${base}/comments`, { body }, "Comment");
+    if (result.ok) {
+      if (result.queued) setCommentQueued(true);
+      else if (result.data) setComments((prev) => [...prev, result.data as Comment]);
       setNewComment("");
     }
     setPostingComment(false);
@@ -346,12 +334,10 @@ export default function PestEventDetail({
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch(`${base}/photos`, { method: "POST", body: form });
-    if (res.ok) {
-      const row = await res.json();
-      setPhotos((prev) => [...prev, row]);
+    const result = await queuedFileFetch(`${base}/photos`, file, "file", "Photo");
+    if (result.ok) {
+      if (result.queued) setPhotoQueued(true);
+      else if (result.data) setPhotos((prev) => [...prev, result.data as Photo]);
     }
     setUploading(false);
   }
@@ -422,6 +408,8 @@ export default function PestEventDetail({
         </div>
       </div>
 
+      {statusQueued && <div className="text-xs text-[var(--text-dim)]">Status change saved offline. Will sync.</div>}
+
       {showEscalateConfirm && (
         <div className="card flex flex-col gap-3 p-3.5">
           <div className="text-sm">
@@ -463,6 +451,12 @@ export default function PestEventDetail({
         <div className="card flex flex-col gap-1 p-3.5">
           <div className="label-mono">{escalation.resolvedAt ? "Reviewed by Spectral" : "Flagged for review -- Spectral will follow up here"}</div>
           {escalation.staffResponse && <div className="text-sm">{escalation.staffResponse}</div>}
+        </div>
+      )}
+
+      {escalationQueued && !escalation && (
+        <div className="card flex flex-col gap-1 p-3.5">
+          <div className="label-mono">Saved offline. Will send to Spectral once you're back online.</div>
         </div>
       )}
 
@@ -740,6 +734,7 @@ export default function PestEventDetail({
             {uploading ? "Uploading…" : "Add photo"}
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
           </label>
+          {photoQueued && <div className="text-xs text-[var(--text-dim)]">Photo saved offline. Will upload once you're back online.</div>}
           {photos.length === 0 ? (
             <div className="text-sm text-[var(--text-dim)]">No photos yet.</div>
           ) : (
@@ -837,6 +832,7 @@ export default function PestEventDetail({
               {postingComment ? "Posting…" : "Post"}
             </button>
           </form>
+          {commentQueued && <div className="text-xs text-[var(--text-dim)]">Comment saved offline. Will post once you're back online.</div>}
         </div>
       )}
     </div>
