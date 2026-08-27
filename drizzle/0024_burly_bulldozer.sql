@@ -1,0 +1,1 @@
+ALTER TABLE "scout_organization" ADD COLUMN "age_confirmed_at" timestamp with time zone;

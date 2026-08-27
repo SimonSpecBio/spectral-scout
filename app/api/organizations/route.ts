@@ -39,6 +39,17 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "You must accept the data agreement to continue" }, { status: 400 });
   }
 
+  // Checked against the real DB row, not just trusted from the client's
+  // needsAgeConfirmation prop -- an org that already has ageConfirmedAt set
+  // never needs to resend it (never re-asked, per the schema column's own
+  // comment), but one that doesn't yet MUST send ageConfirmed: true every
+  // time, same "real no, not a default" rigor as consentAccepted above.
+  const [existing] = await db.select().from(organizations).where(eq(organizations.id, session.organizationId!));
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!existing.ageConfirmedAt && body.ageConfirmed !== true) {
+    return NextResponse.json({ error: "You must confirm your age to continue" }, { status: 400 });
+  }
+
   const [row] = await db
     .update(organizations)
     .set({
@@ -47,6 +58,7 @@ export async function PATCH(request: NextRequest) {
       dataConsentVersion: CURRENT_CONSENT_VERSION,
       dataConsentAcceptedAt: new Date(),
       dataConsentAcceptedByUserId: session.user?.id ?? null,
+      ...(!existing.ageConfirmedAt ? { ageConfirmedAt: new Date() } : {}),
     })
     .where(eq(organizations.id, session.organizationId!))
     .returning();

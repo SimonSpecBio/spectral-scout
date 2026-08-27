@@ -21,7 +21,7 @@ export default async function OnboardingPage() {
 
   const [org] = await db.select().from(organizations).where(eq(organizations.id, session.organizationId!));
   if (!org) redirect("/app");
-  if (org.state && org.dataConsentVersion === CURRENT_CONSENT_VERSION) redirect("/app");
+  if (org.state && org.dataConsentVersion === CURRENT_CONSENT_VERSION && org.ageConfirmedAt) redirect("/app");
 
   const needsProfile = !org.state;
 
@@ -32,10 +32,10 @@ export default async function OnboardingPage() {
         <p className="mt-1 text-sm text-[var(--text-dim)]">
           {needsProfile
             ? "A couple quick details before you get started -- this is what lets us show you the right compliance info for your state."
-            : "We've updated our data agreement -- please review and accept to keep using Spectral Scout."}
+            : "We've updated our data agreement (or added a new confirmation) -- please review to keep using Spectral Scout."}
         </p>
       </div>
-      <OnboardingForm initialName={org.name} needsProfile={needsProfile} />
+      <OnboardingForm initialName={org.name} needsProfile={needsProfile} needsAgeConfirmation={!org.ageConfirmedAt} />
     </div>
   );
 }

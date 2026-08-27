@@ -1,5 +1,9 @@
+import { eq } from "drizzle-orm";
 import Link from "next/link";
+import { db } from "@/db";
+import { memberships } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
+import AccountData from "./AccountData";
 import NotificationsToggle from "./NotificationsToggle";
 import ThemeToggle from "./ThemeToggle";
 
@@ -8,6 +12,14 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const session = await requireGrowerSession();
   if (!session) return null;
+
+  // Mirrors app/api/account's own last-owner guard exactly, computed here
+  // just to decide whether to show the blocked-state copy up front instead
+  // of only after a failed delete attempt.
+  const orgMemberships = await db.select().from(memberships).where(eq(memberships.organizationId, session.organizationId!));
+  const isOwner = session.membershipRole === "owner";
+  const otherMemberships = orgMemberships.filter((m) => m.userId !== session.user!.id!);
+  const blockedAsOnlyOwner = isOwner && otherMemberships.length > 0 && !otherMemberships.some((m) => m.role === "owner");
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
@@ -34,6 +46,8 @@ export default async function SettingsPage() {
           <span className="text-[var(--text-faint)]">&rsaquo;</span>
         </Link>
       </div>
+
+      <AccountData isOwner={isOwner} blockedAsOnlyOwner={blockedAsOnlyOwner} />
     </div>
   );
 }

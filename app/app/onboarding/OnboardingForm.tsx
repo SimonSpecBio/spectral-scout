@@ -22,7 +22,15 @@ function ConsentBody() {
   );
 }
 
-export default function OnboardingForm({ initialName, needsProfile }: { initialName: string; needsProfile: boolean }) {
+export default function OnboardingForm({
+  initialName,
+  needsProfile,
+  needsAgeConfirmation,
+}: {
+  initialName: string;
+  needsProfile: boolean;
+  needsAgeConfirmation: boolean;
+}) {
   const router = useRouter();
   // initialName defaults to the owner's email (auth.ts's provisioning
   // fallback, "name || email") -- pre-filled but selected-all so typing a
@@ -36,6 +44,7 @@ export default function OnboardingForm({ initialName, needsProfile }: { initialN
   // has nothing else to fill in, so it renders the same consent content
   // inline instead of behind an extra modal-open click.
   const [showConsentModal, setShowConsentModal] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +54,11 @@ export default function OnboardingForm({ initialName, needsProfile }: { initialN
     const res = await fetch("/api/organizations", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...(needsProfile ? { name, state } : {}), consentAccepted: true }),
+      body: JSON.stringify({
+        ...(needsProfile ? { name, state } : {}),
+        consentAccepted: true,
+        ...(needsAgeConfirmation ? { ageConfirmed: true } : {}),
+      }),
     });
     if (res.ok) {
       router.push("/app");
@@ -61,6 +74,12 @@ export default function OnboardingForm({ initialName, needsProfile }: { initialN
     return (
       <div className="card flex flex-col gap-4 p-4">
         <ConsentBody />
+        {needsAgeConfirmation && (
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" checked={ageConfirmed} onChange={(e) => setAgeConfirmed(e.target.checked)} className="mt-0.5" />
+            I confirm I am of legal age to cultivate and possess cannabis in my jurisdiction.
+          </label>
+        )}
         {error && (
           <div
             className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
@@ -72,7 +91,7 @@ export default function OnboardingForm({ initialName, needsProfile }: { initialN
             </button>
           </div>
         )}
-        <SubmitButton onClick={acceptAndSubmit} disabled={submitting}>
+        <SubmitButton onClick={acceptAndSubmit} disabled={submitting || (needsAgeConfirmation && !ageConfirmed)}>
           {submitting ? "Saving…" : "I Agree — Continue"}
         </SubmitButton>
       </div>
@@ -129,6 +148,12 @@ export default function OnboardingForm({ initialName, needsProfile }: { initialN
           <div className="flex w-full max-w-md flex-col gap-4 rounded-xl p-5" style={{ background: "var(--surface)" }}>
             <div className="text-lg font-semibold">Before you continue</div>
             <ConsentBody />
+            {needsAgeConfirmation && (
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" checked={ageConfirmed} onChange={(e) => setAgeConfirmed(e.target.checked)} className="mt-0.5" />
+                I confirm I am of legal age to cultivate and possess cannabis in my jurisdiction.
+              </label>
+            )}
             {error && (
               <div
                 className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
@@ -149,7 +174,7 @@ export default function OnboardingForm({ initialName, needsProfile }: { initialN
               >
                 Cancel
               </button>
-              <SubmitButton onClick={acceptAndSubmit} disabled={submitting}>
+              <SubmitButton onClick={acceptAndSubmit} disabled={submitting || (needsAgeConfirmation && !ageConfirmed)}>
                 {submitting ? "Saving…" : "I Agree — Continue"}
               </SubmitButton>
             </div>

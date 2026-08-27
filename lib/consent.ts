@@ -8,7 +8,15 @@
 // aggregate-only comparison to OTHER growers inside the app (not just to
 // Spectral staff, which 1.0 already covered) -- a genuinely new "who can
 // see derived-from-your-data stats" story, so this counts as material.
-export const CURRENT_CONSENT_VERSION = "1.1";
+//
+// 1.1 -> 1.2 (compliance audit, 2026-08-27): added "Your rights" (naming
+// the real, working Settings tools -- export and delete -- that didn't
+// exist before this pass) and "Who else can access it" (sub-processor
+// disclosure: Vercel, Supabase, Resend, web push relays). Neither changes
+// what's collected, but both are new, real disclosures about rights and
+// third parties that weren't stated anywhere before -- material under this
+// file's own "who can see it" standard.
+export const CURRENT_CONSENT_VERSION = "1.2";
 
 export interface ConsentSection {
   heading: string;
@@ -67,6 +75,21 @@ export const CONSENT_SECTIONS: ConsentSection[] = [
     heading: "Photos and file storage",
     paragraphs: [
       "Photos you upload are stored with our cloud storage provider (Vercel Blob) at an unguessable, unlisted address -- the app only ever shows them to your organization's own members and, for pilot-tier accounts, Spectral staff per the above. Photos are stripped of location (GPS) metadata before storage.",
+    ],
+  },
+  {
+    heading: "Who else can access it",
+    paragraphs: [
+      "We use a small number of infrastructure providers to run the app -- they process your data on our behalf, never for their own purposes: Vercel (hosting, and photo storage via Vercel Blob), Supabase (our database, hosted in the United States), and Resend (delivering sign-in and notification emails). If you enable push notifications, your device's browser/OS push service (e.g. Google, Apple, or Mozilla) relays those.",
+      "Your data is processed and stored in the United States. If you're located outside the US, that means it crosses a border to get there.",
+    ],
+  },
+  {
+    heading: "Your rights",
+    paragraphs: [
+      "You can download a copy of everything in your account (Settings -> Your data -> Export my data) or permanently delete your account (Settings -> Your data -> Delete my account) at any time, yourself, without waiting on us. Deleting your account also deletes your entire organization's data if you're its only member -- if you have teammates, only your own login and membership are removed.",
+      "Depending on where you live, you may also have the right to correct inaccurate information we hold about you, or to ask what we've collected and why, beyond what self-serve export already gives you. Reach out using the contact info below for anything the in-app tools don't cover.",
+      "We won't treat you differently or degrade the app for exercising any of these rights.",
     ],
   },
   {

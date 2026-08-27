@@ -16,6 +16,9 @@ declare module "next-auth" {
     // Null (or stale vs lib/consent.ts's CURRENT_CONSENT_VERSION) sends the
     // owner back through onboarding's consent step -- see proxy.ts.
     organizationConsentVersion: string | null;
+    // Null sends the owner back through onboarding's age-confirmation step
+    // -- see proxy.ts. Never re-asked once set (no "version" to go stale).
+    organizationAgeConfirmed: boolean;
     // "owner" doubles as SCHEDULING.md's "manager" role (team invites/removal,
     // task assignment); "member" as "scout". See scout_membership's comment.
     membershipRole: "owner" | "member" | null;
