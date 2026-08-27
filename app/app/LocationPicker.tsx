@@ -48,6 +48,7 @@ export default function LocationPicker({
   initialX,
   initialY,
   step,
+  pinRequired = true,
 }: {
   facilities: PickerFacility[];
   onConfirm: (facilityId: string, areaId: string, x: number, y: number) => void;
@@ -70,6 +71,14 @@ export default function LocationPicker({
   // real multi-step context (a deep link that skips straight here) aren't
   // forced to fake one.
   step?: { current: number; total: number };
+  // Trap readings log against every trap already placed in an area, not one
+  // new pin -- there's nothing to tap on the bay map for that caller, just
+  // site + area. Defaults to true (every other caller places a real pin);
+  // false skips the bay map/instructions entirely and enables confirm as
+  // soon as an area is picked. onConfirm's x/y are meaningless in this mode
+  // (passed as 0) -- the signature stays the same so every pin-placing
+  // caller is unaffected.
+  pinRequired?: boolean;
 }) {
   const initialIdx = initialFacilityId ? facilities.findIndex((f) => f.id === initialFacilityId) : -1;
   const [facilityIdx, setFacilityIdx] = useState(initialIdx >= 0 ? initialIdx : 0);
@@ -104,9 +113,9 @@ export default function LocationPicker({
   }
 
   function confirm() {
-    if (!selected || !currentAreaId || !facility || confirming) return;
+    if ((pinRequired && !selected) || !currentAreaId || !facility || confirming) return;
     setConfirming(true);
-    onConfirm(facility.id, currentAreaId, selected.x, selected.y);
+    onConfirm(facility.id, currentAreaId, selected?.x ?? 0, selected?.y ?? 0);
   }
 
   const selectedView = selected ? toView(selected) : null;
@@ -182,6 +191,14 @@ export default function LocationPicker({
         <div className="flex flex-1 items-center justify-center px-8 text-center text-sm text-[var(--text-dim)]">
           {facility ? `${facility.name} has no areas yet.` : "You have no sites yet."}
         </div>
+      ) : !pinRequired ? (
+        <div
+          className="flex flex-1 items-center justify-center px-8 text-center text-sm text-[var(--text-dim)]"
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          Swipe to change site, then confirm the area below.
+        </div>
       ) : (
         <>
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-5 py-3">
@@ -240,19 +257,28 @@ export default function LocationPicker({
         <div className="mb-3 flex items-center gap-2">
           <span style={{ color: "var(--accent)" }}>&#128205;</span>
           <div>
-            <div className="text-sm">{selected ? bayLabel(selected) : "No location selected"}</div>
-            <div className="label-mono">
-              {facility?.name.toUpperCase() ?? ""}
-              {areas.find((a) => a.id === currentAreaId) ? ` · ${areas.find((a) => a.id === currentAreaId)!.name.toUpperCase()}` : ""}
-            </div>
+            {pinRequired ? (
+              <>
+                <div className="text-sm">{selected ? bayLabel(selected) : "No location selected"}</div>
+                <div className="label-mono">
+                  {facility?.name.toUpperCase() ?? ""}
+                  {areas.find((a) => a.id === currentAreaId) ? ` · ${areas.find((a) => a.id === currentAreaId)!.name.toUpperCase()}` : ""}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-sm">{facility?.name ?? "No site selected"}</div>
+                <div className="label-mono">{areas.find((a) => a.id === currentAreaId)?.name.toUpperCase() ?? ""}</div>
+              </>
+            )}
           </div>
         </div>
         <button
           onClick={confirm}
-          disabled={!selected || !currentAreaId || confirming}
+          disabled={(pinRequired && !selected) || !currentAreaId || confirming}
           className="btn-location w-full rounded-xl py-3.5 text-sm font-medium disabled:opacity-40"
         >
-          {confirming ? "Setting…" : "Set location"}
+          {confirming ? "Setting…" : pinRequired ? "Set location" : "Continue"}
         </button>
       </div>
     </div>
