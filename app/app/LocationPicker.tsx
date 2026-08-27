@@ -16,6 +16,13 @@ const VIEW_W = 296;
 const VIEW_H = 400;
 const BENCH_W = 86;
 const BENCH_H = 9;
+// The drawn bench stays thin (9 units, matching the physical layout), but a
+// 9-unit-tall tap target is well under a real touch target on most phones
+// once the SVG's viewBox is scaled up to the actual screen. A separate
+// invisible rect handles the tap instead, sized to nearly the full 32-unit
+// row pitch (lib/floorplan-bays.ts's BENCH_YS spacing) so it's as large as
+// it can be without overlapping the next bay's own hit area.
+const HIT_H = 30;
 
 function toView(bay: Bay) {
   return { cx: (bay.x / CANVAS_W) * VIEW_W, cy: (bay.y / CANVAS_H) * VIEW_H };
@@ -195,19 +202,19 @@ export default function LocationPicker({
                 const { cx, cy } = toView(b);
                 const isSelected = selected?.row === b.row && selected?.index === b.index;
                 return (
-                  <rect
-                    key={`${b.row}${b.index}`}
-                    x={cx - BENCH_W / 2}
-                    y={cy - BENCH_H / 2}
-                    width={BENCH_W}
-                    height={BENCH_H}
-                    rx={4.5}
-                    fill={isSelected ? "var(--map-bay-selected-fill)" : "var(--map-bay-fill)"}
-                    stroke={isSelected ? "var(--accent)" : "none"}
-                    strokeWidth={1.5}
-                    onClick={() => setSelected(b)}
-                    style={{ cursor: "pointer" }}
-                  />
+                  <g key={`${b.row}${b.index}`} onClick={() => setSelected(b)} style={{ cursor: "pointer" }}>
+                    <rect x={cx - BENCH_W / 2} y={cy - HIT_H / 2} width={BENCH_W} height={HIT_H} fill="transparent" />
+                    <rect
+                      x={cx - BENCH_W / 2}
+                      y={cy - BENCH_H / 2}
+                      width={BENCH_W}
+                      height={BENCH_H}
+                      rx={4.5}
+                      fill={isSelected ? "var(--map-bay-selected-fill)" : "var(--map-bay-fill)"}
+                      stroke={isSelected ? "var(--accent)" : "none"}
+                      strokeWidth={1.5}
+                    />
+                  </g>
                 );
               })}
               <g fontFamily="ui-monospace, monospace" fontSize="8" letterSpacing="0.14em" fill="var(--map-label)">

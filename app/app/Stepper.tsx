@@ -28,7 +28,7 @@ export function Stepper({
       <button
         type="button"
         onClick={() => onChange(Math.max(min, round(value - step)))}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)]"
+        className="flex h-11 w-11 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)]"
       >
         −
       </button>
@@ -36,7 +36,7 @@ export function Stepper({
       <button
         type="button"
         onClick={() => onChange(max != null ? Math.min(max, round(value + step)) : round(value + step))}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)]"
+        className="flex h-11 w-11 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)]"
       >
         +
       </button>
@@ -71,7 +71,7 @@ export function OptionalStepper({
         type="button"
         onClick={() => value !== "" && onChange(Math.max(min, round(value - step)))}
         disabled={value === ""}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)] disabled:opacity-30"
+        className="flex h-11 w-11 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)] disabled:opacity-30"
       >
         −
       </button>
@@ -79,7 +79,7 @@ export function OptionalStepper({
       <button
         type="button"
         onClick={() => onChange(value === "" ? start : max != null ? Math.min(max, round(value + step)) : round(value + step))}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)]"
+        className="flex h-11 w-11 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)]"
       >
         +
       </button>
