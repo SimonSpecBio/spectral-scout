@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import LocationPicker, { type PickerFacility } from "./LocationPicker";
+import { Stepper } from "./Stepper";
 
 // "Counts" capture method (ARCHITECTURE.md ยง3's convergence table: "pests
 // on 5 leaves -> mean pests / leaf") -- a quick tally, deliberately not the
@@ -61,6 +62,13 @@ export default function CountsFlow({
   const [submitting, setSubmitting] = useState(false);
   const [placingLocation, setPlacingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A count of 0 across all 5 leaves is a real, valid finding -- but it's
+  // also exactly what an untouched form looks like, so a scout shouldn't be
+  // able to tap straight through without at least confirming that's really
+  // what they saw. First submit tap with total 0 asks for confirmation
+  // instead of saving; any count change clears it, so a stale confirmation
+  // can't carry over to a different (also-zero) session.
+  const [confirmingZero, setConfirmingZero] = useState(false);
 
   useEffect(() => {
     try {
@@ -75,6 +83,7 @@ export default function CountsFlow({
 
   function setCount(i: number, v: number) {
     setCounts((prev) => prev.map((c, idx) => (idx === i ? Math.max(0, v) : c)));
+    setConfirmingZero(false);
   }
 
   async function submitSession(url: string, x: number | null, y: number | null) {
@@ -105,6 +114,10 @@ export default function CountsFlow({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (total === 0 && !confirmingZero) {
+      setConfirmingZero(true);
+      return;
+    }
     if (facilities) setPlacingLocation(true);
     else if (postUrl) submitSession(postUrl, null, null);
   }
@@ -131,23 +144,7 @@ export default function CountsFlow({
           {counts.map((c, i) => (
             <div key={i} className="flex items-center justify-between py-2.5">
               <span className="text-sm text-[var(--text-dim)]">Leaf {i + 1}</span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCount(i, c - 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)]"
-                >
-                  −
-                </button>
-                <span className="w-6 text-center text-sm tabular-nums">{c}</span>
-                <button
-                  type="button"
-                  onClick={() => setCount(i, c + 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-dim)]"
-                >
-                  +
-                </button>
-              </div>
+              <Stepper value={c} onChange={(v) => setCount(i, v)} />
             </div>
           ))}
         </div>
@@ -188,9 +185,19 @@ export default function CountsFlow({
         disabled={submitting || (!!facilities && facilities.length === 0)}
         className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
       >
-        {submitting ? (facilities ? "Logging…" : "Submitting…") : facilities ? "Log location" : "Submit session"}
+        {submitting
+          ? facilities
+            ? "Logging…"
+            : "Submitting…"
+          : total === 0 && confirmingZero
+            ? "Confirm 0 pests found"
+            : facilities
+              ? "Log location"
+              : "Submit session"}
       </button>
-      <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
+      <div className="text-center text-xs text-[var(--text-dim)]">
+        {total === 0 && confirmingZero ? "Tap again to save a clean count of 0 pests." : "Draft saves automatically as you go."}
+      </div>
     </form>
   );
 }
