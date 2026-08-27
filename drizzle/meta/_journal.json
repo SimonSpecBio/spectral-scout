@@ -176,6 +176,13 @@
       "when": 1787795873183,
       "tag": "0024_burly_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787796956274,
+      "tag": "0025_nebulous_sphinx",
+      "breakpoints": true
     }
   ]
 }

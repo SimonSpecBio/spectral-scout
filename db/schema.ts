@@ -75,12 +75,6 @@ export const organizations = pgTable("scout_organization", {
   // Matched-by-value against scout_user.id, not a real FK -- same
   // convention as scout_membership.userId.
   dataConsentAcceptedByUserId: uuid("data_consent_accepted_by_user_id"),
-  // Age gate (2026-08-27): captured once at onboarding, never re-asked --
-  // unlike dataConsentVersion this has no "version" to go stale, it's a
-  // one-time affirmation. Same "existing orgs get sent back through
-  // onboarding to catch up" gate as consent (proxy.ts), since accounts
-  // created before this shipped were never asked at all.
-  ageConfirmedAt: timestamp("age_confirmed_at", { withTimezone: true }),
   growerType: growerTypeEnum("grower_type"),
   // Freeform, not a parsed numeric sq-ft field -- per Simon's direct call
   // (2026-08-22): asking home cannabis growers for an exact plant count

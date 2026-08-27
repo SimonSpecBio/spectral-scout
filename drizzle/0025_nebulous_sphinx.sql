@@ -1,0 +1,1 @@
+ALTER TABLE "scout_organization" DROP COLUMN "age_confirmed_at";
