@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { inventoryItems, tasks, treatmentTypeEnum } from "@/db/schema";
+import { facilityAreas, inventoryItems, tasks, treatmentTypeEnum } from "@/db/schema";
 import { insertTreatmentAndDecrementStock } from "@/lib/apply-treatment";
-import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
+import { locationLabel } from "@/lib/floorplan-bays";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
@@ -62,7 +62,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
 
   const program = findPestProgram(event.pestSpecies);
-  const location = event.x != null && event.y != null ? bayLabel(nearestBay(event.x, event.y)) : event.pestSpecies;
+  // Falls back to the area's name, not the pest's own species -- an event
+  // with no pin (e.g. promoted from an unpinned general scouting session)
+  // used to produce a visibly duplicated title like "Recheck Whitefly —
+  // Whitefly" (ticket found in a manager-persona walkthrough, 2026-08-27).
+  const area = event.facilityAreaId
+    ? (await db.select({ name: facilityAreas.name }).from(facilityAreas).where(eq(facilityAreas.id, event.facilityAreaId)))[0]
+    : null;
+  const location = locationLabel(event.x, event.y, area?.name ?? null);
+  const suffix = location ? ` — ${location}` : "";
   const createdTasks = [];
 
   if (program?.followUp) {
@@ -76,7 +84,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .insert(tasks)
       .values({
         organizationId: session.organizationId!,
-        title: `Recheck ${event.pestSpecies} — ${location}`,
+        title: `Recheck ${event.pestSpecies}${suffix}`,
         type: "monitor",
         facilityId: id,
         facilityAreaId: event.facilityAreaId,
@@ -96,7 +104,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .insert(tasks)
         .values({
           organizationId: session.organizationId!,
-          title: `Release ${name} — ${location}`,
+          title: `Release ${name}${suffix}`,
           type: "release",
           facilityId: id,
           facilityAreaId: event.facilityAreaId,

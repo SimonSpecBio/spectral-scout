@@ -50,3 +50,19 @@ export function nearestBay(x: number, y: number): Bay {
 export function bayLabel(bay: Pick<Bay, "row" | "index">): string {
   return `Bay ${bay.row}${bay.index}`;
 }
+
+// Shared fallback for "where is this" labels once a pin's x/y is known to be
+// missing -- ticket found in a manager-persona walkthrough (2026-08-27):
+// several call sites fell back to the pest's own species name instead of a
+// real location, producing visibly duplicated text like task title
+// "Recheck Whitefly — Whitefly". app/api/facilities/[id]/areas/[areaId]/
+// scouting/route.ts already had this right (falls back to the area name);
+// this just gives the other call sites the same correct fallback instead of
+// each re-deriving (or mis-deriving) their own. areaName itself can be null
+// (an event with no facilityAreaId at all) -- callers decide what to show
+// then, since "Bay" vs a bare fallback reads differently in a title vs a
+// detail line.
+export function locationLabel(x: number | null, y: number | null, areaName: string | null): string | null {
+  if (x != null && y != null) return bayLabel(nearestBay(x, y));
+  return areaName;
+}

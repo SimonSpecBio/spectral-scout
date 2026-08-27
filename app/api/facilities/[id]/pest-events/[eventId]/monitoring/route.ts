@@ -1,8 +1,8 @@
 import { desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { scoutingObservations } from "@/db/schema";
-import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
+import { facilityAreas, scoutingObservations } from "@/db/schema";
+import { locationLabel } from "@/lib/floorplan-bays";
 import { parseMonitoringPayload } from "@/lib/monitoring";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
@@ -77,13 +77,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (metric) {
       const thresholds = await getSpeciesThresholds(session.organizationId!, event.pestSpecies);
       const threshold = metric.kind === "density" ? thresholds.density : thresholds.pct;
+      // Falls back to the area's name, not the pest's own species -- used
+      // to produce a visibly duplicated task title like "Keep an eye on
+      // Whitefly — Whitefly" for an unpinned event (ticket found in a
+      // manager-persona walkthrough, 2026-08-27).
+      const [monitorArea] = await db.select({ name: facilityAreas.name }).from(facilityAreas).where(eq(facilityAreas.id, event.facilityAreaId!));
       await maybeScheduleKeepAnEyeRecheck({
         organizationId: session.organizationId!,
         facilityId: id,
         facilityAreaId: event.facilityAreaId!,
         pestEventId: eventId,
         pestSpecies: event.pestSpecies,
-        locationLabel: event.x != null && event.y != null ? bayLabel(nearestBay(event.x, event.y)) : event.pestSpecies,
+        locationLabel: locationLabel(event.x, event.y, monitorArea?.name ?? null),
         metricKind: metric.kind,
         value: metric.value,
         threshold,

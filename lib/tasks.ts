@@ -158,7 +158,7 @@ export async function maybeScheduleKeepAnEyeRecheck(params: {
   facilityAreaId: string;
   pestEventId: string | null;
   pestSpecies: string | null;
-  locationLabel: string;
+  locationLabel: string | null;
   metricKind: MetricKind;
   value: number;
   threshold: number;
@@ -186,7 +186,7 @@ export async function maybeScheduleKeepAnEyeRecheck(params: {
   const assigneeUserId = await assignLeastLoadedWorker(organizationId);
   await db.insert(tasks).values({
     organizationId,
-    title: pestSpecies ? `Keep an eye on ${pestSpecies} — ${locationLabel}` : `Keep an eye on ${locationLabel}`,
+    title: `Keep an eye on ${[pestSpecies, locationLabel].filter(Boolean).join(" — ") || "this area"}`,
     type: "monitor",
     facilityId,
     facilityAreaId,

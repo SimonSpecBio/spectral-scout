@@ -2,7 +2,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { eventKindEnum, facilityAreas, facilityMapObjects, inventoryItems, pestEvents, scoutingObservations, severityEnum, tasks } from "@/db/schema";
-import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
+import { locationLabel } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
@@ -133,14 +133,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (severity === "severe" && facilityAreaId) {
     const DAY_MS = 86_400_000;
     const program = findPestProgram(pestSpecies);
-    const location = row.x != null && row.y != null ? bayLabel(nearestBay(row.x, row.y)) : pestSpecies;
+    // Falls back to the area's name, not the pest's own species -- an event
+    // with no pin used to produce a visibly duplicated title like "Recheck
+    // Whitefly — Whitefly" (ticket found in a manager-persona walkthrough,
+    // 2026-08-27). facilityAreaId is guaranteed non-null by this branch's
+    // own condition, so the area is always resolvable here.
+    const [severeArea] = await db.select({ name: facilityAreas.name }).from(facilityAreas).where(eq(facilityAreas.id, facilityAreaId));
+    const location = locationLabel(row.x, row.y, severeArea?.name ?? null);
+    const suffix = location ? ` — ${location}` : "";
     const assigneeUserId = await assignLeastLoadedWorker(session.organizationId!);
 
     const [recheckTask] = await db
       .insert(tasks)
       .values({
         organizationId: session.organizationId!,
-        title: `Recheck ${pestSpecies} — ${location}`,
+        title: `Recheck ${pestSpecies}${suffix}`,
         type: "monitor",
         facilityId: id,
         facilityAreaId,
@@ -174,7 +181,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .insert(tasks)
         .values({
           organizationId: session.organizationId!,
-          title: `Apply ${productName} — ${location}`,
+          title: `Apply ${productName}${suffix}`,
           type: "treatment",
           facilityId: id,
           facilityAreaId,
@@ -194,7 +201,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .values([
           {
             organizationId: session.organizationId!,
-            title: `Treat ${pestSpecies} — ${location}`,
+            title: `Treat ${pestSpecies}${suffix}`,
             type: "treatment",
             facilityId: id,
             facilityAreaId,
@@ -208,7 +215,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           },
           {
             organizationId: session.organizationId!,
-            title: `Treat ${pestSpecies} — ${location}`,
+            title: `Treat ${pestSpecies}${suffix}`,
             type: "treatment",
             facilityId: id,
             facilityAreaId,
