@@ -1,9 +1,10 @@
 import { asc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { db } from "@/db";
-import { customSpecies, monitoringThresholds } from "@/db/schema";
+import { customSpecies, monitoringThresholds, trapThresholds } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
 import { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD } from "@/lib/threshold-engine";
+import { DEFAULT_CATCH_PER_DAY_THRESHOLD } from "@/lib/trap-alerts";
 import CatalogClient from "./CatalogClient";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function CatalogSettingsPage() {
   const session = await requireGrowerSession();
   if (!session) return null;
 
-  const [species, thresholds] = await Promise.all([
+  const [species, thresholds, trapThresholdRows] = await Promise.all([
     db
       .select()
       .from(customSpecies)
@@ -28,6 +29,11 @@ export default async function CatalogSettingsPage() {
       .from(monitoringThresholds)
       .where(eq(monitoringThresholds.organizationId, session.organizationId!))
       .orderBy(asc(monitoringThresholds.pestSpecies)),
+    db
+      .select()
+      .from(trapThresholds)
+      .where(eq(trapThresholds.organizationId, session.organizationId!))
+      .orderBy(asc(trapThresholds.pestSpecies)),
   ]);
 
   return (
@@ -40,8 +46,10 @@ export default async function CatalogSettingsPage() {
         isOwner={session.membershipRole === "owner"}
         initialSpecies={species.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))}
         initialThresholds={thresholds.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() }))}
+        initialTrapThresholds={trapThresholdRows.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() }))}
         defaultPctThreshold={DEFAULT_INFESTED_PCT_THRESHOLD}
         defaultDensityThreshold={DEFAULT_DENSITY_THRESHOLD}
+        defaultCatchPerDayThreshold={DEFAULT_CATCH_PER_DAY_THRESHOLD}
       />
     </div>
   );

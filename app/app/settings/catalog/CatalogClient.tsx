@@ -16,22 +16,38 @@ interface ThresholdRow {
   densityThreshold: number | null;
   createdAt: string;
 }
+interface TrapThresholdRow {
+  id: string;
+  pestSpecies: string;
+  catchPerDayThreshold: number;
+  createdAt: string;
+}
 
 export default function CatalogClient({
   isOwner,
   initialSpecies,
   initialThresholds,
+  initialTrapThresholds,
   defaultPctThreshold,
   defaultDensityThreshold,
+  defaultCatchPerDayThreshold,
 }: {
   isOwner: boolean;
   initialSpecies: SpeciesRow[];
   initialThresholds: ThresholdRow[];
+  initialTrapThresholds: TrapThresholdRow[];
   defaultPctThreshold: number;
   defaultDensityThreshold: number;
+  defaultCatchPerDayThreshold: number;
 }) {
   const [species, setSpecies] = useState(initialSpecies);
   const [thresholds, setThresholds] = useState(initialThresholds);
+  const [trapThresholds, setTrapThresholds] = useState(initialTrapThresholds);
+
+  const [trapThresholdName, setTrapThresholdName] = useState("");
+  const [trapThresholdValue, setTrapThresholdValue] = useState("");
+  const [trapThresholdSubmitting, setTrapThresholdSubmitting] = useState(false);
+  const [trapThresholdError, setTrapThresholdError] = useState<string | null>(null);
 
   const [speciesName, setSpeciesName] = useState("");
   const [speciesLatin, setSpeciesLatin] = useState("");
@@ -105,6 +121,36 @@ export default function CatalogClient({
     if (!confirm(`Remove the monitoring threshold for "${row.pestSpecies}"?`)) return;
     const res = await fetch(`/api/thresholds/${row.id}`, { method: "DELETE" });
     if (res.ok) setThresholds((prev) => prev.filter((t) => t.id !== row.id));
+  }
+
+  async function addTrapThreshold(e: React.FormEvent) {
+    e.preventDefault();
+    setTrapThresholdSubmitting(true);
+    setTrapThresholdError(null);
+    const res = await fetch("/api/trap-thresholds", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pestSpecies: trapThresholdName, catchPerDayThreshold: trapThresholdValue }),
+    });
+    if (res.ok) {
+      const row = await res.json();
+      setTrapThresholds((prev) => {
+        const withoutMatch = prev.filter((t) => t.id !== row.id);
+        return [...withoutMatch, row].sort((a, b) => a.pestSpecies.localeCompare(b.pestSpecies));
+      });
+      setTrapThresholdName("");
+      setTrapThresholdValue("");
+    } else {
+      const body = await res.json().catch(() => ({}));
+      setTrapThresholdError(body.error ?? "Couldn't save threshold.");
+    }
+    setTrapThresholdSubmitting(false);
+  }
+
+  async function removeTrapThreshold(row: TrapThresholdRow) {
+    if (!confirm(`Remove the trap catch/day threshold for "${row.pestSpecies}"?`)) return;
+    const res = await fetch(`/api/trap-thresholds/${row.id}`, { method: "DELETE" });
+    if (res.ok) setTrapThresholds((prev) => prev.filter((t) => t.id !== row.id));
   }
 
   return (
@@ -250,6 +296,67 @@ export default function CatalogClient({
               className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
             >
               {thresholdSubmitting ? "Saving…" : "Save threshold"}
+            </button>
+          </form>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <div className="text-sm font-medium">Trap catch thresholds</div>
+          <p className="text-xs text-[var(--text-dim)]">
+            Catches per trap per day that trigger a trap-spike suggestion for a species. Anything not listed uses the default,{" "}
+            {defaultCatchPerDayThreshold}/day.
+          </p>
+        </div>
+
+        {trapThresholds.length > 0 && (
+          <div className="card flex flex-col divide-y divide-[var(--border)]">
+            {trapThresholds.map((t) => (
+              <div key={t.id} className="flex items-center justify-between gap-3 p-3.5">
+                <div className="text-sm">{t.pestSpecies}</div>
+                <div className="flex items-center gap-3">
+                  <span className="label-mono">{t.catchPerDayThreshold}/day</span>
+                  {isOwner && (
+                    <button onClick={() => removeTrapThreshold(t)} className="text-xs text-[var(--danger)]">
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {isOwner && (
+          <form onSubmit={addTrapThreshold} className="card flex flex-col gap-2 p-4">
+            <input
+              value={trapThresholdName}
+              onChange={(e) => setTrapThresholdName(e.target.value)}
+              placeholder="Species name (matches by name)"
+              required
+              className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+            />
+            <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+              Catch/day threshold
+              <input
+                value={trapThresholdValue}
+                onChange={(e) => setTrapThresholdValue(e.target.value)}
+                type="number"
+                min="0"
+                step="0.1"
+                required
+                placeholder={`${defaultCatchPerDayThreshold}`}
+                className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
+              />
+            </label>
+            {trapThresholdError && <div className="text-sm text-[var(--danger)]">{trapThresholdError}</div>}
+            <button
+              type="submit"
+              disabled={trapThresholdSubmitting || !trapThresholdName.trim() || !trapThresholdValue}
+              className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
+            >
+              {trapThresholdSubmitting ? "Saving…" : "Save threshold"}
             </button>
           </form>
         )}
