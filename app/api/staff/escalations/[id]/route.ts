@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { escalations } from "@/db/schema";
+import { escalations, staffAuditLog } from "@/db/schema";
 import { requireStaffSession } from "@/lib/session";
 
 // Marks one escalation resolved with an optional response note. No re-check
@@ -23,5 +23,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .where(eq(escalations.id, id))
     .returning();
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await db.insert(staffAuditLog).values({
+    staffUserId: session.user!.id!,
+    action: "resolve_escalation",
+    organizationId: row.organizationId,
+    escalationId: row.id,
+  });
+
   return NextResponse.json(row);
 }

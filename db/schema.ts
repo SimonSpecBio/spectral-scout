@@ -428,6 +428,38 @@ export const escalations = pgTable(
   ]
 ).enableRLS();
 
+// Records every time a staff member sees or acts on a pilot org's
+// identifiable data -- the app-layer DB connection has no real row-level
+// enforcement (it connects as a role with BYPASSRLS, and no policies are
+// defined; enableRLS() on these tables is currently decorative, tracked
+// separately), so this log is the only accountability trail for staff
+// access until that's addressed. Scoped to the one real drill-down surface
+// today (app/staff/escalations -- species, severity, notes, photos);
+// app/staff/page.tsx's org list only ever shows a pilot org's name, not
+// deep data, so it isn't logged here.
+export const staffAuditActionEnum = pgEnum("scout_staff_audit_action", ["view_org_data", "resolve_escalation"]);
+
+export const staffAuditLog = pgTable(
+  "scout_staff_audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Matched-by-value against scout_user.id, same convention as
+    // escalations.resolvedByStaffId -- staff sign in through the same
+    // scout_user table as growers.
+    staffUserId: uuid("staff_user_id").notNull(),
+    action: staffAuditActionEnum("action").notNull(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    escalationId: uuid("escalation_id").references(() => escalations.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("scout_staff_audit_log_organization_id_idx").on(table.organizationId),
+    index("scout_staff_audit_log_staff_user_id_idx").on(table.staffUserId),
+  ]
+).enableRLS();
+
 // A browser's Web Push subscription (ticket 91) -- one row per device a
 // user has enabled notifications on, not per user (the same person can
 // subscribe from a phone and a laptop). Matched-by-value against

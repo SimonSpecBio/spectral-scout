@@ -1,7 +1,7 @@
 import { desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { users as authUsers } from "@/db/auth-schema";
-import { escalations, facilities, observationPhotos, organizations, pestEvents } from "@/db/schema";
+import { escalations, facilities, observationPhotos, organizations, pestEvents, staffAuditLog } from "@/db/schema";
 import { canStaffViewOrgDetail, requireStaffSession } from "@/lib/session";
 import ResolveForm from "./ResolveForm";
 
@@ -36,6 +36,21 @@ export default async function StaffEscalationsPage() {
     .orderBy(desc(escalations.createdAt));
 
   const eligible = openRows.filter((r) => canStaffViewOrgDetail(r.org.accountTier));
+
+  // One row per distinct org actually rendered below -- this page is the
+  // one real org-identifiable drill-down surface staff have, so every load
+  // that shows real data gets logged (db/schema.ts's scout_staff_audit_log
+  // comment: there's no DB-level enforcement here, just this trail).
+  const viewedOrgIds = [...new Set(eligible.map((r) => r.org.id))];
+  if (viewedOrgIds.length > 0) {
+    await db.insert(staffAuditLog).values(
+      viewedOrgIds.map((organizationId) => ({
+        staffUserId: session.user!.id!,
+        action: "view_org_data" as const,
+        organizationId,
+      }))
+    );
+  }
 
   const photosByEvent = new Map<string, { id: string; blobUrl: string; caption: string | null }[]>();
   for (const r of eligible) {

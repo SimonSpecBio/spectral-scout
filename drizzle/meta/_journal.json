@@ -183,6 +183,13 @@
       "when": 1787796956274,
       "tag": "0025_nebulous_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787968937640,
+      "tag": "0026_clear_vargas",
+      "breakpoints": true
     }
   ]
 }
