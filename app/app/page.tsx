@@ -10,6 +10,7 @@ import { taskActionHref, taskUrgency } from "@/lib/tasks";
 import { computeEscalationAlerts, computeMonitoringAlerts, metricLabel, type MetricKind } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { requireGrowerSession } from "@/lib/session";
+import LayoutPicker from "./facilities/[id]/areas/[areaId]/LayoutPicker";
 import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
 import MapLensSwitcher, { type BayLensEntry } from "./MapLensSwitcher";
 import PressureGraph from "./PressureGraph";
@@ -325,35 +326,39 @@ export default async function HomePage({
             ))}
           </div>
         )}
-        <MapEditor
-          facilityId={selectedFacility.id}
-          area={{
-            id: selectedArea.id,
-            name: selectedArea.name,
-            backgroundImageUrl: selectedArea.backgroundImageUrl,
-            backgroundScale: selectedArea.backgroundScale,
-          }}
-          initialObjects={objects.map((o) => ({
-            id: o.id,
-            shapeType: o.shapeType,
-            geometry: o.geometry as never,
-            style: o.style as never,
-            label: o.label,
-            zIndex: o.zIndex,
-          }))}
-          initialPestEvents={areaPestEvents.map((ev) => ({
-            id: ev.id,
-            x: ev.x,
-            y: ev.y,
-            pestSpecies: ev.pestSpecies,
-            severity: ev.severity,
-            status: ev.status,
-            notes: ev.notes,
-            createdAt: ev.createdAt.toISOString(),
-            lastTreatedAt: signals.get(ev.id)?.lastTreatedAt ?? null,
-            trend: signals.get(ev.id)?.trend ?? null,
-          }))}
-        />
+        {objects.length === 0 && !selectedArea.backgroundImageUrl ? (
+          <LayoutPicker facilityId={selectedFacility.id} areaId={selectedArea.id} />
+        ) : (
+          <MapEditor
+            facilityId={selectedFacility.id}
+            area={{
+              id: selectedArea.id,
+              name: selectedArea.name,
+              backgroundImageUrl: selectedArea.backgroundImageUrl,
+              backgroundScale: selectedArea.backgroundScale,
+            }}
+            initialObjects={objects.map((o) => ({
+              id: o.id,
+              shapeType: o.shapeType,
+              geometry: o.geometry as never,
+              style: o.style as never,
+              label: o.label,
+              zIndex: o.zIndex,
+            }))}
+            initialPestEvents={areaPestEvents.map((ev) => ({
+              id: ev.id,
+              x: ev.x,
+              y: ev.y,
+              pestSpecies: ev.pestSpecies,
+              severity: ev.severity,
+              status: ev.status,
+              notes: ev.notes,
+              createdAt: ev.createdAt.toISOString(),
+              lastTreatedAt: signals.get(ev.id)?.lastTreatedAt ?? null,
+              trend: signals.get(ev.id)?.trend ?? null,
+            }))}
+          />
+        )}
       </div>
     );
   }
