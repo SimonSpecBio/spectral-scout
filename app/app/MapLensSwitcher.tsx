@@ -20,7 +20,7 @@ const SWIPE_THRESHOLD_PX = 40;
 
 const LENSES = ["pests", "scouted", "temp", "humidity"] as const;
 type Lens = (typeof LENSES)[number];
-const LENS_LABEL: Record<Lens, string> = { pests: "Pests", scouted: "Last scouted", temp: "Temp", humidity: "Humidity" };
+const LENS_LABEL: Record<Lens, string> = { pests: "Pest pressure", scouted: "Last scouted", temp: "Temp", humidity: "Humidity" };
 
 // The dashboard map's lens switcher (ARCHITECTURE.md's map screen) --
 // same 20-bay canvas recolored per lens, per the "one map, several views"
@@ -86,22 +86,21 @@ export default function MapLensSwitcher({
         {lens === "pests" ? <PressureBayMap events={events} /> : <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} />}
       </div>
       <div className="flex items-center justify-between px-1">
-        <p className="text-[10px] text-[var(--text-faint)]">Generic bay layout</p>
+        <select
+          value={lens}
+          onChange={(e) => setLens(e.target.value as Lens)}
+          className="appearance-none border-0 bg-transparent p-0 text-[10px] text-[var(--text-faint)]"
+        >
+          {LENSES.map((l) => (
+            <option key={l} value={l} style={{ background: "var(--surface)" }}>
+              {LENS_LABEL[l]}
+            </option>
+          ))}
+        </select>
         <Link href="/app/facilities" className="text-[10px] text-[var(--accent)]">
           + New site
         </Link>
       </div>
-      <select
-        value={lens}
-        onChange={(e) => setLens(e.target.value as Lens)}
-        className="self-center rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-xs text-[var(--text-dim)]"
-      >
-        {LENSES.map((l) => (
-          <option key={l} value={l} style={{ background: "var(--surface)" }}>
-            {LENS_LABEL[l]}
-          </option>
-        ))}
-      </select>
     </div>
   );
 }
