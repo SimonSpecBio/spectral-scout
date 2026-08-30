@@ -410,18 +410,6 @@ export default async function HomePage({
         ) : (
           <span className="font-medium">{selectedFacility.name}</span>
         )}
-        <div className="flex shrink-0 items-center gap-2">
-          {facilityEvents.length > 0 && (
-            <Link
-              href="#attention"
-              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm"
-              style={{ background: "var(--accent-bg)", color: "var(--accent)" }}
-            >
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
-              {facilityEvents.length} ALERT{facilityEvents.length === 1 ? "" : "S"}
-            </Link>
-          )}
-        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
@@ -449,7 +437,7 @@ export default async function HomePage({
         )
       )}
 
-      <section id="attention" className="flex scroll-mt-4 flex-col gap-3">
+      <section className="flex flex-col gap-3">
         <span className="label-mono">Attention required</span>
         {attention.length === 0 ? (
           <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing needs attention right now.</div>

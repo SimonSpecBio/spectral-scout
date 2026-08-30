@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { sparkPoints } from "@/lib/density";
 
 type Severity = "low" | "moderate" | "high" | "severe";
@@ -19,6 +22,9 @@ interface EventInput {
 const WEEKDAY_LETTER = ["S", "M", "T", "W", "T", "F", "S"];
 
 export default function PressureGraph({ events }: { events: EventInput[] }) {
+  const [showAxisInfo, setShowAxisInfo] = useState(false);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
   const today = new Date();
   today.setHours(23, 59, 59, 999);
 
@@ -40,6 +46,33 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
   const delta = latest - weekAgo;
   const max = Math.max(...days, 1);
 
+  // Same w/h/pad the polyline below is drawn with (sparkPoints(days, 226, 44,
+  // 4)) -- replicated here (not imported from sparkPoints, which only
+  // returns the joined points string) so the crosshair lands exactly on the
+  // point a tap was nearest to, not a slightly-off approximation.
+  const CHART_W = 226, CHART_H = 44, PAD = 4;
+  const minDay = Math.min(...days);
+  const maxDay = Math.max(...days);
+  const span = maxDay - minDay || 1;
+  const pointX = (i: number) => PAD + (i * (CHART_W - 2 * PAD)) / (days.length - 1);
+  const pointY = (v: number) => CHART_H - PAD - ((v - minDay) / span) * (CHART_H - 2 * PAD);
+
+  function handleChartClick(e: React.MouseEvent<SVGSVGElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const localX = ((e.clientX - rect.left) * (252 / rect.width)) - 22;
+    let nearest = 0;
+    let minDist = Infinity;
+    for (let i = 0; i < days.length; i++) {
+      const d = Math.abs(pointX(i) - localX);
+      if (d < minDist) {
+        minDist = d;
+        nearest = i;
+      }
+    }
+    setShowAxisInfo(false);
+    setActiveIndex((prev) => (prev === nearest ? null : nearest));
+  }
+
   return (
     <div className="card p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -50,9 +83,19 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
           </span>
         )}
       </div>
-      <svg viewBox="0 0 252 72" className="block w-full">
+      <svg viewBox="0 0 252 72" className="block w-full" onClick={handleChartClick} style={{ cursor: "pointer" }}>
         <g fontFamily="ui-monospace, monospace" fontSize="8" fill="var(--map-label)">
-          <text x="0" y="12">{max}</text>
+          <text
+            x="0"
+            y="12"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveIndex(null);
+              setShowAxisInfo((v) => !v);
+            }}
+          >
+            {max}
+          </text>
           <text x="0" y="56">0</text>
         </g>
         <g stroke="var(--map-grid-stroke)" strokeWidth="0.5">
@@ -75,10 +118,36 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
             </text>
           ))}
         </g>
+
+        {activeIndex != null && (() => {
+          const x = 22 + pointX(activeIndex);
+          const y = 4 + pointY(days[activeIndex]);
+          const boxX = Math.min(Math.max(x - 12, 22), 252 - 24);
+          return (
+            <g>
+              <line x1={x} y1={8} x2={x} y2={52} stroke="var(--text-faint)" strokeWidth="0.75" strokeDasharray="2 2" />
+              <line x1={22} y1={y} x2={252} y2={y} stroke="var(--text-faint)" strokeWidth="0.75" strokeDasharray="2 2" />
+              <circle cx={x} cy={y} r={2.5} fill="var(--danger)" />
+              <g transform={`translate(${boxX}, ${Math.max(y - 17, 0)})`}>
+                <rect width="24" height="13" rx="3" fill="var(--surface-raised)" stroke="var(--border)" strokeWidth="0.5" />
+                <text x="12" y="9.5" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="8" fill="var(--text)">
+                  {days[activeIndex]}
+                </text>
+              </g>
+            </g>
+          );
+        })()}
+
+        {showAxisInfo && (
+          <g transform="translate(0, 16)">
+            <rect width="200" height="26" rx="3" fill="var(--surface-raised)" stroke="var(--border)" strokeWidth="0.5" />
+            <text fontFamily="ui-monospace, monospace" fontSize="6.5" fill="var(--text-dim)">
+              <tspan x="6" y="11">Severity score, not a pest count --</tspan>
+              <tspan x="6" y="20">each outbreak adds 1(low)-4(severe)</tspan>
+            </text>
+          </g>
+        )}
       </svg>
-      <p className="mt-1 text-[10px] text-[var(--text-faint)]">
-        Score, not a pest count -- each active outbreak adds 1-4 depending on severity (low=1, severe=4)
-      </p>
     </div>
   );
 }
