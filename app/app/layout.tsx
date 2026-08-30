@@ -21,9 +21,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ThemeProvider initialTheme={theme}>
-      <div className="mx-auto flex max-w-6xl gap-8 px-6 pb-28 pt-8 lg:pb-8">
+      <div className="mx-auto flex max-w-6xl gap-8 px-6 pb-28 pt-4 lg:pb-8 lg:pt-8">
         <Sidebar email={session.user?.email} isPilot={session.accountTier === "pilot"} />
-        <div className="flex min-w-0 flex-1 flex-col gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-3 lg:gap-6">
           <header className="flex items-center justify-end lg:hidden">
             <div className="flex items-center gap-2">
               {session.accountTier === "pilot" && (

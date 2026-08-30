@@ -11,16 +11,15 @@ export default function BayBarMap({
   colorByBay,
   badgeByBay,
   glowBar,
-  legend,
+  hrefByBay,
 }: {
   colorByBay: Map<string, string>;
   badgeByBay?: Map<string, string>;
   glowBar?: { x: number; y: number } | null;
-  // Only meaningful for lenses where color alone carries the signal (the
-  // Pests/severity lens) -- the other lenses already print a value badge
-  // on each bar (temp/humidity/days-since-scouted), so color there is a
-  // secondary cue, not the only one, and don't pass this.
-  legend?: { label: string; color: string }[];
+  // Only set for the Pests lens -- a bay with an active event links straight
+  // to that event's detail page, so tapping the outbreak on the map is the
+  // same as tapping it in the Attention Required list.
+  hrefByBay?: Map<string, string>;
 }) {
   const rowA = BAYS.filter((b) => b.row === "A");
   const rowB = BAYS.filter((b) => b.row === "B");
@@ -28,6 +27,7 @@ export default function BayBarMap({
 
   const fillFor = (bay: (typeof BAYS)[number]) => colorByBay.get(`${bay.row}${bay.index}`) ?? IDLE_FILL;
   const badgeFor = (bay: (typeof BAYS)[number]) => badgeByBay?.get(`${bay.row}${bay.index}`);
+  const hrefFor = (bay: (typeof BAYS)[number]) => hrefByBay?.get(`${bay.row}${bay.index}`);
 
   return (
     <div className="flex flex-col gap-2">
@@ -58,26 +58,50 @@ export default function BayBarMap({
           <line x1="161" y1="22" x2="161" y2="302" stroke="var(--map-grid-stroke)" strokeWidth="0.75" strokeDasharray="1 5" />
           {glowBar && <circle cx={glowBar.x} cy={glowBar.y} r={62} fill="url(#heatGlow)" />}
           <g>
-            {rowA.map((bay, i) => (
-              <g key={`A${bay.index}`}>
-                <rect x="50" y={barYs[i]} width="98" height="8" rx="4" fill={fillFor(bay)} />
-                {badgeFor(bay) && (
-                  <text x="144" y={barYs[i] - 2} fontFamily="ui-monospace, monospace" fontSize="7" fill="var(--map-label-dim)" textAnchor="end">
-                    {badgeFor(bay)}
-                  </text>
-                )}
-              </g>
-            ))}
-            {rowB.map((bay, i) => (
-              <g key={`B${bay.index}`}>
-                <rect x="174" y={barYs[i]} width="98" height="8" rx="4" fill={fillFor(bay)} />
-                {badgeFor(bay) && (
-                  <text x="268" y={barYs[i] - 2} fontFamily="ui-monospace, monospace" fontSize="7" fill="var(--map-label-dim)" textAnchor="end">
-                    {badgeFor(bay)}
-                  </text>
-                )}
-              </g>
-            ))}
+            {rowA.map((bay, i) => {
+              const href = hrefFor(bay);
+              const bar = (
+                <>
+                  {/* Invisible, taller hit target -- the visible bar is only
+                      8px, too small to tap reliably on a phone. */}
+                  {href && <rect x="50" y={barYs[i] - 10} width="98" height="28" fill="transparent" />}
+                  <rect x="50" y={barYs[i]} width="98" height="8" rx="4" fill={fillFor(bay)} />
+                  {badgeFor(bay) && (
+                    <text x="144" y={barYs[i] - 2} fontFamily="ui-monospace, monospace" fontSize="7" fill="var(--map-label-dim)" textAnchor="end">
+                      {badgeFor(bay)}
+                    </text>
+                  )}
+                </>
+              );
+              return href ? (
+                <a key={`A${bay.index}`} href={href} style={{ cursor: "pointer" }}>
+                  {bar}
+                </a>
+              ) : (
+                <g key={`A${bay.index}`}>{bar}</g>
+              );
+            })}
+            {rowB.map((bay, i) => {
+              const href = hrefFor(bay);
+              const bar = (
+                <>
+                  {href && <rect x="174" y={barYs[i] - 10} width="98" height="28" fill="transparent" />}
+                  <rect x="174" y={barYs[i]} width="98" height="8" rx="4" fill={fillFor(bay)} />
+                  {badgeFor(bay) && (
+                    <text x="268" y={barYs[i] - 2} fontFamily="ui-monospace, monospace" fontSize="7" fill="var(--map-label-dim)" textAnchor="end">
+                      {badgeFor(bay)}
+                    </text>
+                  )}
+                </>
+              );
+              return href ? (
+                <a key={`B${bay.index}`} href={href} style={{ cursor: "pointer" }}>
+                  {bar}
+                </a>
+              ) : (
+                <g key={`B${bay.index}`}>{bar}</g>
+              );
+            })}
           </g>
           <g fontFamily="ui-monospace, monospace" fontSize="8" letterSpacing="0.14em" fill="var(--map-label)">
             <text x="50" y="12">ROW A</text>
@@ -85,16 +109,6 @@ export default function BayBarMap({
           </g>
         </svg>
       </div>
-      {legend && legend.length > 0 && (
-        <div className="flex flex-wrap justify-center gap-3 px-1">
-          {legend.map((item) => (
-            <span key={item.label} className="flex items-center gap-1.5 text-[9px] text-[var(--text-dim)]">
-              <span className="h-2.5 w-2.5 rounded-sm" style={{ background: item.color }} />
-              {item.label}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

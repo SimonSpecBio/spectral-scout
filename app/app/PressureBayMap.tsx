@@ -3,11 +3,10 @@ import { BAYS, nearestBay } from "@/lib/floorplan-bays";
 import BayBarMap from "./BayBarMap";
 
 const SEVERITY_RANK: Record<Severity, number> = { low: 0, moderate: 1, high: 2, severe: 3 };
-const SEVERITY_LEGEND = (Object.keys(SEVERITY_RANK) as Severity[])
-  .sort((a, b) => SEVERITY_RANK[a] - SEVERITY_RANK[b])
-  .map((s) => ({ label: s[0].toUpperCase() + s.slice(1), color: SEVERITY_COLOR[s] }));
 
 interface EventInput {
+  id: string;
+  facilityId: string;
   x: number;
   y: number;
   severity: Severity;
@@ -25,6 +24,10 @@ interface EventInput {
 export default function PressureBayMap({ events }: { events: EventInput[] }) {
   const colorByBay = new Map<string, string>();
   const severityByBay = new Map<string, Severity>();
+  // A bay's bar links to whichever event set its color (the worst-severity
+  // one there) -- if two events tie in severity at the same bay, the first
+  // one seen wins; good enough since the bar can only ever point at one.
+  const hrefByBay = new Map<string, string>();
   for (const ev of events) {
     const bay = nearestBay(ev.x, ev.y);
     const key = `${bay.row}${bay.index}`;
@@ -32,6 +35,7 @@ export default function PressureBayMap({ events }: { events: EventInput[] }) {
     if (!existing || SEVERITY_RANK[ev.severity] > SEVERITY_RANK[existing]) {
       severityByBay.set(key, ev.severity);
       colorByBay.set(key, SEVERITY_COLOR[ev.severity]);
+      hrefByBay.set(key, `/app/facilities/${ev.facilityId}/pest-events/${ev.id}`);
     }
   }
 
@@ -52,5 +56,5 @@ export default function PressureBayMap({ events }: { events: EventInput[] }) {
     }
   }
 
-  return <BayBarMap colorByBay={colorByBay} glowBar={glowBar} legend={SEVERITY_LEGEND} />;
+  return <BayBarMap colorByBay={colorByBay} glowBar={glowBar} hrefByBay={hrefByBay} />;
 }

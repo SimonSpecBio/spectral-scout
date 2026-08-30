@@ -271,7 +271,7 @@ export default async function HomePage({
   const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, selectedFacility.id));
 
   let desktopMapSection: React.ReactNode = null;
-  let heatmapEvents: { x: number; y: number; severity: "low" | "moderate" | "high" | "severe" }[] = [];
+  let heatmapEvents: { id: string; facilityId: string; x: number; y: number; severity: "low" | "moderate" | "high" | "severe" }[] = [];
   let bayLensEntries: BayLensEntry[] = [];
   if (areas.length === 0) {
     desktopMapSection = (
@@ -300,7 +300,7 @@ export default async function HomePage({
 
     heatmapEvents = areaPestEvents
       .filter((ev) => ev.status === "active" && ev.x != null && ev.y != null)
-      .map((ev) => ({ x: ev.x!, y: ev.y!, severity: ev.severity }));
+      .map((ev) => ({ id: ev.id, facilityId: selectedFacility.id, x: ev.x!, y: ev.y!, severity: ev.severity }));
 
     bayLensEntries = [...bayLensStats.entries()].map(([key, s]) => ({
       key,
@@ -414,26 +414,13 @@ export default async function HomePage({
           {facilityEvents.length > 0 && (
             <Link
               href="#attention"
-              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1"
-              style={{ background: "var(--accent-bg)" }}
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm"
+              style={{ background: "var(--accent-bg)", color: "var(--accent)" }}
             >
               <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
-              <span className="label-mono whitespace-nowrap" style={{ color: "var(--accent)" }}>
-                {facilityEvents.length} ALERT{facilityEvents.length === 1 ? "" : "S"}
-              </span>
+              {facilityEvents.length} ALERT{facilityEvents.length === 1 ? "" : "S"}
             </Link>
           )}
-          {/* Sites/facility management was mobile-overflow-menu-only before
-              this -- effectively hidden for anything beyond a single-
-              facility org. A direct shortcut from the dashboard itself,
-              where the facility switcher already lives. */}
-          <Link href="/app/facilities" className="flex h-8 w-8 items-center justify-center text-[var(--text-faint)]" aria-label="Manage sites">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
-              <path d="M8 1.5 1.5 5v6L8 14.5 14.5 11V5z" />
-              <path d="M1.5 5 8 8.5 14.5 5" />
-              <path d="M8 8.5v6" />
-            </svg>
-          </Link>
         </div>
       </div>
 
@@ -441,6 +428,8 @@ export default async function HomePage({
         <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
         <div className="hidden sm:block">{desktopMapSection}</div>
       </div>
+
+      <PressureGraph events={events.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
 
       {events.length === 0 ? (
         <Link href="/app/preventive" className="card flex items-center justify-between gap-3 p-4 text-sm">
@@ -593,8 +582,6 @@ export default async function HomePage({
           </div>
         )}
       </section>
-
-      <PressureGraph events={events.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
