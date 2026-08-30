@@ -24,8 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="mx-auto flex max-w-6xl gap-8 px-6 pb-28 pt-8 lg:pb-8">
         <Sidebar email={session.user?.email} isPilot={session.accountTier === "pilot"} />
         <div className="flex min-w-0 flex-1 flex-col gap-6">
-          <header className="flex items-center justify-between lg:hidden">
-            <span className="font-semibold">Spectral Scout</span>
+          <header className="flex items-center justify-end lg:hidden">
             <div className="flex items-center gap-2">
               {session.accountTier === "pilot" && (
                 <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 text-xs text-[var(--accent)]">

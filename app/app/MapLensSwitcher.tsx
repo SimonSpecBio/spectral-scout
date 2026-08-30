@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import BayBarMap from "./BayBarMap";
 import PressureBayMap from "./PressureBayMap";
@@ -84,7 +85,12 @@ export default function MapLensSwitcher({
       <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         {lens === "pests" ? <PressureBayMap events={events} /> : <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} />}
       </div>
-      <p className="text-center text-[10px] text-[var(--text-faint)]">Generic bay layout, not your exact floor plan</p>
+      <div className="flex items-center justify-between px-1">
+        <p className="text-[10px] text-[var(--text-faint)]">Generic bay layout</p>
+        <Link href="/app/facilities" className="text-[10px] text-[var(--accent)]">
+          + New site
+        </Link>
+      </div>
       <select
         value={lens}
         onChange={(e) => setLens(e.target.value as Lens)}

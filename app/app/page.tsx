@@ -376,22 +376,22 @@ export default async function HomePage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         {orgFacilities.length > 1 ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2">
             {facilitiesNeedingAttention > 0 && (
-              <span className="label-mono" style={{ color: "var(--accent)" }}>
+              <span className="label-mono whitespace-nowrap" style={{ color: "var(--accent)" }}>
                 {facilitiesNeedingAttention} of {orgFacilities.length} sites need attention
               </span>
             )}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 overflow-x-auto">
               {orgFacilities.map((f) => {
                 const count = activeCountByFacility.get(f.id) ?? 0;
                 return (
                   <Link
                     key={f.id}
                     href={`/app?facility=${f.id}`}
-                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm ${
+                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${
                       f.id === selectedFacility.id ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
                     }`}
                   >
@@ -410,14 +410,18 @@ export default async function HomePage({
         ) : (
           <span className="font-medium">{selectedFacility.name}</span>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {facilityEvents.length > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "var(--accent-bg)" }}>
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
-              <span className="label-mono" style={{ color: "var(--accent)" }}>
+            <Link
+              href="#attention"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1"
+              style={{ background: "var(--accent-bg)" }}
+            >
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />
+              <span className="label-mono whitespace-nowrap" style={{ color: "var(--accent)" }}>
                 {facilityEvents.length} ALERT{facilityEvents.length === 1 ? "" : "S"}
               </span>
-            </span>
+            </Link>
           )}
           {/* Sites/facility management was mobile-overflow-menu-only before
               this -- effectively hidden for anything beyond a single-
@@ -456,7 +460,7 @@ export default async function HomePage({
         )
       )}
 
-      <section className="flex flex-col gap-3">
+      <section id="attention" className="flex scroll-mt-4 flex-col gap-3">
         <span className="label-mono">Attention required</span>
         {attention.length === 0 ? (
           <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing needs attention right now.</div>
