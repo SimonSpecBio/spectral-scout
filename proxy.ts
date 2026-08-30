@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { CURRENT_CONSENT_VERSION } from "@/lib/consent";
+import { encodeSessionHeader, SESSION_HEADER_NAME } from "@/lib/session-cache";
 
 // Guards /app/* (grower) and /staff/* (internal) plus their API routes.
 // "/" stays public -- it's the marketing/landing page and sign-in entry for
@@ -36,7 +37,13 @@ export default auth((req) => {
     ) {
       return NextResponse.redirect(new URL("/app/onboarding", req.nextUrl.origin));
     }
-    return NextResponse.next();
+    // Hand the session this auth() call already paid for down to the page/
+    // route handler via a signed header, so lib/session.ts doesn't re-run
+    // the same staff/membership/organization lookup chain a second time
+    // for the same request (see lib/session-cache.ts).
+    const forwardHeaders = new Headers(req.headers);
+    forwardHeaders.set(SESSION_HEADER_NAME, encodeSessionHeader(req.auth));
+    return NextResponse.next({ request: { headers: forwardHeaders } });
   }
 
   if (pathname.startsWith("/api/")) {
