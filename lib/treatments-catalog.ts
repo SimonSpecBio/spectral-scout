@@ -242,13 +242,17 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: ["pr_abamectin"],
     followUp: { recheckDays: 5, releaseIntervalDays: 7, escalateIfNoDeclineDays: 14 },
     cautions: ["Explodes in hot/dry conditions", "If using sulfur/oil, do not release predators into residue"],
-    // UC IPM Peppermint Pest Management Guidelines: ~5 mites/leaf action
-    // threshold; 15/23 sampled leaves (~65%) showing any presence is the
-    // documented occupancy-% equivalent. No cannabis-specific research
-    // exists (NC State: "no research has been done"); this is the
-    // best-documented ag-crop analog, high confidence.
-    defaultDensityThreshold: 5,
-    defaultOccupancyPctThreshold: 65,
+    // Rutgers NJAES Plant & Pest Advisory (greenhouse ivy geranium, Apr
+    // 2022): 7 mites/leaf for a mature crop (5+ weeks in production), 2/leaf
+    // for younger plants -- using the mature-crop figure as the single
+    // default since Scout has no crop-stage/age field to pick between them.
+    // Greenhouse-native, unlike the field-crop (UC IPM peppermint) number
+    // this replaced (2026-08-29 threshold research pass) -- still no
+    // cannabis-specific research exists (NC State: "no research has been
+    // done"). No occupancy-% figure carried over: the peppermint source's
+    // 65% wasn't from this citation, and mixing sources under one number
+    // would misrepresent both.
+    defaultDensityThreshold: 7,
   },
   {
     id: "pest_broadmite", commonName: "Broad / hemp russet mite", latin: "Polyphagotarsonemus latus / Aculops cannabicola", kind: "pest",
@@ -289,14 +293,15 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: [],
     followUp: { recheckDays: 5, releaseIntervalDays: 7, escalateIfNoDeclineDays: 21 },
     cautions: ["Identify species -- parasitoid choice differs", "Remove yellow cards before big parasitoid releases"],
-    // UC IPM/Naranjo et al. (field cotton, silverleaf whitefly): 10+
-    // adults/leaf during early migration (peer-reviewed range tested at
-    // 5-10/leaf for best economic return -- Simon confirmed 10 as the
-    // number to use), 40% of leaves infested (>=3 adults/leaf) as the
-    // occupancy equivalent. Field-cotton-derived, not greenhouse/cannabis-
-    // specific -- medium confidence, closest documented analog found.
-    defaultDensityThreshold: 10,
-    defaultOccupancyPctThreshold: 40,
+    // Deliberately NO numeric threshold here (removed 2026-08-30, threshold
+    // research pass). The prior 10/leaf + 40% figures traced to UC IPM/
+    // Naranjo et al. field cotton -- but UC IPM states plainly "Thresholds
+    // have not yet been established for greenhouse whitefly," and the
+    // nearest per-leaf figures found in this pass (UC IPM field tomato: 4
+    // adults/leaf; UF/IFAS, same pest/crop: 1 adult/leaflet) disagree with
+    // each other by 4x, so a single borrowed number reads as more precise
+    // than the evidence supports. Falls back to the generic default for
+    // now, same as every other species with no defensible number.
   },
   {
     id: "pest_fungusgnat", commonName: "Fungus gnats", latin: "Bradysia spp.", kind: "pest",

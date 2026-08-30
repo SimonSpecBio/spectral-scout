@@ -20,8 +20,8 @@ export interface ThresholdSource {
 const THRESHOLD_SOURCES: Record<string, ThresholdSource> = {
   pest_tssm: {
     confidence: "medium",
-    basis: "Field-crop analog (UC IPM peppermint) -- no published cannabis-specific threshold exists.",
-    sourceUrl: "https://ipm.ucanr.edu/agriculture/peppermint/webspinning-spider-mites/",
+    basis: "Greenhouse-native (Rutgers, ivy geranium) mature-crop figure -- no published cannabis-specific threshold exists, and Scout has no crop-stage field to use the source's younger-crop number too.",
+    sourceUrl: "https://plant-pest-advisory.rutgers.edu/pest-counts-action-thresholds-in-the-greenhouse/",
   },
   pest_broadmite: {
     confidence: "low",
@@ -39,9 +39,9 @@ const THRESHOLD_SOURCES: Record<string, ThresholdSource> = {
     sourceUrl: "https://ipm.ucanr.edu/agriculture/peppers/green-peach-aphid/",
   },
   pest_whitefly: {
-    confidence: "medium",
-    basis: "Field-cotton analog (UC IPM), peer-reviewed range -- a well-studied number, just not cannabis-specific.",
-    sourceUrl: "https://ipm.ucanr.edu/agriculture/cotton/sweetpotato-whitefly-silverleaf-whitefly/",
+    confidence: "low",
+    basis: "UC IPM: 'Thresholds have not yet been established for greenhouse whitefly' -- the nearest per-leaf figures found (field tomato) disagree with each other by 4x, so no single number is defensible.",
+    sourceUrl: "https://ipm.ucanr.edu/agriculture/tomato/greenhouse-whitefly/",
   },
   pest_fungusgnat: {
     confidence: "n/a",
