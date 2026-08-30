@@ -81,6 +81,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,
       severity,
       notes: typeof body.notes === "string" && body.notes ? body.notes : null,
+      createdByUserId: session.user!.id!,
     })
     .returning();
 

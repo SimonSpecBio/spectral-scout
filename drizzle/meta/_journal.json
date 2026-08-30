@@ -190,6 +190,13 @@
       "when": 1787968937640,
       "tag": "0026_clear_vargas",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1788127907488,
+      "tag": "0027_kind_saracen",
+      "breakpoints": true
     }
   ]
 }

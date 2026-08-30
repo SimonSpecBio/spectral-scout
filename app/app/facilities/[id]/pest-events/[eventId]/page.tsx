@@ -57,6 +57,13 @@ export default async function PestEventPage({
   const thresholds = await getSpeciesThresholds(session.organizationId!, event.pestSpecies);
   const locationLabel = area ? `${area.name}, ${facility.name}` : facility.name;
 
+  // Null for events created before createdByUserId existed, or if that user
+  // account was later deleted -- PestEventDetail just omits the "Logged by"
+  // line rather than showing a broken/blank name in either case.
+  const loggedByName = event.createdByUserId
+    ? (await db.select({ name: authUsers.name, email: authUsers.email }).from(authUsers).where(eq(authUsers.id, event.createdByUserId)))[0]
+    : null;
+
   // "After an event auto-resolves, don't just go quiet" -- only computed
   // for the auto-resolve case (manual resolve means the grower already
   // knows and closed it deliberately, same distinction the notification
@@ -96,6 +103,7 @@ export default async function PestEventPage({
           createdAt: event.createdAt.toISOString(),
           resolvedAt: event.resolvedAt ? event.resolvedAt.toISOString() : null,
           autoResolved: event.autoResolved,
+          loggedBy: loggedByName ? (loggedByName.name ?? loggedByName.email) : null,
         }}
         locationLabel={locationLabel}
         mapHref={area ? `/app/facilities/${id}/areas/${area.id}` : null}

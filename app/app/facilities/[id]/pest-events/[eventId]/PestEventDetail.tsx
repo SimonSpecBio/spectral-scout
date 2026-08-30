@@ -56,6 +56,9 @@ interface Event {
   createdAt: string;
   resolvedAt: string | null;
   autoResolved: boolean;
+  // Null for events created before this was tracked, or a since-deleted
+  // account -- there's no way to know who logged those after the fact.
+  loggedBy: string | null;
 }
 
 const TABS = ["timeline", "recommended", "treatments", "photos", "monitoring", "comments"] as const;
@@ -343,7 +346,7 @@ export default function PestEventDetail({
   }
 
   const timeline = [
-    { label: "Detected", at: event.createdAt },
+    { label: event.loggedBy ? `Detected by ${event.loggedBy}` : "Detected", at: event.createdAt },
     ...treatmentsList.map((t) => ({ label: `${t.type.replace("_", " ")} applied${t.product ? ` -- ${t.product}` : ""}`, at: t.appliedAt })),
     ...(event.resolvedAt ? [{ label: "Resolved", at: event.resolvedAt }] : []),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
@@ -380,6 +383,10 @@ export default function PestEventDetail({
             </div>
             {event.scientificName && <div className="text-sm italic text-[var(--text-dim)]">{event.scientificName}</div>}
             <div className="text-sm text-[var(--text-dim)]">{locationLabel}</div>
+            <div className="text-xs text-[var(--text-faint)]">
+              Detected {new Date(event.createdAt).toLocaleDateString()}
+              {event.loggedBy && <> by {event.loggedBy}</>}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">

@@ -339,6 +339,12 @@ export const pestEvents = pgTable(
     severity: severityEnum("severity").notNull().default("moderate"),
     status: pestEventStatusEnum("status").notNull().default("active"),
     notes: text("notes"),
+    // Null for every event created before this column existed -- there's no
+    // way to know who logged those after the fact, so the detail page just
+    // omits the line rather than guessing. Same soft (non-FK) convention as
+    // tasks.createdByUserId/shareLinks.createdByUserId, not enforced against
+    // users.id.
+    createdByUserId: uuid("created_by_user_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     // Set only when maybeAutoResolve (lib/threshold-engine.ts) closed this

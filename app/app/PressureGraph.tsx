@@ -76,6 +76,9 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
           ))}
         </g>
       </svg>
+      <p className="mt-1 text-[10px] text-[var(--text-faint)]">
+        Score, not a pest count -- each active outbreak adds 1-4 depending on severity (low=1, severe=4)
+      </p>
     </div>
   );
 }
