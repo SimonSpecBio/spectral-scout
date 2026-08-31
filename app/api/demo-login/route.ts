@@ -5,9 +5,7 @@ import { db } from "@/db";
 import { sessions, users } from "@/db/auth-schema";
 import { memberships, organizations } from "@/db/schema";
 import { CURRENT_CONSENT_VERSION } from "@/lib/consent";
-
-const DEMO_EMAIL = "demo@spectralscout.app";
-const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // matches NextAuth's database-session default
+import { DEMO_EMAIL, DEMO_QUERY_PARAM, DEMO_SESSION_MAX_AGE_MS } from "@/lib/demo-account";
 
 // Best-effort, in-memory, per-IP -- same "doesn't survive a cold start,
 // stops a scripted hammering loop" tradeoff as lib/rate-limit.ts's
@@ -82,16 +80,25 @@ async function handleDemoLogin(request: NextRequest): Promise<NextResponse> {
 
   const user = await ensureDemoUser();
   const sessionToken = crypto.randomBytes(32).toString("hex");
-  await db.insert(sessions).values({ sessionToken, userId: user.id, expires: new Date(Date.now() + SESSION_MAX_AGE_MS) });
+  await db.insert(sessions).values({ sessionToken, userId: user.id, expires: new Date(Date.now() + DEMO_SESSION_MAX_AGE_MS) });
 
+  // Both a real cookie (so a real browser's follow-up navigation to any
+  // other /app page just keeps working) AND the token in the redirect's own
+  // URL (so a stateless client -- one that follows a redirect but doesn't
+  // carry Set-Cookie into the next request, which is how a lot of simple
+  // AI-agent HTTP fetchers behave, unlike a real browser) still lands
+  // authenticated on this one request with no cookie at all. proxy.ts
+  // recognizes this query param directly against the sessions table.
+  const target = new URL("/app", request.nextUrl.origin);
+  target.searchParams.set(DEMO_QUERY_PARAM, sessionToken);
   const isHttps = request.nextUrl.protocol === "https:";
-  const response = NextResponse.redirect(new URL("/app", request.nextUrl.origin));
+  const response = NextResponse.redirect(target);
   response.cookies.set(isHttps ? "__Secure-authjs.session-token" : "authjs.session-token", sessionToken, {
     httpOnly: true,
     secure: isHttps,
     sameSite: "lax",
     path: "/",
-    expires: new Date(Date.now() + SESSION_MAX_AGE_MS),
+    expires: new Date(Date.now() + DEMO_SESSION_MAX_AGE_MS),
   });
   return response;
 }
