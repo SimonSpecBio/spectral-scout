@@ -16,6 +16,19 @@ export default function PwaRegister() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
+    // A controllerchange event fires the FIRST time this page ever gets a
+    // controller at all (a brand-new visitor's just-installed worker
+    // calling clients.claim()) just as much as it does when a NEWER worker
+    // replaces an already-active one. Only the second case means the page
+    // is running stale code that's worth reloading for -- the first case
+    // has no old controller to be stale relative to, and reloading right
+    // then raced with whatever navigation the visitor was already
+    // mid-click on (root cause of the demo-login link intermittently
+    // landing back on "/" instead of /app: the forced reload could fire in
+    // the same instant as the click's own navigation, and depending on
+    // exact timing either one could win the race).
+    const hadControllerAtLoad = !!navigator.serviceWorker.controller;
+
     let reg: ServiceWorkerRegistration | null = null;
 
     navigator.serviceWorker.register("/sw.js").then((registration) => {
@@ -42,6 +55,7 @@ export default function PwaRegister() {
       window.location.reload();
     }
     function handleControllerChange() {
+      if (!hadControllerAtLoad) return;
       if (refreshing) return;
       // Don't truncate an in-progress capture-form submission (queuedFetch)
       // just because a new service worker version claimed control in the
