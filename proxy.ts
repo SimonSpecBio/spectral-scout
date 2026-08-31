@@ -6,10 +6,13 @@ import { encodeSessionHeader, SESSION_HEADER_NAME } from "@/lib/session-cache";
 // Guards /app/* (grower) and /staff/* (internal) plus their API routes.
 // "/" stays public -- it's the marketing/landing page and sign-in entry for
 // a self-serve free tool, unlike the other three apps where every page
-// requires a session. /api/auth/* stays public (NextAuth's own flow) and
-// /api/cron/* authenticates via a bearer secret instead of a session.
-// Role/org-scoping happens inside each route handler (lib/session.ts) --
-// path-based gating alone can't express "this org's data only."
+// requires a session. /api/auth/* stays public (NextAuth's own flow),
+// /api/cron/* authenticates via a bearer secret instead of a session, and
+// /api/demo-login is deliberately the one route anyone can hit with zero
+// session -- that's its entire job (see its own comment for the abuse
+// tradeoffs already accepted). Role/org-scoping happens inside each route
+// handler (lib/session.ts) -- path-based gating alone can't express "this
+// org's data only."
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
@@ -56,5 +59,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/app/:path*", "/staff/:path*", "/api/((?!auth|cron).*)"],
+  matcher: ["/app/:path*", "/staff/:path*", "/api/((?!auth|cron|demo-login).*)"],
 };

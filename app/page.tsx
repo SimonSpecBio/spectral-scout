@@ -55,6 +55,14 @@ export default async function Home() {
         >
           Sign in
         </Link>
+        {/* One shared, always-onboarded account -- no signup, no real
+            email, just straight into a working app with sample data.
+            Deliberately de-emphasized vs. the real Sign in button above. */}
+        <form action="/api/demo-login" method="POST">
+          <button type="submit" className="text-xs text-[var(--text-dim)] underline">
+            Just want to poke around? Try the test account →
+          </button>
+        </form>
         <p className="max-w-[420px] text-xs leading-relaxed text-[var(--text-faint)]">
           Built by{" "}
           <a href="https://spectralbiocontrol.com" className="text-[var(--text-dim)] underline">
