@@ -7,6 +7,12 @@ import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
 import NewAreaForm from "./NewAreaForm";
 
+// Without this, adding an area (NewAreaForm's router.refresh()) could
+// leave the list showing only the areas that existed when this dynamic-
+// segment route was last rendered -- same fix already applied to
+// app/app/traps/page.tsx and the dashboard for the same reason.
+export const dynamic = "force-dynamic";
+
 export default async function FacilityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireGrowerSession();
   if (!session) return null;

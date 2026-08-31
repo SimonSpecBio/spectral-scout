@@ -9,6 +9,11 @@ import { requireGrowerSession } from "@/lib/session";
 import LayoutPicker from "./LayoutPicker";
 import MapEditor from "./MapEditorClient";
 
+// Same "list didn't refresh after create" gap as the facility detail page
+// -- LayoutPicker's router.refresh() after generating a layout could leave
+// this rendering a cached pre-layout state without it.
+export const dynamic = "force-dynamic";
+
 export default async function AreaMapPage({ params }: { params: Promise<{ id: string; areaId: string }> }) {
   const session = await requireGrowerSession();
   if (!session) return null;
