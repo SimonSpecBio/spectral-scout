@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents, scoutingObservations, tasks, treatments, trapReadings, traps } from "@/db/schema";
 import { metricLabel, sessionMetric } from "@/lib/threshold-engine";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 
 export type LogKind = "finding" | "monitor" | "action" | "disease";
 const KIND_COLOR: Record<LogKind, string> = { finding: "#CE5D40", monitor: "#4E6280", action: "#4E9E86", disease: "#C79A3A" };
@@ -51,13 +52,20 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
     entries.push({
       at: e.createdAt,
       kind: e.kind === "pathogen" ? "disease" : "finding",
-      label: `${e.pestSpecies} detected`,
+      label: `${displayNameForPestSpecies(e.pestSpecies)} detected`,
       sub: loc.toUpperCase(),
       facilityId: e.facilityId,
       eventId: e.id,
     });
     if (e.resolvedAt) {
-      entries.push({ at: e.resolvedAt, kind: "action", label: `${e.pestSpecies} resolved`, sub: loc.toUpperCase(), facilityId: e.facilityId, eventId: e.id });
+      entries.push({
+        at: e.resolvedAt,
+        kind: "action",
+        label: `${displayNameForPestSpecies(e.pestSpecies)} resolved`,
+        sub: loc.toUpperCase(),
+        facilityId: e.facilityId,
+        eventId: e.id,
+      });
     }
   }
 
