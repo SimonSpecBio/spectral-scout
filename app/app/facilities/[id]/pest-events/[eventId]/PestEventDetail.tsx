@@ -716,6 +716,19 @@ export default function PestEventDetail({
                 className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
               />
             )}
+            {/* REI/PHI (lib/rei-phi.ts's computeRestrictions) only ever reads
+                reiHours/phiDays off a LINKED inventory item -- a freeform
+                pesticide name looks identical to a tracked one in this form
+                but silently gets zero restriction tracking. Guessing at a
+                fuzzy match to a catalog product's numbers here would be
+                worse than no match at all (a wrong REI/PHI window is a
+                safety problem, not just a missing feature), so this warns
+                instead of inferring. */}
+            {treatmentType === "pesticide" && !inventoryItemId && (
+              <div className="rounded-md p-2.5 text-xs" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
+                Not linked to inventory -- this won&apos;t get re-entry/harvest (REI/PHI) tracking. Pick it from the list above if it&apos;s in stock.
+              </div>
+            )}
             <div className="flex gap-2">
               {inventoryItemId && (
                 <input
