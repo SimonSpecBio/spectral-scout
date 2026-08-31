@@ -57,12 +57,14 @@ export default async function Home() {
         </Link>
         {/* One shared, always-onboarded account -- no signup, no real
             email, just straight into a working app with sample data.
-            Deliberately de-emphasized vs. the real Sign in button above. */}
-        <form action="/api/demo-login" method="POST">
-          <button type="submit" className="text-xs text-[var(--text-dim)] underline">
-            Just want to poke around? Try the test account →
-          </button>
-        </form>
+            Deliberately de-emphasized vs. the real Sign in button above.
+            A plain <a href>, not next/link's <Link> or a <form> submit --
+            this needs to be a real, crawlable link a script or AI agent
+            can follow with a bare GET, not something that only works via
+            a simulated form submission or client-side route interception. */}
+        <a href="/api/demo-login" className="text-xs text-[var(--text-dim)] underline">
+          Just want to poke around? Try the test account →
+        </a>
         <p className="max-w-[420px] text-xs leading-relaxed text-[var(--text-faint)]">
           Built by{" "}
           <a href="https://spectralbiocontrol.com" className="text-[var(--text-dim)] underline">

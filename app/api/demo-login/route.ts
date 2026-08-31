@@ -74,7 +74,7 @@ async function ensureDemoUser() {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handleDemoLogin(request: NextRequest): Promise<NextResponse> {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkDemoLoginRateLimit(ip)) {
     return NextResponse.json({ error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
@@ -94,4 +94,16 @@ export async function POST(request: NextRequest) {
     expires: new Date(Date.now() + SESSION_MAX_AGE_MS),
   });
   return response;
+}
+
+// GET, not just POST -- a plain <a href> (what a crawler/AI agent follows,
+// as opposed to submitting a form) issues a GET. Both methods do the exact
+// same thing; there's no state-changing distinction worth making here since
+// the whole route accepts zero verification by design already.
+export async function GET(request: NextRequest) {
+  return handleDemoLogin(request);
+}
+
+export async function POST(request: NextRequest) {
+  return handleDemoLogin(request);
 }
