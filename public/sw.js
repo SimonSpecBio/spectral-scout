@@ -13,7 +13,7 @@
 // the offline capture queue (lib/offline-queue.ts, app-layer IndexedDB,
 // not this file) is what actually guarantees "nothing is lost in a dead
 // zone" for scouting/trap/treatment submissions.
-const VERSION = "v3";
+const VERSION = "v4";
 const CACHE_NAME = `spectral-scout-${VERSION}`;
 const APP_SHELL = ["/offline", "/manifest.webmanifest", "/favicon.png", "/icons/icon-192.png", "/icons/icon-512.png"];
 
@@ -64,6 +64,22 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return; // mutations pass straight through -- the offline queue handles those at the app layer
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  // Auth redirects (demo-login's session-creation hop, and NextAuth's own
+  // sign-in/callback flow) must never be intercepted. A service worker
+  // that calls fetch(request) on a NAVIGATION and the fetch follows a
+  // redirect internally gets back a Response whose .url is the final
+  // (redirected-to) address -- but respondWith()'ing that for a
+  // navigation renders the target page's content while the browser's
+  // address bar and Next.js's own client router still think they're at
+  // the ORIGINAL url. That mismatch broke client-side hydration and
+  // bounced the tab back to "/" (root cause of "test account link sends
+  // me to the sign-in page" -- the auth/session logic itself was never
+  // broken, this was). Letting the browser handle these as a normal,
+  // uncontrolled navigation sidesteps the whole problem.
+  if (request.mode === "navigate" && (url.pathname === "/api/demo-login" || url.pathname.startsWith("/api/auth/"))) {
+    return;
+  }
 
   // Navigations (HTML pages): network-first so a signed-in grower always
   // gets fresh data when online, falling back to whatever was last cached
