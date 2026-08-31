@@ -735,6 +735,7 @@ export default function PestEventDetail({
                   type="number"
                   inputMode="decimal"
                   min={0}
+                  step="any"
                   value={quantityUsed}
                   onChange={(e) => setQuantityUsed(e.target.value === "" ? "" : Number(e.target.value))}
                   placeholder="Qty used"

@@ -145,7 +145,11 @@ export default function NewTreatmentForm({
           )}
           {inventoryItemId && (
             <FormField label={`Quantity used${selectedItem ? ` (${selectedItem.unit})` : ""}`} layout="row">
-              <Stepper value={quantityUsed} onChange={setQuantityUsed} min={0} />
+              {/* Whole-number taps for discrete "units" (beneficial sachets/
+                  vials); a liquid/weight unit (L, gal, kg, oz) needs finer
+                  steps -- a 1.0 default made a 0.1 L dose of anything
+                  impossible to enter via the +/- buttons at all. */}
+              <Stepper value={quantityUsed} onChange={setQuantityUsed} min={0} step={selectedItem?.unit === "units" ? 1 : 0.1} />
             </FormField>
           )}
           <FormField label="Target pest (optional)">
