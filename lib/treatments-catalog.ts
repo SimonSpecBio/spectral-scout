@@ -436,7 +436,64 @@ export const PESTS: PestProgram[] = [
 
 export function findPestProgram(pestSpecies: string): PestProgram | null {
   const q = pestSpecies.trim().toLowerCase();
-  return PESTS.find((p) => p.commonName.toLowerCase() === q || p.latin.toLowerCase() === q) ?? null;
+  return PESTS.find((p) => p.id === q || p.commonName.toLowerCase() === q || p.latin.toLowerCase() === q) ?? null;
+}
+
+// Freeform text a grower or an older event might have typed, keyed to the
+// catalog id it actually means -- "PM" and "powdery mildew" typed into two
+// different events used to become two different pestEvents.pestSpecies
+// strings (and so two open cases for the same real infestation). Only
+// covers variants actually seen in the wild so far; anything not listed
+// here still resolves correctly if it matches a commonName/latin exactly
+// (findPestProgram above), and falls through to a genuine custom-species
+// event otherwise.
+const PEST_ALIASES: Record<string, string> = {
+  pm: "path_pm",
+  "powdery mildew": "path_pm",
+  mites: "pest_tssm",
+  mite: "pest_tssm",
+  "spider mites": "pest_tssm",
+  "spider mite": "pest_tssm",
+  "two-spotted spider mite": "pest_tssm",
+  "two spotted spider mite": "pest_tssm",
+  tssm: "pest_tssm",
+  aphids: "pest_aphid",
+  aphid: "pest_aphid",
+  whiteflies: "pest_whitefly",
+  "fungus gnat": "pest_fungusgnat",
+  mealybug: "pest_mealybug",
+  botrytis: "path_botrytis",
+  "gray mold": "path_botrytis",
+  "grey mold": "path_botrytis",
+  "bud rot": "path_botrytis",
+  "root rot": "path_rootrot",
+  thrips: "pest_thrips",
+};
+
+// The one place event-creation resolves whatever a grower typed (or a
+// promoted scouting session's species field) down to the catalog id that
+// same input already means, if any -- pestEvents.pestSpecies is meant to
+// store THIS return value going forward, not the raw input. Returns the
+// input unchanged (trimmed) when nothing in the catalog or alias map
+// matches, which is the correct outcome for a genuine species the catalog
+// doesn't cover -- those stay freeform, same as before.
+export function resolveCanonicalPestId(pestSpecies: string): string {
+  const trimmed = pestSpecies.trim();
+  const q = trimmed.toLowerCase();
+  if (PEST_ALIASES[q]) return PEST_ALIASES[q];
+  const program = findPestProgram(trimmed);
+  return program ? program.id : trimmed;
+}
+
+// The inverse of resolveCanonicalPestId, for every place that renders a
+// pest event's species to a human -- pestSpecies is now usually a catalog
+// id ("pest_tssm"), which is exactly what nobody wants to read on a
+// screen. Falls back to the raw string unchanged for genuine custom
+// species (never matched a catalog id), so this is always safe to wrap
+// display text in regardless of which era an event's data came from.
+export function displayNameForPestSpecies(pestSpecies: string): string {
+  const program = PESTS.find((p) => p.id === pestSpecies);
+  return program ? program.commonName : pestSpecies;
 }
 export function findAgent(id: string): Agent | undefined {
   return AGENTS.find((a) => a.id === id);

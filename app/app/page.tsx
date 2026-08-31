@@ -9,6 +9,7 @@ import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-
 import { taskActionHref, taskUrgency } from "@/lib/tasks";
 import { computeEscalationAlerts, computeMonitoringAlerts, metricLabel, type MetricKind } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import { requireGrowerSession } from "@/lib/session";
 import LayoutPicker from "./facilities/[id]/areas/[areaId]/LayoutPicker";
 import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
@@ -252,11 +253,12 @@ export default async function HomePage({
   const activity = events
     .flatMap((e) => {
       const loc = locationOf(e);
-      const list = [{ label: `${e.pestSpecies} detected`, sub: loc, at: e.createdAt, alert: true }];
+      const species = displayNameForPestSpecies(e.pestSpecies);
+      const list = [{ label: `${species} detected`, sub: loc, at: e.createdAt, alert: true }];
       for (const t of treatmentsByEvent.get(e.id) ?? []) {
-        list.push({ label: `${t.type.replace("_", " ")} applied -- ${e.pestSpecies}`, sub: loc, at: t.appliedAt, alert: false });
+        list.push({ label: `${t.type.replace("_", " ")} applied -- ${species}`, sub: loc, at: t.appliedAt, alert: false });
       }
-      if (e.resolvedAt) list.push({ label: `${e.pestSpecies} resolved`, sub: loc, at: e.resolvedAt, alert: false });
+      if (e.resolvedAt) list.push({ label: `${species} resolved`, sub: loc, at: e.resolvedAt, alert: false });
       return list;
     })
     .sort((a, b) => b.at.getTime() - a.at.getTime())
@@ -457,7 +459,7 @@ export default async function HomePage({
                       style={{ background: SEVERITY_COLOR[bandFromRatio(a.catchPerDay / a.threshold)] }}
                     />
                     <div className="flex-1">
-                      <div className="text-sm">{a.trapLabel} spike &mdash; confirm {a.pestSpecies}?</div>
+                      <div className="text-sm">{a.trapLabel} spike &mdash; confirm {displayNameForPestSpecies(a.pestSpecies)}?</div>
                       <div className="label-mono">
                         {(trapAreaNameById.get(a.facilityAreaId) ?? "").toUpperCase()} &middot; {a.catchPerDay.toFixed(1)}/DAY
                       </div>
@@ -502,7 +504,7 @@ export default async function HomePage({
                       style={{ background: SEVERITY_COLOR[eventSeverityById.get(a.eventId) ?? bandFromMetric(a.metricKind, a.value)] }}
                     />
                     <div className="flex-1">
-                      <div className="text-sm">{a.pestSpecies} over threshold</div>
+                      <div className="text-sm">{displayNameForPestSpecies(a.pestSpecies)} over threshold</div>
                       <div className="label-mono">
                         {metricLabel({ kind: a.metricKind, value: a.value }).toUpperCase()} &middot; THRESHOLD{" "}
                         {a.metricKind === "occupancy" ? `${a.threshold}%` : `${a.threshold}/LEAF`}
@@ -525,7 +527,7 @@ export default async function HomePage({
                       style={{ background: SEVERITY_COLOR[eventSeverityById.get(a.eventId) ?? bandFromMetric(a.metricKind, a.latestValue)] }}
                     />
                     <div className="flex-1">
-                      <div className="text-sm">{a.pestSpecies} not improving — try a different tier?</div>
+                      <div className="text-sm">{displayNameForPestSpecies(a.pestSpecies)} not improving — try a different tier?</div>
                       <div className="label-mono">
                         {metricLabel({ kind: a.metricKind, value: a.baselineValue }).toUpperCase()} →{" "}
                         {metricLabel({ kind: a.metricKind, value: a.latestValue }).toUpperCase()} AFTER {a.daysSinceTreatment}D
@@ -558,7 +560,7 @@ export default async function HomePage({
               <Link key={`${item.kind}-${e.id}`} href={`/app/facilities/${e.facilityId}/pest-events/${e.id}`} className="flex items-center gap-3 p-3.5">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[e.severity] }} />
                 <div className="flex-1">
-                  <div className="text-sm capitalize">{item.kind === "followup" ? `${e.pestSpecies} recheck overdue` : `${e.pestSpecies} trending up`}</div>
+                  <div className="text-sm capitalize">{item.kind === "followup" ? `${displayNameForPestSpecies(e.pestSpecies)} recheck overdue` : `${displayNameForPestSpecies(e.pestSpecies)} trending up`}</div>
                   <div className="label-mono">
                     {(e.areaName ?? e.facilityName).toUpperCase()} &middot; {item.kind === "followup" ? relativeTime(e.createdAt) : e.severity.toUpperCase()}
                   </div>
@@ -597,7 +599,7 @@ export default async function HomePage({
                 <Link key={row.key} href={`/app/facilities/${row.event.facilityId}/pest-events/${row.event.id}`} className="flex items-center gap-3">
                   <span className="h-4 w-4 shrink-0 rounded border border-[var(--text-faint)]" />
                   <span className="text-sm">
-                    Follow up {row.event.pestSpecies} -- {row.event.areaName ?? row.event.facilityName}
+                    Follow up {displayNameForPestSpecies(row.event.pestSpecies)} -- {row.event.areaName ?? row.event.facilityName}
                   </span>
                 </Link>
               )
@@ -607,7 +609,7 @@ export default async function HomePage({
                 <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[var(--surface-raised)] text-[length:var(--text-2xs)] text-[var(--text-faint)]">
                   ✓
                 </span>
-                <span className="text-sm text-[var(--text-faint)] line-through">{e.pestSpecies} resolved</span>
+                <span className="text-sm text-[var(--text-faint)] line-through">{displayNameForPestSpecies(e.pestSpecies)} resolved</span>
               </div>
             ))}
           </div>

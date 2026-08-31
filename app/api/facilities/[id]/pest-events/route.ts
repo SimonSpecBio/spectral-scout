@@ -7,7 +7,7 @@ import { getOwnedFacility } from "@/lib/facilities";
 import { parseMonitoringPayload } from "@/lib/monitoring";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
-import { findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
+import { findAgent, findPestProgram, findProduct, resolveCanonicalPestId } from "@/lib/treatments-catalog";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireGrowerSession();
@@ -36,8 +36,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!facility) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json();
-  const pestSpecies = typeof body.pestSpecies === "string" ? body.pestSpecies.trim() : "";
-  if (!pestSpecies) return NextResponse.json({ error: "pestSpecies is required" }, { status: 400 });
+  const rawPestSpecies = typeof body.pestSpecies === "string" ? body.pestSpecies.trim() : "";
+  if (!rawPestSpecies) return NextResponse.json({ error: "pestSpecies is required" }, { status: 400 });
+  // Stored going forward as the catalog id ("pest_tssm"), not whatever the
+  // grower/scouting-session actually typed -- "PM" and "powdery mildew"
+  // used to create two visually-different-but-identical open cases in the
+  // same area. Falls through to the raw text unchanged for a genuine
+  // species the catalog/alias map doesn't cover.
+  const pestSpecies = resolveCanonicalPestId(rawPestSpecies);
   const severity = severityEnum.enumValues.includes(body.severity) ? body.severity : "moderate";
   const kind = eventKindEnum.enumValues.includes(body.kind) ? body.kind : "pest";
 
@@ -68,22 +74,47 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (mapObject) mapObjectId = mapObject.id;
   }
 
-  const [row] = await db
-    .insert(pestEvents)
-    .values({
-      facilityId: id,
-      facilityAreaId,
-      mapObjectId,
-      x: typeof body.x === "number" ? body.x : null,
-      y: typeof body.y === "number" ? body.y : null,
-      kind,
-      pestSpecies,
-      scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,
-      severity,
-      notes: typeof body.notes === "string" && body.notes ? body.notes : null,
-      createdByUserId: session.user!.id!,
-    })
-    .returning();
+  // One open case per pest per area -- a re-scout of the same (now-
+  // canonicalized) pest in the same area should update the existing case,
+  // not open a visually-identical twin next to it. Only applies once an
+  // area is actually known; a pin-less event (no facilityAreaId) has
+  // nothing to dedupe against.
+  let row: typeof pestEvents.$inferSelect;
+  const existingOpenCase = facilityAreaId
+    ? (
+        await db
+          .select()
+          .from(pestEvents)
+          .where(
+            and(
+              eq(pestEvents.facilityAreaId, facilityAreaId),
+              eq(pestEvents.pestSpecies, pestSpecies),
+              eq(pestEvents.status, "active")
+            )
+          )
+      )[0]
+    : undefined;
+
+  if (existingOpenCase) {
+    row = existingOpenCase;
+  } else {
+    [row] = await db
+      .insert(pestEvents)
+      .values({
+        facilityId: id,
+        facilityAreaId,
+        mapObjectId,
+        x: typeof body.x === "number" ? body.x : null,
+        y: typeof body.y === "number" ? body.y : null,
+        kind,
+        pestSpecies,
+        scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,
+        severity,
+        notes: typeof body.notes === "string" && body.notes ? body.notes : null,
+        createdByUserId: session.user!.id!,
+      })
+      .returning();
+  }
 
   // An initial assessment (e.g. the disease-event form's leaf-severity grid)
   // taken at creation time, folded into this same request instead of a

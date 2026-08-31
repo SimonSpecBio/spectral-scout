@@ -86,10 +86,11 @@ async function ensureDemoUser() {
 // someone in, but landed on "No sites yet" with nothing to actually poke
 // at (code review, 2026-08-31). Idempotent on "does this org already have
 // a facility," same reasoning as ensureDemoUser: cheap to check, safe to
-// call on every login. Species stored as the catalog's exact commonName
-// (not a raw catalog id -- findPestProgram matches on commonName/latin,
-// not id, and that lookup is what drives thresholds/recommendations for
-// these seeded events same as it would for a real grower's own events).
+// call on every login. Species stored as the catalog id directly
+// ("pest_tssm" etc), same canonical form every event now stores (see
+// resolveCanonicalPestId) -- findPestProgram/displayNameForPestSpecies
+// both resolve an id, so these seeded events get real thresholds/
+// recommendations and a proper display name exactly like a grower's own.
 async function ensureDemoFacility(organizationId: string, userId: string) {
   const [existingFacility] = await db.select().from(facilities).where(eq(facilities.organizationId, organizationId));
   if (existingFacility) return;
@@ -122,7 +123,7 @@ async function ensureDemoFacility(organizationId: string, userId: string) {
         x: 99,
         y: 40,
         kind: "pest",
-        pestSpecies: "Two-spotted spider mite",
+        pestSpecies: "pest_tssm",
         scientificName: "Tetranychus urticae",
         severity: "moderate",
         createdByUserId: userId,
@@ -135,7 +136,7 @@ async function ensureDemoFacility(organizationId: string, userId: string) {
       x: 99,
       y: 96,
       kind: "pest",
-      pestSpecies: "Aphids (green peach / cannabis aphid)",
+      pestSpecies: "pest_aphid",
       scientificName: "Myzus persicae / Phorodon cannabis",
       severity: "low",
       createdByUserId: userId,
@@ -147,7 +148,7 @@ async function ensureDemoFacility(organizationId: string, userId: string) {
       x: 223,
       y: 68,
       kind: "pathogen",
-      pestSpecies: "Powdery mildew",
+      pestSpecies: "path_pm",
       scientificName: "Golovinomyces / Podosphaera spp.",
       severity: "high",
       createdByUserId: userId,

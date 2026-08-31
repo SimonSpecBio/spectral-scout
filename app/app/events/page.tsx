@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents } from "@/db/schema";
 import { SEVERITY_COLOR } from "@/lib/colors";
 import { requireGrowerSession } from "@/lib/session";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 
 // See app/app/page.tsx's identical export for why: without this, the
 // filter=/facility=-only navigation here can reuse a cached render instead
@@ -96,7 +97,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
               <div className="flex items-center gap-3">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[e.severity] }} />
                 <div>
-                  <div className="font-medium capitalize">{e.pestSpecies}</div>
+                  <div className="font-medium capitalize">{displayNameForPestSpecies(e.pestSpecies)}</div>
                   <div className="text-xs text-[var(--text-dim)]">
                     {e.areaName ? `${e.areaName}, ${e.facilityName}` : e.facilityName}
                   </div>

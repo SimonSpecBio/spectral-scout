@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users as authUsers } from "@/db/auth-schema";
 import { facilities, facilityAreas, observationPhotos, pestEventComments, pestEvents, shareLinks, treatments } from "@/db/schema";
 import { SEVERITY_COLOR } from "@/lib/colors";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function SharedEventPage({ params }: { params: Promise<{ to
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-6 py-8">
       <div>
         <div className="label-mono text-[var(--text-faint)]">Shared read-only view -- {facility?.name}{area ? ` / ${area.name}` : ""}</div>
-        <h1 className="text-2xl font-semibold capitalize">{event.pestSpecies}</h1>
+        <h1 className="text-2xl font-semibold capitalize">{displayNameForPestSpecies(event.pestSpecies)}</h1>
         <div className="mt-1 flex items-center gap-2 text-sm">
           <span className="h-2 w-2 rounded-full" style={{ background: SEVERITY_COLOR[event.severity] }} />
           <span className="capitalize">{event.severity} severity</span>

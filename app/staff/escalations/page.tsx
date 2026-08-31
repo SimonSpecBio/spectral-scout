@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users as authUsers } from "@/db/auth-schema";
 import { escalations, facilities, observationPhotos, organizations, pestEvents, staffAuditLog } from "@/db/schema";
 import { canStaffViewOrgDetail, requireStaffSession } from "@/lib/session";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import ResolveForm from "./ResolveForm";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +76,8 @@ export default async function StaffEscalationsPage() {
                 {r.org.name} &middot; {r.facility.name}
               </div>
               <div className="text-xs text-[var(--text-dim)]">
-                {r.event.pestSpecies} &middot; {r.event.severity} severity &middot; requested by {r.requester?.name ?? r.requester?.email ?? "someone"}{" "}
+                {displayNameForPestSpecies(r.event.pestSpecies)} &middot; {r.event.severity} severity &middot; requested by{" "}
+                {r.requester?.name ?? r.requester?.email ?? "someone"}{" "}
                 {r.escalation.createdAt.toLocaleString()}
               </div>
             </div>

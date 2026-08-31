@@ -10,7 +10,7 @@ import { queuedFetch, queuedFileFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
 import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
-import { findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
+import { displayNameForPestSpecies, findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
 import RecommendationsPanel from "./RecommendationsPanel";
 
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
@@ -376,7 +376,7 @@ export default function PestEventDetail({
           <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[event.severity] }} />
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold capitalize">{event.pestSpecies}</h1>
+              <h1 className="text-2xl font-semibold capitalize">{displayNameForPestSpecies(event.pestSpecies)}</h1>
               {event.kind === "pathogen" && (
                 <span className="label-mono rounded border border-[var(--border-soft)] px-1.5 py-0.5">Disease</span>
               )}
