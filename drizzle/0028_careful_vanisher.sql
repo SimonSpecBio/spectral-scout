@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "scout_pest_event_open_case_idx" ON "scout_pest_event" USING btree ("facility_area_id","pest_species") WHERE "scout_pest_event"."status" = 'active';

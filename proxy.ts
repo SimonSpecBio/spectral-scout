@@ -114,6 +114,12 @@ export default auth(async (req) => {
   return NextResponse.redirect(signInUrl);
 });
 
+// The negative lookahead does path-SEGMENT exclusion, not substring --
+// (?!auth|cron|...) alone would also exclude e.g. a future /api/authorize
+// route from the auth gate entirely (its path literally starts with the
+// substring "auth"), shipping it unauthenticated by accident with no
+// warning. Each excluded name must be followed by "/" or end-of-path to
+// actually match.
 export const config = {
-  matcher: ["/app/:path*", "/staff/:path*", "/api/((?!auth|cron|demo-login).*)"],
+  matcher: ["/app/:path*", "/staff/:path*", "/api/((?!auth/|cron/|demo-login(?:/|$)|health(?:/|$)).*)"],
 };

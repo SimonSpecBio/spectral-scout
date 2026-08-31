@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sessions, users } from "@/db/auth-schema";
@@ -84,19 +84,30 @@ async function ensureDemoUser() {
 
 // A demo org with no sites was a dead end -- the button correctly logged
 // someone in, but landed on "No sites yet" with nothing to actually poke
-// at (code review, 2026-08-31). Idempotent on "does this org already have
-// a facility," same reasoning as ensureDemoUser: cheap to check, safe to
-// call on every login. Species stored as the catalog id directly
-// ("pest_tssm" etc), same canonical form every event now stores (see
-// resolveCanonicalPestId) -- findPestProgram/displayNameForPestSpecies
-// both resolve an id, so these seeded events get real thresholds/
-// recommendations and a proper display name exactly like a grower's own.
+// at (code review, 2026-08-31). Idempotent on "does the Steele ST fixture
+// specifically exist," not just "does this org have any facility at all"
+// -- checking for any facility meant this never re-ran once someone (a
+// tester, another agent) created an unrelated second site in the demo
+// org, and separately meant a schema/convention change (pestSpecies
+// switching from commonName strings to catalog ids) silently left the
+// original seed permanently stale since the function would never touch
+// it again. Species stored as the catalog id directly ("pest_tssm" etc),
+// same canonical form every event now stores (see resolveCanonicalPestId)
+// -- findPestProgram/displayNameForPestSpecies both resolve an id, so
+// these seeded events get real thresholds/recommendations and a proper
+// display name exactly like a grower's own.
 async function ensureDemoFacility(organizationId: string, userId: string) {
-  const [existingFacility] = await db.select().from(facilities).where(eq(facilities.organizationId, organizationId));
+  const [existingFacility] = await db
+    .select()
+    .from(facilities)
+    .where(and(eq(facilities.organizationId, organizationId), eq(facilities.name, "Steele ST")));
   if (existingFacility) return;
 
   await db.transaction(async (tx) => {
-    const [alreadyThere] = await tx.select().from(facilities).where(eq(facilities.organizationId, organizationId));
+    const [alreadyThere] = await tx
+      .select()
+      .from(facilities)
+      .where(and(eq(facilities.organizationId, organizationId), eq(facilities.name, "Steele ST")));
     if (alreadyThere) return;
 
     const [facility] = await tx.insert(facilities).values({ organizationId, name: "Steele ST" }).returning();

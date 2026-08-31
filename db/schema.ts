@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   date,
@@ -9,6 +10,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -357,6 +359,18 @@ export const pestEvents = pgTable(
     index("scout_pest_event_facility_id_idx").on(table.facilityId),
     index("scout_pest_event_facility_area_id_idx").on(table.facilityAreaId),
     index("scout_pest_event_status_idx").on(table.status),
+    // "One open case per (area, canonical pest id)" was enforced only in
+    // app code (select-then-insert in the POST route) -- correct under a
+    // single request, but two concurrent submissions for the same pest in
+    // the same area could both pass the "does this exist" check before
+    // either commits, producing the exact duplicate-case bug already fixed
+    // once. This is the actual guarantee; the app-level check stays too
+    // (cheaper than paying for a full round trip through the constraint on
+    // every normal request) but this is what makes it correct under
+    // concurrency, not just correct-looking under a manual test.
+    uniqueIndex("scout_pest_event_open_case_idx")
+      .on(table.facilityAreaId, table.pestSpecies)
+      .where(sql`${table.status} = 'active'`),
   ]
 ).enableRLS();
 

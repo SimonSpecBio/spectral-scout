@@ -76,27 +76,56 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // One open case per pest per area -- a re-scout of the same (now-
   // canonicalized) pest in the same area should update the existing case,
-  // not open a visually-identical twin next to it. Only applies once an
-  // area is actually known; a pin-less event (no facilityAreaId) has
-  // nothing to dedupe against.
+  // not open a visually-identical twin next to it. Enforced by a real
+  // partial unique index (db/schema.ts's scout_pest_event_open_case_idx),
+  // not just this check -- a plain select-then-insert here would leave a
+  // race window where two concurrent requests for the same (area, pest)
+  // could both pass the "does this exist" check before either commits.
+  // onConflictDoNothing() makes the insert itself the source of truth: if
+  // it's a genuine new case it lands; if a concurrent request already won,
+  // this returns nothing and the row is fetched below instead of erroring.
+  // Only applies once an area is actually known; a pin-less event (no
+  // facilityAreaId) has nothing to dedupe against.
   let row: typeof pestEvents.$inferSelect;
-  const existingOpenCase = facilityAreaId
-    ? (
-        await db
-          .select()
-          .from(pestEvents)
-          .where(
-            and(
-              eq(pestEvents.facilityAreaId, facilityAreaId),
-              eq(pestEvents.pestSpecies, pestSpecies),
-              eq(pestEvents.status, "active")
-            )
+  let isNewCase: boolean;
+  if (facilityAreaId) {
+    const [inserted] = await db
+      .insert(pestEvents)
+      .values({
+        facilityId: id,
+        facilityAreaId,
+        mapObjectId,
+        x: typeof body.x === "number" ? body.x : null,
+        y: typeof body.y === "number" ? body.y : null,
+        kind,
+        pestSpecies,
+        scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,
+        severity,
+        notes: typeof body.notes === "string" && body.notes ? body.notes : null,
+        createdByUserId: session.user!.id!,
+      })
+      .onConflictDoNothing({
+        target: [pestEvents.facilityAreaId, pestEvents.pestSpecies],
+        where: eq(pestEvents.status, "active"),
+      })
+      .returning();
+    if (inserted) {
+      row = inserted;
+      isNewCase = true;
+    } else {
+      const [existing] = await db
+        .select()
+        .from(pestEvents)
+        .where(
+          and(
+            eq(pestEvents.facilityAreaId, facilityAreaId),
+            eq(pestEvents.pestSpecies, pestSpecies),
+            eq(pestEvents.status, "active")
           )
-      )[0]
-    : undefined;
-
-  if (existingOpenCase) {
-    row = existingOpenCase;
+        );
+      row = existing;
+      isNewCase = false;
+    }
   } else {
     [row] = await db
       .insert(pestEvents)
@@ -114,6 +143,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         createdByUserId: session.user!.id!,
       })
       .returning();
+    isNewCase = true;
   }
 
   // An initial assessment (e.g. the disease-event form's leaf-severity grid)
@@ -189,14 +219,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // by hand. Mirrors apply-program/route.ts's recheck+release pattern, just
   // triggered at event-creation time instead of at treatment time, since a
   // Severe event needs a plan immediately, not only after something's
-  // already been applied. Gated on !existingOpenCase -- this used to run
+  // already been applied. Gated on isNewCase -- this used to run
   // unconditionally on every POST that resolved to "severe," so re-scouting
   // the same pest in the same area (previously always a distinct case
   // before pestSpecies was canonicalized) fanned out a fresh set of
   // recheck/treatment tasks each time. Now it only fires once, when the
   // case is actually created.
   const createdTasks: (typeof tasks.$inferSelect)[] = [];
-  if (!existingOpenCase && severity === "severe" && facilityAreaId) {
+  if (isNewCase && severity === "severe" && facilityAreaId) {
     const DAY_MS = 86_400_000;
     const program = findPestProgram(pestSpecies);
     // Falls back to the area's name, not the pest's own species -- an event
