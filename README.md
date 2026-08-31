@@ -37,13 +37,45 @@ engineering setup.
   spectral-ops's `pilots` table, same trick spectral-pilot already uses, to
   resolve pilot-tier orgs' program details by `pilotKey`.
 
-## Not built yet
+## What's built
 
-Facility map editor UI (Konva canvas, background-image tracing), pest
-event creation flow, scouting submission form, treatment records,
-analytics, and the staff promote-to-detail pages beyond the placeholder
-org list. Schema and plumbing (auth, org auto-provisioning, tier
-enforcement) come first on purpose -- everything else builds on top of it.
+This section used to say the app was schema-and-plumbing-only. It isn't
+anymore -- the map editor, pest-event flow, scouting, and treatments
+listed below as "not built" all shipped a while ago. Current state, by
+area:
+
+- **Facility map**: Konva canvas editor (`MapEditor.tsx`), preset
+  layouts for a first-time area (`LayoutPicker.tsx`) plus tracing over an
+  uploaded background image, a generic 20-bay pressure/lens heatmap for
+  mobile (`PressureBayMap.tsx`/`BayBarMap.tsx`) independent of a
+  facility's own drawn layout.
+- **Pest events**: the central case object, creation flow, one open case
+  per (area, canonical catalog pest id) -- `pestEvents.pestSpecies`
+  stores the catalog id (`lib/treatments-catalog.ts`'s `PestProgram.id`),
+  never freeform text, resolved via `resolveCanonicalPestId()` at
+  creation and rendered back to a human name via
+  `displayNameForPestSpecies()`.
+- **Scouting**: Plant sampling (leaf-grid) and Counts methods, promotion
+  of a scouting session into a pest event, threshold-based alerts
+  (`lib/threshold-engine.ts`).
+- **Treatments**: pesticide / biological / spectral_light, REI/PHI
+  tracking, inventory decrement on apply.
+- **Tasks/Schedule**: auto-created rechecks for Severe events, manual
+  tasks, offline-queue-backed submission.
+- **Sticky traps**: install, readings, catch-rate alerts.
+- **Staff**: general-vs-pilot privacy gate (`canStaffViewOrgDetail()`),
+  escalations ("Ask a person"), audit log.
+- **Demo access**: a public, zero-signup "Try the test account" link
+  (`/api/demo-login`) into a shared, always-seeded demo organization.
+
+## Known gaps / in progress
+
+Not every pest-event render site has been swept to display the catalog
+id as its human name yet (a handful of lower-traffic pages still show
+the raw id if you look closely). Trap thresholds have a data model but
+no dedicated settings UI yet. See the Operations Airtable base for the
+current backlog rather than trusting this list to stay perfectly
+current.
 
 ## One-time setup
 

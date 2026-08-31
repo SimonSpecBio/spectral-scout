@@ -189,9 +189,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // by hand. Mirrors apply-program/route.ts's recheck+release pattern, just
   // triggered at event-creation time instead of at treatment time, since a
   // Severe event needs a plan immediately, not only after something's
-  // already been applied.
+  // already been applied. Gated on !existingOpenCase -- this used to run
+  // unconditionally on every POST that resolved to "severe," so re-scouting
+  // the same pest in the same area (previously always a distinct case
+  // before pestSpecies was canonicalized) fanned out a fresh set of
+  // recheck/treatment tasks each time. Now it only fires once, when the
+  // case is actually created.
   const createdTasks: (typeof tasks.$inferSelect)[] = [];
-  if (severity === "severe" && facilityAreaId) {
+  if (!existingOpenCase && severity === "severe" && facilityAreaId) {
     const DAY_MS = 86_400_000;
     const program = findPestProgram(pestSpecies);
     // Falls back to the area's name, not the pest's own species -- an event
