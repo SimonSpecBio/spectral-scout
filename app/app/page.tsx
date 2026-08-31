@@ -376,10 +376,17 @@ export default async function HomePage({
   }
   const facilitiesNeedingAttention = orgFacilities.filter((f) => (activeCountByFacility.get(f.id) ?? 0) > 0).length;
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
-        {orgFacilities.length > 1 ? (
+  // "Scout / member: first screen is a due list, not a map" -- a scout's
+  // job on any given visit is working down what's due, not staring at
+  // pressure trends only a manager acts on. Owner/manager keeps the
+  // existing map-first home entirely unchanged; the sections below are
+  // the exact same JSX either way, just reordered (and the map swapped
+  // for a link) per role rather than duplicated.
+  const isScout = session.membershipRole === "member";
+
+  const headerRow = (
+    <div className="flex items-center justify-between gap-3">
+      {orgFacilities.length > 1 ? (
           <div className="flex min-w-0 flex-col gap-2">
             {facilitiesNeedingAttention > 0 && (
               <span className="label-mono whitespace-nowrap" style={{ color: "var(--accent)" }}>
@@ -413,7 +420,10 @@ export default async function HomePage({
           <span className="font-medium">{selectedFacility.name}</span>
         )}
       </div>
+  );
 
+  const mapAndGraphSection = (
+    <>
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
         <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
         <div className="hidden sm:block">{desktopMapSection}</div>
@@ -438,9 +448,25 @@ export default async function HomePage({
           </div>
         )
       )}
+    </>
+  );
 
-      <section className="flex flex-col gap-3">
-        <span className="label-mono">Attention required</span>
+  // Scout home skips the full map/graph -- a lightweight count-of-hotspots
+  // link instead, per "3 hotspots in this room, tap to see them" rather
+  // than embedding the 7-day pressure chart nobody but a manager acts on.
+  const scoutMapLink = (
+    <Link href={`/app/facilities/${selectedFacility.id}`} className="card flex items-center justify-between gap-3 p-4 text-sm">
+      <span>
+        {active.filter((e) => e.facilityId === selectedFacility.id).length} active hotspot
+        {active.filter((e) => e.facilityId === selectedFacility.id).length === 1 ? "" : "s"} at {selectedFacility.name}
+      </span>
+      <span className="shrink-0 text-[var(--accent)]">View map →</span>
+    </Link>
+  );
+
+  const attentionSection = (
+    <section className="flex flex-col gap-3">
+      <span className="label-mono">Attention required</span>
         {attention.length === 0 ? (
           <div className="card p-4 text-sm text-[var(--text-dim)]">Nothing needs attention right now.</div>
         ) : (
@@ -572,8 +598,10 @@ export default async function HomePage({
           </div>
         )}
       </section>
+  );
 
-      <section className="flex flex-col gap-3">
+  const tasksSection = (
+    <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <span className="label-mono">Today&apos;s tasks</span>
           <Link href="/app/schedule" className="text-xs text-[var(--accent)]">
@@ -614,9 +642,11 @@ export default async function HomePage({
             ))}
           </div>
         )}
-      </section>
+    </section>
+  );
 
-      <section className="flex flex-col gap-3">
+  const activitySection = (
+    <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <span className="label-mono">Recent activity</span>
           <Link href="/app/timeline" className="text-xs text-[var(--accent)]">
@@ -653,7 +683,26 @@ export default async function HomePage({
             ))}
           </div>
         )}
-      </section>
+    </section>
+  );
+
+  return (
+    <div className="flex flex-col gap-6">
+      {headerRow}
+      {isScout ? (
+        <>
+          {tasksSection}
+          {attentionSection}
+          {scoutMapLink}
+        </>
+      ) : (
+        <>
+          {mapAndGraphSection}
+          {attentionSection}
+          {tasksSection}
+        </>
+      )}
+      {activitySection}
     </div>
   );
 }
