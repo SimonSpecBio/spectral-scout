@@ -16,6 +16,11 @@ import RecommendationsPanel from "./RecommendationsPanel";
 
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
 
+// A one- or two-point line isn't a real trend, just noise presented as one
+// (reviewer finding, ticket recqSM600NM2KJHjh) -- the chart stays hidden
+// below this and shows the plain latest reading instead.
+const MIN_SESSIONS_FOR_CHART = 3;
+
 interface Treatment {
   id: string;
   type: TreatmentType;
@@ -436,7 +441,7 @@ export default function PestEventDetail({
         </div>
       </div>
 
-      {densities.length > 0 && chartMetricKind ? (
+      {densities.length >= MIN_SESSIONS_FOR_CHART && chartMetricKind ? (
         <div className="card flex flex-col gap-3 p-4">
           <div className="flex items-center justify-between">
             <span className="label-mono">Infestation over time</span>
@@ -511,6 +516,26 @@ export default function PestEventDetail({
                 <div className="text-xs text-[var(--text-dim)]">sessions logged</div>
               </div>
             </div>
+          </div>
+        </div>
+      ) : densities.length > 0 && chartMetricKind ? (
+        // 1-2 sessions logged -- a line/graph off that few points isn't a
+        // real trend, just noise presented as one (reviewer finding, ticket
+        // recqSM600NM2KJHjh). Show the plain latest reading instead of
+        // scaledPoints' misleading one/two-point line until there's enough
+        // data for MIN_SESSIONS_FOR_CHART to actually mean something.
+        <div className="card flex items-center justify-between gap-3 p-4">
+          <div>
+            <div className="text-2xl font-semibold">
+              {chartMetricKind === "density" ? latestDensity.toFixed(1) : `${Math.round(latestDensity)}%`}
+            </div>
+            <div className="text-xs text-[var(--text-dim)]">
+              {chartMetricKind === "density" ? "latest pests/leaf" : "latest infested"} ·{" "}
+              {new Date(chronological[chronological.length - 1].date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </div>
+          </div>
+          <div className="text-xs text-[var(--text-faint)]">
+            {MIN_SESSIONS_FOR_CHART - densities.length} more session{MIN_SESSIONS_FOR_CHART - densities.length === 1 ? "" : "s"} for a trend chart
           </div>
         </div>
       ) : (
