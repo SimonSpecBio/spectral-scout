@@ -11,6 +11,7 @@ import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
 import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
+import { thresholdSourceFor } from "@/lib/threshold-sources";
 import { displayNameForPestSpecies, findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
 import RecommendationsPanel from "./RecommendationsPanel";
 
@@ -83,6 +84,7 @@ export default function PestEventDetail({
   currentUserId,
   inventoryItems,
   thresholds,
+  showThresholdConfidence,
   followUpSuggestions,
   initialTab,
   isHomeGrower,
@@ -101,6 +103,10 @@ export default function PestEventDetail({
   currentUserId: string;
   inventoryItems: { id: string; name: string; unit: string; quantity: number; reorderLevel: number | null; unitCost: number | null }[];
   thresholds: SpeciesThresholds;
+  // False once the org has its own override for this species -- the
+  // catalog's research confidence describes ITS number, not one an org
+  // chose themselves (page.tsx's comment on hasOrgThresholdOverride).
+  showThresholdConfidence: boolean;
   followUpSuggestions: FollowUpSuggestion[];
   initialTab?: string;
   isHomeGrower: boolean;
@@ -164,6 +170,15 @@ export default function PestEventDetail({
   const spectralProtocol = spectralProgram
     ? buildSpectralLightProtocol(spectralProgram)
     : { applicability: "not_indicated" as const, summary: "", schedule: "" };
+
+  // Subtle trust signal, not a citation -- confidence only (Simon, 2026-09-01:
+  // "don't surface citation... confidence, but I want it to be subtle").
+  // "n/a" isn't shown -- that means the threshold isn't even a leaf-based
+  // number for this species (thrips, fungus gnats), so there's nothing
+  // meaningful to rate the confidence of here.
+  const thresholdSource = showThresholdConfidence ? thresholdSourceFor(event.pestSpecies) : null;
+  const thresholdConfidenceLabel =
+    thresholdSource && thresholdSource.confidence !== "n/a" ? thresholdSource.confidence : null;
 
   const lastTreatment = treatmentsList[0];
   let quickLog: { type: TreatmentType; product: string } | null = null;
@@ -517,6 +532,9 @@ export default function PestEventDetail({
               </div>
             </div>
           </div>
+          {thresholdConfidenceLabel && (
+            <div className="text-xs text-[var(--text-faint)]">Threshold confidence: {thresholdConfidenceLabel}</div>
+          )}
         </div>
       ) : densities.length > 0 && chartMetricKind ? (
         // 1-2 sessions logged -- a line/graph off that few points isn't a

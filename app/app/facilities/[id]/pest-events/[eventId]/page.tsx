@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { users as authUsers } from "@/db/auth-schema";
-import { facilityAreas, inventoryItems, observationPhotos, pestEventComments, scoutingObservations, treatments } from "@/db/schema";
+import { facilityAreas, inventoryItems, monitoringThresholds, observationPhotos, pestEventComments, scoutingObservations, treatments } from "@/db/schema";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { getOwnedFacility } from "@/lib/facilities";
 import { isHomeGrower } from "@/lib/grower-type";
@@ -55,6 +55,15 @@ export default async function PestEventPage({
     .where(eq(pestEventComments.pestEventId, eventId))
     .orderBy(pestEventComments.createdAt);
   const thresholds = await getSpeciesThresholds(session.organizationId!, event.pestSpecies);
+  // Whether the numbers/mode in `thresholds` are still the catalog's own
+  // research-backed default, or an org already overrode them -- the
+  // confidence badge (PestEventDetail's chart) only means anything next to
+  // the catalog's real number, not an org's own customized one, so this
+  // gates whether it renders at all rather than risk it reading as
+  // vouching for a value the org chose themselves.
+  const hasOrgThresholdOverride = (
+    await db.select().from(monitoringThresholds).where(eq(monitoringThresholds.organizationId, session.organizationId!))
+  ).some((t) => t.pestSpecies.toLowerCase() === event.pestSpecies.toLowerCase());
   const locationLabel = area ? `${area.name}, ${facility.name}` : facility.name;
 
   // Null for events created before createdByUserId existed, or if that user
@@ -137,6 +146,7 @@ export default async function PestEventPage({
           unitCost: i.unitCost == null ? null : Number(i.unitCost),
         }))}
         thresholds={thresholds}
+        showThresholdConfidence={!hasOrgThresholdOverride}
       />
     </div>
   );
