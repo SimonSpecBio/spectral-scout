@@ -1,3 +1,5 @@
+import { nearestZoneLabel, type Zone } from "@/lib/map-zones";
+
 // Canvas-space (900x600, the same space the real Konva map and stored
 // pest_events x/y already use) positions of the 20 generic "bay" slots
 // (a stand-in layout shared by every facility, not that facility's actual
@@ -62,7 +64,17 @@ export function bayLabel(bay: Pick<Bay, "row" | "index">): string {
 // (an event with no facilityAreaId at all) -- callers decide what to show
 // then, since "Bay" vs a bare fallback reads differently in a title vs a
 // detail line.
-export function locationLabel(x: number | null, y: number | null, areaName: string | null): string | null {
-  if (x != null && y != null) return bayLabel(nearestBay(x, y));
+// `zones` is optional and additive: a caller that already has the area's
+// real facilityMapObjects loaded (lib/map-zones.ts) gets a real label
+// ("Bench 3", "Zone A") instead of the generic "Bay A1" whenever the area
+// has been laid out; every existing caller that doesn't pass zones keeps
+// its exact prior behavior (ticket recwOKlHCcSyXb971 -- the generic label
+// was the ONLY thing shown on a re-entry restriction warning, with no way
+// to match it to a real physical location).
+export function locationLabel(x: number | null, y: number | null, areaName: string | null, zones?: Zone[]): string | null {
+  if (x != null && y != null) {
+    const real = zones?.length ? nearestZoneLabel(x, y, zones) : null;
+    return real ?? bayLabel(nearestBay(x, y));
+  }
   return areaName;
 }

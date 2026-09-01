@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BAYS, bayLabel, CANVAS_H, CANVAS_W, nearestBay, type Bay } from "@/lib/floorplan-bays";
+import { nearestZoneLabel, type Zone } from "@/lib/map-zones";
 
 // The single location-picking component every creation flow uses now
 // (pest/disease events, traps, treatments, scouting): "fill the form
@@ -31,6 +32,12 @@ function toView(bay: Bay) {
 export interface PickerArea {
   id: string;
   name: string;
+  // This area's real, grower-named map zones (lib/map-zones.ts), if it's
+  // ever been laid out -- empty for an area still on the generic BAYS
+  // grid. Only used to resolve a REAL label for whichever generic bay slot
+  // gets tapped; the tap targets themselves stay the same fixed 10-slot
+  // grid regardless (see confirm bar below).
+  zones?: Zone[];
 }
 
 export interface PickerFacility {
@@ -94,6 +101,12 @@ export default function LocationPicker({
   const facility = facilities[facilityIdx];
   const areas = facility?.areas ?? [];
   const currentAreaId = areaId && areas.some((a) => a.id === areaId) ? areaId : (areas[0]?.id ?? null);
+  const currentArea = areas.find((a) => a.id === currentAreaId);
+  // The real name for whichever generic bay slot is selected, when this
+  // area has ever been laid out -- falls back to the generic "Bay A1" only
+  // when there's nothing real to resolve against (ticket recwOKlHCcSyXb971).
+  const selectedRealLabel =
+    selected && currentArea?.zones?.length ? nearestZoneLabel(selected.x, selected.y, currentArea.zones) : null;
 
   function goTo(idx: number) {
     const next = ((idx % facilities.length) + facilities.length) % facilities.length;
@@ -259,7 +272,7 @@ export default function LocationPicker({
           <div>
             {pinRequired ? (
               <>
-                <div className="text-sm">{selected ? bayLabel(selected) : "No location selected"}</div>
+                <div className="text-sm">{selected ? (selectedRealLabel ?? bayLabel(selected)) : "No location selected"}</div>
                 <div className="label-mono">
                   {facility?.name.toUpperCase() ?? ""}
                   {areas.find((a) => a.id === currentAreaId) ? ` · ${areas.find((a) => a.id === currentAreaId)!.name.toUpperCase()}` : ""}

@@ -1,14 +1,12 @@
 import Link from "next/link";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { facilities, treatments } from "@/db/schema";
-import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
-import { computeRestrictions } from "@/lib/rei-phi";
+import { facilities } from "@/db/schema";
+import { computeRestrictions, labelBiologicalReleases } from "@/lib/rei-phi";
 import { requireGrowerSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-const DAY_MS = 86_400_000;
 const LOOKBACK_DAYS = 14;
 
 function formatCountdown(ms: number): string {
@@ -45,12 +43,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
   const restrictions = await computeRestrictions(selectedFacility.id);
   const active = restrictions.filter((r) => r.reiActive || r.phiActive);
 
-  const since = new Date(Date.now() - LOOKBACK_DAYS * DAY_MS);
-  const bioTreatments = await db
-    .select()
-    .from(treatments)
-    .where(and(eq(treatments.facilityId, selectedFacility.id), eq(treatments.type, "biological"), gte(treatments.appliedAt, since)))
-    .orderBy(desc(treatments.appliedAt));
+  const bioTreatments = await labelBiologicalReleases(selectedFacility.id, LOOKBACK_DAYS);
   const clearRestricted = restrictions.filter((r) => !r.reiActive && !r.phiActive);
 
   return (
@@ -132,7 +125,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
                 <div key={t.id} className="flex items-center gap-3 p-3.5">
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--success)" }} />
                   <div>
-                    <div className="text-sm">{t.x != null && t.y != null ? bayLabel(nearestBay(t.x, t.y)) : "—"} · {t.product ?? "biocontrol"} released</div>
+                    <div className="text-sm">{t.bay} · {t.product ?? "biocontrol"} released</div>
                     <div className="label-mono">Biocontrol · no restriction</div>
                   </div>
                 </div>

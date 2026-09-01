@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { facilities, facilityAreas } from "@/db/schema";
+import { buildPickerFacilities } from "@/lib/location-picker-data";
 import { requireGrowerSession } from "@/lib/session";
 import NewTrapForm from "./NewTrapForm";
 
@@ -12,12 +10,9 @@ export default async function NewTrapPage() {
   const session = await requireGrowerSession();
   if (!session) return null;
 
-  const orgFacilities = await db
-    .select()
-    .from(facilities)
-    .where(eq(facilities.organizationId, session.organizationId!));
+  const pickerFacilities = await buildPickerFacilities(session.organizationId!);
 
-  if (orgFacilities.length === 0) {
+  if (pickerFacilities.length === 0) {
     return (
       <div className="flex flex-col gap-6">
         <h1 className="text-2xl font-semibold">Add trap</h1>
@@ -31,13 +26,6 @@ export default async function NewTrapPage() {
       </div>
     );
   }
-
-  const allAreas = await db.select().from(facilityAreas);
-  const pickerFacilities = orgFacilities.map((f) => ({
-    id: f.id,
-    name: f.name,
-    areas: allAreas.filter((a) => a.facilityId === f.id).map((a) => ({ id: a.id, name: a.name })),
-  }));
 
   return <NewTrapForm facilities={pickerFacilities} />;
 }

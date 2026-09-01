@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { facilities, facilityAreas, scoutingObservations } from "@/db/schema";
+import { scoutingObservations } from "@/db/schema";
+import { buildPickerFacilities } from "@/lib/location-picker-data";
 import { requireGrowerSession } from "@/lib/session";
 import { sessionMetric } from "@/lib/threshold-engine";
 import NewEventForm from "./NewEventForm";
@@ -29,12 +30,9 @@ export default async function NewEventPage({
       )[0]
     : null;
 
-  const orgFacilities = await db
-    .select()
-    .from(facilities)
-    .where(eq(facilities.organizationId, session.organizationId!));
+  const pickerFacilities = await buildPickerFacilities(session.organizationId!);
 
-  if (orgFacilities.length === 0) {
+  if (pickerFacilities.length === 0) {
     return (
       <div className="flex flex-col gap-6">
         <h1 className="text-2xl font-semibold">New pest event</h1>
@@ -48,13 +46,6 @@ export default async function NewEventPage({
       </div>
     );
   }
-
-  const allAreas = await db.select().from(facilityAreas);
-  const pickerFacilities = orgFacilities.map((f) => ({
-    id: f.id,
-    name: f.name,
-    areas: allAreas.filter((a) => a.facilityId === f.id).map((a) => ({ id: a.id, name: a.name })),
-  }));
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">

@@ -7,6 +7,7 @@ import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transforme
 import type Konva from "konva";
 import { CANVAS_TEXT } from "@/lib/canvas-text-scale";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
+import { pointInShape } from "@/lib/map-zones";
 import { queuedFetch } from "@/lib/offline-queue";
 import { useTheme } from "@/app/app/ThemeProvider";
 
@@ -91,40 +92,11 @@ const SEVERITY_RANK: Record<Severity, number> = { low: 0, moderate: 1, high: 2, 
 // hotspot signal, not a decoration a grower picks per-shape. If an active
 // pest event's pin falls inside a zone, that zone tints to the worst
 // severity found inside it instead.
-function pointInShape(px: number, py: number, obj: Pick<MapObject, "shapeType" | "geometry">): boolean {
-  const g = obj.geometry;
-  if (obj.shapeType === "rect") {
-    const x0 = Math.min(g.x ?? 0, (g.x ?? 0) + (g.width ?? 0));
-    const x1 = Math.max(g.x ?? 0, (g.x ?? 0) + (g.width ?? 0));
-    const y0 = Math.min(g.y ?? 0, (g.y ?? 0) + (g.height ?? 0));
-    const y1 = Math.max(g.y ?? 0, (g.y ?? 0) + (g.height ?? 0));
-    return px >= x0 && px <= x1 && py >= y0 && py <= y1;
-  }
-  if (obj.shapeType === "circle") {
-    const dx = px - (g.x ?? 0);
-    const dy = py - (g.y ?? 0);
-    return Math.sqrt(dx * dx + dy * dy) <= (g.radius ?? 0);
-  }
-  if (obj.shapeType === "polygon" && g.points) {
-    let inside = false;
-    const pts = g.points;
-    for (let i = 0, j = pts.length / 2 - 1; i < pts.length / 2; j = i++) {
-      const xi = pts[i * 2],
-        yi = pts[i * 2 + 1];
-      const xj = pts[j * 2],
-        yj = pts[j * 2 + 1];
-      if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
-    }
-    return inside;
-  }
-  return false;
-}
-
 function hotspotSeverity(obj: MapObject, events: PestEvent[]): Severity | null {
   let worst: Severity | null = null;
   for (const ev of events) {
     if (ev.status !== "active" || ev.x == null || ev.y == null) continue;
-    if (!pointInShape(ev.x, ev.y, obj)) continue;
+    if (!pointInShape(ev.x, ev.y, obj.shapeType, obj.geometry)) continue;
     if (!worst || SEVERITY_RANK[ev.severity] > SEVERITY_RANK[worst]) worst = ev.severity;
   }
   return worst;
