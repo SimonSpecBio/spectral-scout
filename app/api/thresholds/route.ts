@@ -51,8 +51,18 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (infestedPctThreshold === undefined && densityThreshold === undefined) {
-    return NextResponse.json({ error: "infestedPctThreshold or densityThreshold is required" }, { status: 400 });
+  // Tri-state: absent -> leave whatever's already saved (or unset, on a
+  // fresh row) alone; true/false -> an explicit override in that
+  // direction; null -> explicitly clear back to the catalog default. This
+  // is the only field here that's meaningfully three-valued -- the numeric
+  // ones above only distinguish "provided" from "not provided."
+  let presenceTriggeredOverride: boolean | null | undefined;
+  if (body.presenceTriggeredOverride !== undefined) {
+    presenceTriggeredOverride = body.presenceTriggeredOverride === null ? null : Boolean(body.presenceTriggeredOverride);
+  }
+
+  if (infestedPctThreshold === undefined && densityThreshold === undefined && presenceTriggeredOverride === undefined) {
+    return NextResponse.json({ error: "infestedPctThreshold, densityThreshold, or presenceTriggeredOverride is required" }, { status: 400 });
   }
 
   const existing = await db
@@ -67,6 +77,7 @@ export async function POST(request: NextRequest) {
       .set({
         ...(infestedPctThreshold !== undefined ? { infestedPctThreshold } : {}),
         ...(densityThreshold !== undefined ? { densityThreshold } : {}),
+        ...(presenceTriggeredOverride !== undefined ? { presenceTriggeredOverride } : {}),
       })
       .where(eq(monitoringThresholds.id, match.id))
       .returning();
@@ -80,6 +91,7 @@ export async function POST(request: NextRequest) {
       pestSpecies,
       infestedPctThreshold: infestedPctThreshold ?? null,
       densityThreshold: densityThreshold ?? null,
+      presenceTriggeredOverride: presenceTriggeredOverride ?? null,
     })
     .returning();
   return NextResponse.json(row);

@@ -211,6 +211,13 @@
       "when": 1788220455322,
       "tag": "0029_careful_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1788221783367,
+      "tag": "0030_sleepy_vector",
+      "breakpoints": true
     }
   ]
 }

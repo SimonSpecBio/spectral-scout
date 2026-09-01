@@ -76,7 +76,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const metric = sessionMetric(row);
     if (metric) {
       const thresholds = await getSpeciesThresholds(session.organizationId!, event.pestSpecies);
-      const threshold = metric.kind === "density" ? thresholds.density : thresholds.pct;
+      // 0 for a presence-triggered species -- with value <= 0 already
+      // excluded above, this makes maybeScheduleKeepAnEyeRecheck's
+      // value >= threshold check always true, correctly skipping it (no
+      // "under threshold but nonzero" state exists when any detection at
+      // all is already over threshold).
+      const threshold = thresholds.presenceTriggered ? 0 : metric.kind === "density" ? thresholds.density : thresholds.pct;
       // Falls back to the area's name, not the pest's own species -- used
       // to produce a visibly duplicated task title like "Keep an eye on
       // Whitefly — Whitefly" for an unpinned event (ticket found in a

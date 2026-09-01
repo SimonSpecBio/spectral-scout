@@ -1,0 +1,1 @@
+ALTER TABLE "scout_monitoring_threshold" ADD COLUMN "presence_triggered_override" boolean;

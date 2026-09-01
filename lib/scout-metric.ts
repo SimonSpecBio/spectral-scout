@@ -58,8 +58,24 @@ export function metricLabel(metric: SessionMetric): string {
 export interface SpeciesThresholds {
   pct: number;
   density: number;
+  // Resolved (catalog default, then org override) presence-triggered flag
+  // -- see lib/treatments-catalog.ts's PestProgram.presenceTriggered
+  // comment. When true, pct/density are meaningless for comparison (any
+  // detection at all is over threshold); still populated so callers that
+  // only display a number don't need a separate null-handling path.
+  presenceTriggered: boolean;
 }
 
 export function thresholdFor(metric: SessionMetric, thresholds: SpeciesThresholds): number {
   return metric.kind === "occupancy" ? thresholds.pct : thresholds.density;
+}
+
+// The one place that decides "is this reading bad enough to alert on."
+// Every threshold/alert function in threshold-engine.ts reads through this
+// instead of comparing metric.value against a numeric threshold directly,
+// so a presence-triggered species (mealybug, broad mite, whitefly,
+// botrytis -- lib/treatments-catalog.ts) can't be silently re-broken by a
+// future caller re-implementing the comparison against pct/density.
+export function isOverThreshold(metric: SessionMetric, thresholds: SpeciesThresholds): boolean {
+  return thresholds.presenceTriggered ? metric.value > 0 : metric.value >= thresholdFor(metric, thresholds);
 }

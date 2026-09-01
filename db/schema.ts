@@ -892,6 +892,14 @@ export const monitoringThresholds = pgTable(
     pestSpecies: text("pest_species").notNull(),
     infestedPctThreshold: numeric("infested_pct_threshold", { mode: "number" }),
     densityThreshold: numeric("density_threshold", { mode: "number" }),
+    // Null = no override, use the catalog's presenceTriggered flag (or the
+    // generic numeric defaults, for a species with neither). An org can
+    // force EITHER direction explicitly -- true even for a species the
+    // catalog gives a real numeric threshold, or false to opt a
+    // catalog-presence-triggered species back into numeric thresholds --
+    // so this can't just be a read of the catalog flag (Airtable ticket
+    // recQMFkZ85yI2OE1i, scope confirmed with Simon 2026-08-30).
+    presenceTriggeredOverride: boolean("presence_triggered_override"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("scout_monitoring_threshold_organization_id_idx").on(table.organizationId)]

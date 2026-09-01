@@ -381,7 +381,10 @@ export default function PestEventDetail({
   const chartMetricKind: MetricKind | null = chronologicalAll.length > 0 ? chronologicalAll[chronologicalAll.length - 1].metricKind : null;
   const chronological = chartMetricKind ? chronologicalAll.filter((s) => s.metricKind === chartMetricKind) : [];
   const densities = chronological.map((s) => s.value);
-  const chartThreshold = chartMetricKind === "density" ? thresholds.density : thresholds.pct;
+  // 0 for a presence-triggered species -- draws the reference line at the
+  // floor instead of a numeric threshold that isn't the real rule for
+  // this species (lib/scout-metric.ts's isOverThreshold).
+  const chartThreshold = thresholds.presenceTriggered ? 0 : chartMetricKind === "density" ? thresholds.density : thresholds.pct;
   const latestDensity = densities[densities.length - 1];
   const baselineDensity = densities[0];
   const changeVsBaseline =
@@ -457,7 +460,11 @@ export default function PestEventDetail({
                   <>
                     <line x1={0} y1={scaled.refY} x2={220} y2={scaled.refY} stroke="var(--text-faint)" strokeWidth={1} strokeDasharray="3 3" />
                     <text x={2} y={scaled.refY - 3} className="font-mono" fontSize={8} fill="var(--text-faint)">
-                      {chartMetricKind === "density" ? `${chartThreshold}/leaf threshold` : `${chartThreshold}% threshold`}
+                      {thresholds.presenceTriggered
+                        ? "Alert on any detection"
+                        : chartMetricKind === "density"
+                          ? `${chartThreshold}/leaf threshold`
+                          : `${chartThreshold}% threshold`}
                     </text>
                     <polyline points={scaled.points} fill="none" stroke="var(--danger)" strokeWidth={2} />
                     {densities.map((v, i) => (

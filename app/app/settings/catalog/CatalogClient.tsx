@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { findPestProgram } from "@/lib/treatments-catalog";
 
 interface SpeciesRow {
   id: string;
@@ -14,7 +15,16 @@ interface ThresholdRow {
   pestSpecies: string;
   infestedPctThreshold: number | null;
   densityThreshold: number | null;
+  presenceTriggeredOverride: boolean | null;
   createdAt: string;
+}
+
+// Mirrors lib/scout-metric.ts's isOverThreshold resolution (catalog
+// default, then org override) so this settings list shows the same
+// answer the alert engine actually uses -- not just what's stored.
+function resolvedPresenceTriggered(row: Pick<ThresholdRow, "pestSpecies" | "presenceTriggeredOverride">): boolean {
+  if (row.presenceTriggeredOverride !== null) return row.presenceTriggeredOverride;
+  return findPestProgram(row.pestSpecies)?.presenceTriggered ?? false;
 }
 interface TrapThresholdRow {
   id: string;
@@ -58,6 +68,10 @@ export default function CatalogClient({
   const [thresholdName, setThresholdName] = useState("");
   const [thresholdPct, setThresholdPct] = useState("");
   const [thresholdDensity, setThresholdDensity] = useState("");
+  // null = use the catalog default (or generic numeric fallback) for
+  // whatever name is typed above; true/false = force presence-triggered
+  // mode on or off regardless of what the catalog says.
+  const [thresholdPresenceOverride, setThresholdPresenceOverride] = useState<boolean | null>(null);
   const [thresholdSubmitting, setThresholdSubmitting] = useState(false);
   const [thresholdError, setThresholdError] = useState<string | null>(null);
 
@@ -99,6 +113,7 @@ export default function CatalogClient({
         pestSpecies: thresholdName,
         infestedPctThreshold: thresholdPct || null,
         densityThreshold: thresholdDensity || null,
+        presenceTriggeredOverride: thresholdPresenceOverride,
       }),
     });
     if (res.ok) {
@@ -110,6 +125,7 @@ export default function CatalogClient({
       setThresholdName("");
       setThresholdPct("");
       setThresholdDensity("");
+      setThresholdPresenceOverride(null);
     } else {
       const body = await res.json().catch(() => ({}));
       setThresholdError(body.error ?? "Couldn't save threshold.");
@@ -242,7 +258,9 @@ export default function CatalogClient({
                 <div className="text-sm">{t.pestSpecies}</div>
                 <div className="flex items-center gap-3">
                   <span className="label-mono">
-                    {t.infestedPctThreshold ?? defaultPctThreshold}% &middot; {t.densityThreshold ?? defaultDensityThreshold}/leaf
+                    {resolvedPresenceTriggered(t)
+                      ? "Alert on any detection"
+                      : `${t.infestedPctThreshold ?? defaultPctThreshold}% · ${t.densityThreshold ?? defaultDensityThreshold}/leaf`}
                   </span>
                   {isOwner && (
                     <button onClick={() => removeThreshold(t)} className="text-xs text-[var(--danger)]">
@@ -264,35 +282,71 @@ export default function CatalogClient({
               required
               className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
             />
-            <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
-              Occupancy threshold (Plant sampling)
-              <input
-                value={thresholdPct}
-                onChange={(e) => setThresholdPct(e.target.value)}
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                placeholder={`${defaultPctThreshold}%`}
-                className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
-              />
-            </label>
-            <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
-              Density threshold (Counts, pests/leaf)
-              <input
-                value={thresholdDensity}
-                onChange={(e) => setThresholdDensity(e.target.value)}
-                type="number"
-                min="0"
-                step="0.1"
-                placeholder={`${defaultDensityThreshold}`}
-                className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
-              />
-            </label>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-[var(--text-dim)]">
+                Alert mode -- some species (mealybug, broad mite, whitefly, botrytis) default to alerting on any
+                detection instead of a numeric threshold, since no defensible number exists for them.
+              </span>
+              <div className="flex gap-2">
+                {(
+                  [
+                    { value: null, label: "Catalog default" },
+                    { value: true, label: "Any detection" },
+                    { value: false, label: "Numeric" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    type="button"
+                    key={String(opt.value)}
+                    onClick={() => setThresholdPresenceOverride(opt.value)}
+                    className={`flex-1 rounded-md border px-2 py-1.5 text-xs ${
+                      thresholdPresenceOverride === opt.value
+                        ? "border-[var(--accent)] text-[var(--accent)]"
+                        : "border-[var(--border)] text-[var(--text-dim)]"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {thresholdPresenceOverride !== true && (
+              <>
+                <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+                  Occupancy threshold (Plant sampling)
+                  <input
+                    value={thresholdPct}
+                    onChange={(e) => setThresholdPct(e.target.value)}
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder={`${defaultPctThreshold}%`}
+                    className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+                  Density threshold (Counts, pests/leaf)
+                  <input
+                    value={thresholdDensity}
+                    onChange={(e) => setThresholdDensity(e.target.value)}
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder={`${defaultDensityThreshold}`}
+                    className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
+                  />
+                </label>
+              </>
+            )}
             {thresholdError && <div className="text-sm text-[var(--danger)]">{thresholdError}</div>}
             <button
               type="submit"
-              disabled={thresholdSubmitting || !thresholdName.trim() || (!thresholdPct && !thresholdDensity)}
+              disabled={
+                thresholdSubmitting ||
+                !thresholdName.trim() ||
+                (thresholdPresenceOverride !== true && !thresholdPct && !thresholdDensity && thresholdPresenceOverride === null)
+              }
               className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
             >
               {thresholdSubmitting ? "Saving…" : "Save threshold"}

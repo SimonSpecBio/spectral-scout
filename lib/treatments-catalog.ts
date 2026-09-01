@@ -88,6 +88,15 @@ export interface PestProgram {
   // defaults rather than a fabricated one.
   defaultDensityThreshold?: number;
   defaultOccupancyPctThreshold?: number;
+  // Species where no numeric threshold is defensible AND the sourced
+  // guidance (lib/threshold-sources.ts) is explicitly "treat/act at first
+  // detection" rather than just silence -- mealybug, broad mite, whitefly,
+  // botrytis. Distinct from a species that simply has no
+  // defaultOccupancyPctThreshold/defaultDensityThreshold (aphids, thrips-
+  // on-leaves): those fall back to the generic numeric default because no
+  // one told us otherwise, these fall back to "alert on any detection"
+  // because someone did (Airtable ticket recQMFkZ85yI2OE1i).
+  presenceTriggered?: boolean;
 }
 
 export const AGENTS: Agent[] = [
@@ -263,6 +272,10 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: ["pr_abamectin"],
     followUp: { recheckDays: 4, releaseIntervalDays: 7, escalateIfNoDeclineDays: 10 },
     cautions: ["Do not overlap sulfur and oils", "Symptoms lag population -- treat early and aggressively"],
+    // "Symptoms lag population" above is exactly why this is presence-
+    // triggered, not just threshold-less -- by the time a numeric count
+    // would clear a threshold, damage is already done.
+    presenceTriggered: true,
   },
   {
     id: "pest_thrips", commonName: "Western flower thrips", latin: "Frankliniella occidentalis", kind: "pest",
@@ -302,6 +315,7 @@ export const PESTS: PestProgram[] = [
     // each other by 4x, so a single borrowed number reads as more precise
     // than the evidence supports. Falls back to the generic default for
     // now, same as every other species with no defensible number.
+    presenceTriggered: true,
   },
   {
     id: "pest_fungusgnat", commonName: "Fungus gnats", latin: "Bradysia spp.", kind: "pest",
@@ -322,6 +336,7 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: [],
     followUp: { recheckDays: 7, releaseIntervalDays: 14, escalateIfNoDeclineDays: 28 },
     cautions: ["Waxy coating resists contact sprays -- coverage + repeat needed"],
+    presenceTriggered: true,
   },
   {
     id: "path_pm", commonName: "Powdery mildew", latin: "Golovinomyces / Podosphaera spp.", kind: "pathogen",
@@ -357,12 +372,12 @@ export const PESTS: PestProgram[] = [
     // industry/extension guidance is universally "any visible sporulation
     // = treat/remove immediately," not "wait until N% of leaves show it."
     // An earlier pass here wrongly reused powdery mildew's 2% as a stand-in
-    // before that research existed; removed. Falls back to the generic
-    // 15% default for now, which is ALSO not really right for an
-    // any-detection pathogen -- the real fix is a dedicated "alert on any
-    // positive detection" path in threshold-engine.ts rather than
-    // expressing this as a percentage at all. Flagged as a follow-up, not
-    // solved by picking a different number here.
+    // before that research existed; removed. presenceTriggered below is
+    // the dedicated "alert on any positive detection" path this comment
+    // used to ask for (Airtable ticket recQMFkZ85yI2OE1i) -- the numeric
+    // defaults are now bypassed entirely for this species rather than
+    // expressing "any detection" as a percentage.
+    presenceTriggered: true,
   },
   {
     id: "path_rootrot", commonName: "Root rot complex (Pythium / Fusarium)", latin: "Pythium spp. / Fusarium spp.", kind: "pathogen",

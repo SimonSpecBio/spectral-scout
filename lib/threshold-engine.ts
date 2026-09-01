@@ -5,6 +5,7 @@ import { resolvePestEvent } from "@/lib/pest-events";
 import {
   DEFAULT_DENSITY_THRESHOLD,
   DEFAULT_INFESTED_PCT_THRESHOLD,
+  isOverThreshold,
   sessionMetric,
   thresholdFor,
   type MetricKind,
@@ -18,7 +19,7 @@ import { findPestProgram } from "@/lib/treatments-catalog";
 // one module -- only PestEventDetail.tsx (a client component) needs to
 // import the pure pieces from lib/scout-metric.ts directly, since this
 // file's `db` import can't be bundled for the browser.
-export { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, sessionMetric, metricLabel } from "@/lib/scout-metric";
+export { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, isOverThreshold, sessionMetric, metricLabel } from "@/lib/scout-metric";
 export type { MetricKind, SessionMetric, SpeciesThresholds } from "@/lib/scout-metric";
 
 // Falls back to this before ever reaching the flat generic DEFAULT_*
@@ -32,6 +33,7 @@ function builtinThresholdsFor(pestSpecies: string): SpeciesThresholds {
   return {
     pct: program?.defaultOccupancyPctThreshold ?? DEFAULT_INFESTED_PCT_THRESHOLD,
     density: program?.defaultDensityThreshold ?? DEFAULT_DENSITY_THRESHOLD,
+    presenceTriggered: program?.presenceTriggered ?? false,
   };
 }
 
@@ -50,6 +52,7 @@ async function getSpeciesThresholdsMap(organizationId: string): Promise<Map<stri
     map.set(row.pestSpecies.toLowerCase(), {
       pct: row.infestedPctThreshold ?? builtin.pct,
       density: row.densityThreshold ?? builtin.density,
+      presenceTriggered: row.presenceTriggeredOverride ?? builtin.presenceTriggered,
     });
   }
   return map;
@@ -116,8 +119,7 @@ export async function computeMonitoringAlerts(organizationId: string): Promise<M
     if (!metric) continue;
 
     const thresholds = thresholdsBySpecies.get(event.pestSpecies.toLowerCase()) ?? builtinThresholdsFor(event.pestSpecies);
-    const threshold = thresholdFor(metric, thresholds);
-    if (metric.value < threshold) continue;
+    if (!isOverThreshold(metric, thresholds)) continue;
 
     alerts.push({
       eventId: event.id,
@@ -126,7 +128,9 @@ export async function computeMonitoringAlerts(organizationId: string): Promise<M
       pestSpecies: event.pestSpecies,
       metricKind: metric.kind,
       value: metric.value,
-      threshold,
+      // 0 for a presence-triggered species -- the effective threshold IS
+      // "any detection," not a real percentage/density number.
+      threshold: thresholds.presenceTriggered ? 0 : thresholdFor(metric, thresholds),
       at: latest.createdAt,
     });
   }
@@ -160,7 +164,7 @@ export async function maybeAutoResolve(eventId: string, organizationId: string) 
   const allBelowThreshold = sessions.every((s) => {
     const metric = sessionMetric(s);
     if (!metric) return false;
-    return metric.value < thresholdFor(metric, thresholds);
+    return !isOverThreshold(metric, thresholds);
   });
   if (!allBelowThreshold) return null;
 
