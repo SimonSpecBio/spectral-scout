@@ -38,6 +38,58 @@ async function resolveDemoQuerySession(token: string) {
   };
 }
 
+// Real script/style/img/connect-src CSP (follow-up to ticket 106's
+// frame-ancestors-only pass) for the signed-in app surface -- /app/* and
+// /staff/*, where a real session and real actions live, is the highest-
+// value target for this. Uses Next's documented nonce pattern rather than
+// 'unsafe-inline' for script-src: Next's own inline hydration scripts
+// (the RSC streaming payload pushes -- no hand-written inline <script> tags
+// exist in this app, confirmed by grep) pick up whichever nonce is present
+// in this response's own CSP header automatically, so a real XSS-injected
+// inline script (no way to predict a per-request nonce) still gets
+// blocked. 'unsafe-eval' only in dev -- Turbopack/webpack's HMR client
+// needs it; a production build does not.
+//
+// img-src's blob-storage host is this project's actual Vercel Blob store
+// (verified against real stored URLs, not guessed) -- wildcarded on the
+// subdomain in case the store id ever rotates. No external fonts (next/font
+// self-hosts Manrope at build time), no third-party client-side fetches
+// anywhere in the app (grep-verified) -- Google OAuth's redirect to
+// accounts.google.com is a full top-level navigation, not a fetch/frame,
+// so it isn't governed by connect-src/frame-src here. Deliberately NOT
+// applied to public pages (/, /share/[token], /api/auth/* -- excluded from
+// this middleware's matcher by design) since Next's nonce-in-<script>
+// auto-injection needs this middleware to run on that request; those pages
+// keep next.config.ts's existing, more permissive baseline instead of
+// silently breaking sign-in or the share link.
+function cspHeaderFor(nonce: string): string {
+  const scriptSrc = process.env.NODE_ENV === "production" ? `'nonce-${nonce}' 'strict-dynamic'` : `'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`;
+  return [
+    `script-src 'self' ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https://*.public.blob.vercel-storage.com",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
+// Sets the CSP on BOTH the outgoing request headers (Next's own page
+// rendering reads this to nonce its generated <script> tags -- the
+// documented mechanism, not something reverse-engineered here) and the
+// response headers (what the browser actually enforces against). Mutates
+// `forwardHeaders` in place since every caller already builds one to carry
+// the session header through.
+function applyCsp(forwardHeaders: Headers): string {
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = cspHeaderFor(nonce);
+  forwardHeaders.set("Content-Security-Policy", csp);
+  return csp;
+}
+
 // Guards /app/* (grower) and /staff/* (internal) plus their API routes.
 // "/" stays public -- it's the marketing/landing page and sign-in entry for
 // a self-serve free tool, unlike the other three apps where every page
@@ -57,7 +109,9 @@ export default auth(async (req) => {
     if (demoSession) {
       const forwardHeaders = new Headers(req.headers);
       forwardHeaders.set(SESSION_HEADER_NAME, encodeSessionHeader(demoSession));
+      const csp = applyCsp(forwardHeaders);
       const response = NextResponse.next({ request: { headers: forwardHeaders } });
+      response.headers.set("Content-Security-Policy", csp);
       // Best-effort: if this client DOES keep cookies after all, later
       // requests stop needing ?demo= at all. If it doesn't, this line does
       // nothing and the query param keeps carrying the session on its own.
@@ -102,7 +156,10 @@ export default auth(async (req) => {
     // for the same request (see lib/session-cache.ts).
     const forwardHeaders = new Headers(req.headers);
     forwardHeaders.set(SESSION_HEADER_NAME, encodeSessionHeader(req.auth));
-    return NextResponse.next({ request: { headers: forwardHeaders } });
+    const csp = applyCsp(forwardHeaders);
+    const response = NextResponse.next({ request: { headers: forwardHeaders } });
+    response.headers.set("Content-Security-Policy", csp);
+    return response;
   }
 
   if (pathname.startsWith("/api/")) {

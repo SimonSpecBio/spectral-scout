@@ -4,11 +4,17 @@ import type { NextConfig } from "next";
 // clickjacking protection on signed-in /app/* pages. frame-ancestors/
 // X-Frame-Options is the one that actually matters here (nothing in this
 // app is meant to be iframed, including the public /share/[token] page --
-// it's a standalone link, not an embed feature). Deliberately NOT adding a
-// full script-src/default-src CSP lockdown in this pass: that needs
-// auditing every external resource this app actually loads (Google OAuth
-// redirect, Vercel Blob image domain, web push) to avoid silently breaking
-// one of them, which is a separate, more careful piece of work.
+// it's a standalone link, not an embed feature).
+//
+// A real script/style/img/connect-src CSP (follow-up ticket) now exists
+// too, but only for /app/* and /staff/* -- proxy.ts sets a per-request
+// nonce'd version there, since that's where a real session and real
+// actions live. It's set in the middleware, not here, because script-src
+// needs a fresh nonce every request (this config's headers() is static).
+// Public pages (/, /share/[token], /api/auth/*) keep this frame-ancestors-
+// only baseline unchanged -- extending the nonce mechanism to them means
+// widening proxy.ts's matcher, a separate, more careful piece of work than
+// this pass (getting it wrong risks silently breaking sign-in itself).
 const nextConfig: NextConfig = {
   async headers() {
     return [
