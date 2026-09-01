@@ -2,6 +2,7 @@ import { and, eq, ilike, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { facilities, facilityAreas, pestEventComments, pestEvents, treatments } from "@/db/schema";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import { requireGrowerSession } from "@/lib/session";
 
 export interface SearchResult {
@@ -30,10 +31,22 @@ export async function GET(request: NextRequest) {
   const facilityNameById = new Map(orgFacilities.map((f) => [f.id, f.name]));
   if (facilityIds.length === 0) return NextResponse.json([]);
 
-  const [matchedSites, matchedAreas, matchedEvents, matchedTreatments, matchedComments] = await Promise.all([
+  // pestEvents.pestSpecies stores a catalog id (e.g. "pest_tssm") for
+  // anything in the catalog, or legacy free text for older/custom entries --
+  // never the human name a grower actually types or sees ("Two-Spotted
+  // Spider Mite"). An ILIKE against the raw column matched only by
+  // coincidence (legacy rows that happened to still be free text), which is
+  // why a single word like "mite" could work while a real display-name
+  // phrase like "spider mite" came up empty against a canonicalized row.
+  // Filtered in JS against the resolved display name instead of pushing
+  // this into SQL -- see displayNameForPestSpecies's own note on why a
+  // fuzzy reverse-match isn't attempted anywhere else in the app either.
+  const qLower = q.toLowerCase();
+
+  const [matchedSites, matchedAreas, orgEvents, matchedTreatments, matchedComments] = await Promise.all([
     db.select().from(facilities).where(and(inArray(facilities.id, facilityIds), ilike(facilities.name, pattern))),
     db.select().from(facilityAreas).where(and(inArray(facilityAreas.facilityId, facilityIds), ilike(facilityAreas.name, pattern))),
-    db.select().from(pestEvents).where(and(inArray(pestEvents.facilityId, facilityIds), ilike(pestEvents.pestSpecies, pattern))),
+    db.select().from(pestEvents).where(inArray(pestEvents.facilityId, facilityIds)),
     db.select().from(treatments).where(and(inArray(treatments.facilityId, facilityIds), ilike(treatments.product, pattern))),
     db
       .select({ comment: pestEventComments, event: pestEvents })
@@ -42,11 +55,15 @@ export async function GET(request: NextRequest) {
       .where(and(inArray(pestEvents.facilityId, facilityIds), ilike(pestEventComments.body, pattern))),
   ]);
 
+  const matchedEvents = orgEvents.filter(
+    (e) => e.pestSpecies.toLowerCase().includes(qLower) || displayNameForPestSpecies(e.pestSpecies).toLowerCase().includes(qLower)
+  );
+
   const results: SearchResult[] = [
     ...matchedEvents.map((e) => ({
       type: "event" as const,
       id: e.id,
-      label: e.pestSpecies,
+      label: displayNameForPestSpecies(e.pestSpecies),
       sub: `Pest event · ${facilityNameById.get(e.facilityId) ?? ""}`,
       href: `/app/facilities/${e.facilityId}/pest-events/${e.id}`,
     })),
@@ -63,7 +80,7 @@ export async function GET(request: NextRequest) {
       type: "comment" as const,
       id: comment.id,
       label: comment.body.length > 80 ? `${comment.body.slice(0, 80)}…` : comment.body,
-      sub: `Comment on ${event.pestSpecies} · ${facilityNameById.get(event.facilityId) ?? ""}`,
+      sub: `Comment on ${displayNameForPestSpecies(event.pestSpecies)} · ${facilityNameById.get(event.facilityId) ?? ""}`,
       href: `/app/facilities/${event.facilityId}/pest-events/${event.id}?tab=comments`,
     })),
     ...matchedSites.map((f) => ({
