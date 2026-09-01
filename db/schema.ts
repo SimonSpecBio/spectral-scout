@@ -646,6 +646,16 @@ export const treatments = pgTable(
   // scout_task.minutesSpent's comment on why this stays operation-owned,
   // not pooled into any cross-org aggregate).
   minutesSpent: integer("minutes_spent"),
+  // type = spectral_light only -- what the grower actually ran, not what
+  // lib/spectral-light.ts suggests. That module's "60 minutes mid-dark"
+  // schedule is a starting-point recommendation shown in the UI; it must
+  // never be silently written here as if it were the applied dose. A
+  // plain string, not a foreign key -- no fixtures table exists yet, and
+  // this pass doesn't need one (Airtable ticket recCANfUblrsjACn7).
+  fixtureId: text("fixture_id"),
+  minutesAfterDark: integer("minutes_after_dark"),
+  durationMin: integer("duration_min"),
+  pulseCount: integer("pulse_count").default(1),
   },
   (table) => [
     index("scout_treatment_facility_id_idx").on(table.facilityId),

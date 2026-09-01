@@ -10,6 +10,7 @@ import { queuedFetch, queuedFileFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
 import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
+import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { displayNameForPestSpecies, findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
 import RecommendationsPanel from "./RecommendationsPanel";
 
@@ -131,6 +132,10 @@ export default function PestEventDetail({
   const [product, setProduct] = useState("");
   const [quantityUsed, setQuantityUsed] = useState<number | "">("");
   const [minutesSpent, setMinutesSpent] = useState<number | "">("");
+  const [fixtureId, setFixtureId] = useState("");
+  const [minutesAfterDark, setMinutesAfterDark] = useState<number | "">("");
+  const [durationMin, setDurationMin] = useState<number | "">("");
+  const [pulseCount, setPulseCount] = useState<number | "">("");
   const [treatmentNotes, setTreatmentNotes] = useState("");
   const [submittingTreatment, setSubmittingTreatment] = useState(false);
   const [treatmentQueued, setTreatmentQueued] = useState(false);
@@ -150,6 +155,11 @@ export default function PestEventDetail({
   // same catalog RecommendationsPanel reads from. null when there's
   // nothing to prefill (brand-new species with no program and no prior
   // treatments) -- the button just doesn't render rather than guessing.
+  const spectralProgram = findPestProgram(event.pestSpecies);
+  const spectralProtocol = spectralProgram
+    ? buildSpectralLightProtocol(spectralProgram)
+    : { applicability: "not_indicated" as const, summary: "", schedule: "" };
+
   const lastTreatment = treatmentsList[0];
   let quickLog: { type: TreatmentType; product: string } | null = null;
   if (lastTreatment?.product) {
@@ -308,6 +318,10 @@ export default function PestEventDetail({
         product: selectedItem?.name ?? product,
         quantityUsed: quantityUsed === "" ? null : quantityUsed,
         minutesSpent: minutesSpent === "" ? null : minutesSpent,
+        fixtureId: fixtureId || null,
+        minutesAfterDark: minutesAfterDark === "" ? null : minutesAfterDark,
+        durationMin: durationMin === "" ? null : durationMin,
+        pulseCount: pulseCount === "" ? null : pulseCount,
         notes: treatmentNotes,
       },
       "Treatment"
@@ -328,6 +342,10 @@ export default function PestEventDetail({
       setProduct("");
       setQuantityUsed("");
       setMinutesSpent("");
+      setFixtureId("");
+      setMinutesAfterDark("");
+      setDurationMin("");
+      setPulseCount("");
       setTreatmentNotes("");
     }
     setSubmittingTreatment(false);
@@ -728,6 +746,55 @@ export default function PestEventDetail({
               <div className="rounded-md p-2.5 text-xs" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
                 Not linked to inventory -- this won&apos;t get re-entry/harvest (REI/PHI) tracking. Pick it from the list above if it&apos;s in stock.
               </div>
+            )}
+            {treatmentType === "spectral_light" && (
+              <>
+                {spectralProtocol.applicability !== "not_indicated" && (
+                  // The suggested schedule stays a plain description here,
+                  // never a pre-filled field value -- lib/spectral-light.ts's
+                  // "60 minutes mid-dark" default is a starting point for the
+                  // grower to read and act on, not a fact this form should
+                  // write to the record on their behalf.
+                  <div className="rounded-md p-2.5 text-xs" style={{ background: "var(--surface-raised)", color: "var(--text-dim)" }}>
+                    Suggested: {spectralProtocol.schedule}
+                  </div>
+                )}
+                <input
+                  value={fixtureId}
+                  onChange={(e) => setFixtureId(e.target.value)}
+                  placeholder="Fixture ID (optional)"
+                  className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={minutesAfterDark}
+                    onChange={(e) => setMinutesAfterDark(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder="Mins after dark"
+                    className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={durationMin}
+                    onChange={(e) => setDurationMin(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder="Duration (mins)"
+                    className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    value={pulseCount}
+                    onChange={(e) => setPulseCount(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder="Pulse count"
+                    className="w-28 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+                  />
+                </div>
+              </>
             )}
             <div className="flex gap-2">
               {inventoryItemId && (

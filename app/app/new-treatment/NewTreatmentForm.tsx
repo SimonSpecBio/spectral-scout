@@ -40,6 +40,10 @@ export default function NewTreatmentForm({
   const [quantityUsed, setQuantityUsed] = useState(typeof draft?.quantityUsed === "number" ? draft.quantityUsed : 0);
   const [targetPest, setTargetPest] = useState(typeof draft?.targetPest === "string" ? draft.targetPest : "");
   const [minutesSpent, setMinutesSpent] = useState(typeof draft?.minutesSpent === "number" ? draft.minutesSpent : 0);
+  const [fixtureId, setFixtureId] = useState(typeof draft?.fixtureId === "string" ? draft.fixtureId : "");
+  const [minutesAfterDark, setMinutesAfterDark] = useState(typeof draft?.minutesAfterDark === "number" ? draft.minutesAfterDark : 0);
+  const [durationMin, setDurationMin] = useState(typeof draft?.durationMin === "number" ? draft.durationMin : 0);
+  const [pulseCount, setPulseCount] = useState(typeof draft?.pulseCount === "number" ? draft.pulseCount : 0);
   const [notes, setNotes] = useState(typeof draft?.notes === "string" ? draft.notes : "");
   const [placingLocation, setPlacingLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -47,11 +51,14 @@ export default function NewTreatmentForm({
 
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ type, inventoryItemId, quantityUsed, targetPest, minutesSpent, notes }));
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ type, inventoryItemId, quantityUsed, targetPest, minutesSpent, fixtureId, minutesAfterDark, durationMin, pulseCount, notes })
+      );
     } catch {
       /* storage full or unavailable */
     }
-  }, [type, inventoryItemId, quantityUsed, targetPest, minutesSpent, notes]);
+  }, [type, inventoryItemId, quantityUsed, targetPest, minutesSpent, fixtureId, minutesAfterDark, durationMin, pulseCount, notes]);
 
   const selectedItem = items.find((i) => i.id === inventoryItemId);
 
@@ -67,6 +74,10 @@ export default function NewTreatmentForm({
         quantityUsed: quantityUsed || null,
         targetPest: targetPest || null,
         minutesSpent: minutesSpent || null,
+        fixtureId: fixtureId || null,
+        minutesAfterDark: minutesAfterDark || null,
+        durationMin: durationMin || null,
+        pulseCount: pulseCount || null,
         notes: notes || null,
         x,
         y,
@@ -151,6 +162,27 @@ export default function NewTreatmentForm({
                   impossible to enter via the +/- buttons at all. */}
               <Stepper value={quantityUsed} onChange={setQuantityUsed} min={0} step={selectedItem?.unit === "units" ? 1 : 0.1} />
             </FormField>
+          )}
+          {type === "spectral_light" && (
+            <>
+              <FormField label="Fixture ID (optional)">
+                <input
+                  value={fixtureId}
+                  onChange={(e) => setFixtureId(e.target.value)}
+                  placeholder="Fixture ID (optional)"
+                  className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+                />
+              </FormField>
+              <FormField label="Minutes after dark" layout="row">
+                <Stepper value={minutesAfterDark} onChange={setMinutesAfterDark} min={0} step={5} />
+              </FormField>
+              <FormField label="Duration (minutes)" layout="row">
+                <Stepper value={durationMin} onChange={setDurationMin} min={0} step={5} />
+              </FormField>
+              <FormField label="Pulse count" layout="row">
+                <Stepper value={pulseCount} onChange={setPulseCount} min={0} step={1} />
+              </FormField>
+            </>
           )}
           <FormField label="Target pest (optional)">
             <input
