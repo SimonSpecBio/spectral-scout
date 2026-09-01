@@ -57,9 +57,10 @@ export default async function PestEventPage({
   const thresholds = await getSpeciesThresholds(session.organizationId!, event.pestSpecies);
   // Whether the numbers/mode in `thresholds` are still the catalog's own
   // research-backed default, or an org already overrode them -- the
-  // confidence badge (PestEventDetail's chart) only means anything next to
-  // the catalog's real number, not an org's own customized one, so this
-  // gates whether it renders at all rather than risk it reading as
+  // confidence badge (PestEventDetail's chart, currently hidden -- see
+  // SHOW_THRESHOLD_CONFIDENCE there) only means anything next to the
+  // catalog's real number, not an org's own customized one, so this
+  // gates whether it would render at all rather than risk it reading as
   // vouching for a value the org chose themselves.
   const hasOrgThresholdOverride = (
     await db.select().from(monitoringThresholds).where(eq(monitoringThresholds.organizationId, session.organizationId!))

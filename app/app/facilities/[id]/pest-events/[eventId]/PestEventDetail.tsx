@@ -22,6 +22,13 @@ type TreatmentType = "pesticide" | "biological" | "spectral_light";
 // below this and shows the plain latest reading instead.
 const MIN_SESSIONS_FOR_CHART = 3;
 
+// Hidden per Simon (2026-09-01) after seeing them live on the chart --
+// code/computation kept intact rather than deleted, in case these come
+// back in a different form later. Flip to true to re-enable.
+const SHOW_SESSIONS_LOGGED_STAT = false;
+const SHOW_MORE_SESSIONS_HINT = false;
+const SHOW_THRESHOLD_CONFIDENCE = false;
+
 interface Treatment {
   id: string;
   type: TreatmentType;
@@ -103,9 +110,9 @@ export default function PestEventDetail({
   currentUserId: string;
   inventoryItems: { id: string; name: string; unit: string; quantity: number; reorderLevel: number | null; unitCost: number | null }[];
   thresholds: SpeciesThresholds;
-  // False once the org has its own override for this species -- the
-  // catalog's research confidence describes ITS number, not one an org
-  // chose themselves (page.tsx's comment on hasOrgThresholdOverride).
+  // False once the org has its own override for this species -- unused
+  // while SHOW_THRESHOLD_CONFIDENCE is false, kept so the confidence
+  // badge's org-override gating still works correctly if re-enabled.
   showThresholdConfidence: boolean;
   followUpSuggestions: FollowUpSuggestion[];
   initialTab?: string;
@@ -173,9 +180,8 @@ export default function PestEventDetail({
 
   // Subtle trust signal, not a citation -- confidence only (Simon, 2026-09-01:
   // "don't surface citation... confidence, but I want it to be subtle").
-  // "n/a" isn't shown -- that means the threshold isn't even a leaf-based
-  // number for this species (thrips, fungus gnats), so there's nothing
-  // meaningful to rate the confidence of here.
+  // Hidden via SHOW_THRESHOLD_CONFIDENCE after Simon saw it live, but this
+  // computation stays intact for re-enabling later.
   const thresholdSource = showThresholdConfidence ? thresholdSourceFor(event.pestSpecies) : null;
   const thresholdConfidenceLabel =
     thresholdSource && thresholdSource.confidence !== "n/a" ? thresholdSource.confidence : null;
@@ -526,13 +532,15 @@ export default function PestEventDetail({
                   <div className="text-xs text-[var(--text-dim)]">vs first session</div>
                 </div>
               )}
-              <div>
-                <div className="text-2xl font-semibold">{densities.length}</div>
-                <div className="text-xs text-[var(--text-dim)]">sessions logged</div>
-              </div>
+              {SHOW_SESSIONS_LOGGED_STAT && (
+                <div>
+                  <div className="text-2xl font-semibold">{densities.length}</div>
+                  <div className="text-xs text-[var(--text-dim)]">sessions logged</div>
+                </div>
+              )}
             </div>
           </div>
-          {thresholdConfidenceLabel && (
+          {SHOW_THRESHOLD_CONFIDENCE && thresholdConfidenceLabel && (
             <div className="text-xs text-[var(--text-faint)]">Threshold confidence: {thresholdConfidenceLabel}</div>
           )}
         </div>
@@ -552,9 +560,11 @@ export default function PestEventDetail({
               {new Date(chronological[chronological.length - 1].date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
             </div>
           </div>
-          <div className="text-xs text-[var(--text-faint)]">
-            {MIN_SESSIONS_FOR_CHART - densities.length} more session{MIN_SESSIONS_FOR_CHART - densities.length === 1 ? "" : "s"} for a trend chart
-          </div>
+          {SHOW_MORE_SESSIONS_HINT && (
+            <div className="text-xs text-[var(--text-faint)]">
+              {MIN_SESSIONS_FOR_CHART - densities.length} more session{MIN_SESSIONS_FOR_CHART - densities.length === 1 ? "" : "s"} for a trend chart
+            </div>
+          )}
         </div>
       ) : (
         <div className="card flex items-center justify-between gap-3 p-4">
