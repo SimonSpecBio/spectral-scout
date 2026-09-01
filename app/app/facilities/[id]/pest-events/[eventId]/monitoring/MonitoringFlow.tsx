@@ -157,6 +157,7 @@ export default function MonitoringFlow({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (agg.leavesChecked === 0) return;
     // Location is optional -- skip straight to submitting if this session
     // doesn't capture one (event-scoped monitoring inherits the event's own
     // pin server-side instead).
@@ -359,12 +360,20 @@ export default function MonitoringFlow({
 
       <button
         type="submit"
-        disabled={submitting || (!!facilities && facilities.length === 0)}
+        disabled={submitting || agg.leavesChecked === 0 || (!!facilities && facilities.length === 0)}
         className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
       >
         {submitting ? (facilities ? "Logging…" : "Submitting…") : facilities ? "Log location" : "Submit session"}
       </button>
-      <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
+      <div className="text-center text-xs text-[var(--text-dim)]">
+        {/* Unlike Counts' fixed 5-leaf tally (a 0 total is still a real,
+            completed finding), this grid is live-editable with no fixed
+            sample size -- 0 of 30 checked can only mean nothing was done
+            yet, never "checked everything, found nothing." So this blocks
+            outright instead of asking for a confirm-through, unlike
+            CountsFlow's confirmingZero. */}
+        {agg.leavesChecked === 0 ? "Check at least one leaf before submitting." : "Draft saves automatically as you go."}
+      </div>
     </form>
   );
 }
