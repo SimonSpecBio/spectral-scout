@@ -4,10 +4,19 @@ import { requireGrowerSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
+// A real "Applications" vs "Treatments" split (Airtable ticket B8) needs
+// Simon's own call on what distinguishes them in his mental model first --
+// today's LogEntry.kind doesn't separate them cleanly (both a real
+// pesticide/biological/spectral application AND a completed task fall
+// under "action"), so inventing a split here risked guessing at something
+// the ticket explicitly flagged to ask him about. Monitoring is added
+// since it's genuinely unambiguous (kind === "monitor" already exists as
+// its own category); the clickability fixes below apply regardless.
 const SCOPES = [
   { value: "all", label: "Whole org" },
   { value: "events", label: "Events" },
   { value: "treatments", label: "Treatments" },
+  { value: "monitoring", label: "Monitoring" },
 ] as const;
 
 function dayLabel(date: Date): string {
@@ -34,7 +43,9 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
       ? entries.filter((e) => e.kind === "finding" || e.kind === "disease")
       : scope === "treatments"
         ? entries.filter((e) => e.kind === "action")
-        : entries;
+        : scope === "monitoring"
+          ? entries.filter((e) => e.kind === "monitor")
+          : entries;
 
   const grouped = new Map<string, typeof filtered>();
   for (const e of filtered) {
@@ -87,8 +98,20 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
                     </div>
                   </div>
                 );
-                return e.facilityId && e.eventId ? (
-                  <Link key={i} href={`/app/facilities/${e.facilityId}/pest-events/${e.eventId}`}>
+                // A standalone applied treatment, or a monitoring session
+                // that never promoted into an event, has nowhere event-
+                // specific to land -- the facility itself is still a real,
+                // useful destination rather than leaving the entry dead
+                // (ticket B8; previously required BOTH ids, so these two
+                // cases were stuck unclickable even though facilityId was
+                // already known).
+                const href = e.facilityId
+                  ? e.eventId
+                    ? `/app/facilities/${e.facilityId}/pest-events/${e.eventId}`
+                    : `/app/facilities/${e.facilityId}`
+                  : null;
+                return href ? (
+                  <Link key={i} href={href}>
                     {content}
                   </Link>
                 ) : (

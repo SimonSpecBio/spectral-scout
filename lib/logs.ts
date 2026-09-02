@@ -32,6 +32,10 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
 
   const areas = await db.select().from(facilityAreas).where(inArray(facilityAreas.facilityId, facilityIds));
   const areaNameById = new Map(areas.map((a) => [a.id, a.name]));
+  // Threads a monitoring session's own area back to its parent facility --
+  // scoutingObservations only ever stores facilityAreaId, not facilityId
+  // directly, which is why these entries never got a link before (ticket B8).
+  const facilityIdByAreaId = new Map(areas.map((a) => [a.id, a.facilityId]));
 
   const [events, sessions, appliedTreatments, readings, orgTraps, doneTasks] = await Promise.all([
     db.select().from(pestEvents).where(inArray(pestEvents.facilityId, facilityIds)),
@@ -77,6 +81,12 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
       kind: "monitor",
       label: "Monitoring session",
       sub: [loc, metric ? metricLabel(metric) : null].filter(Boolean).join(" · ").toUpperCase(),
+      facilityId: facilityIdByAreaId.get(s.facilityAreaId),
+      // Only the sessions that promoted into a real Pest/Disease Event have
+      // anywhere meaningful to link to beyond the facility itself -- most
+      // routine sessions don't, and Timeline's own href logic falls back to
+      // the facility page whenever eventId is absent.
+      eventId: s.promotedPestEventId ?? undefined,
     });
   }
 
