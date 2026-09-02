@@ -6,6 +6,7 @@ import { requireGrowerSession } from "@/lib/session";
 import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import ScoutingCapture from "../../../../../ScoutingCapture";
 import type { ScoutingMethod } from "../../../../../MethodChoice";
+import DiseaseMonitoringFlow from "./DiseaseMonitoringFlow";
 
 const VALID_METHODS: ScoutingMethod[] = ["plant_sampling", "counts"];
 
@@ -30,6 +31,20 @@ export default async function MonitoringPage({
 
   const postUrl = `/api/facilities/${id}/pest-events/${eventId}/monitoring`;
   const redirectHref = `/app/facilities/${id}/pest-events/${eventId}`;
+
+  // Pathogen events skip MethodChoice/ScoutingCapture entirely -- "Counts"
+  // and "Plant sampling" are both pest presence/density methods, neither of
+  // which fits a disease's % leaf-area severity scale (ticket C1).
+  if (event.kind === "pathogen") {
+    return (
+      <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+        <Link href={redirectHref} className="text-sm text-[var(--text-dim)]">
+          ← {displayNameForPestSpecies(event.pestSpecies)}
+        </Link>
+        <DiseaseMonitoringFlow postUrl={postUrl} redirectHref={redirectHref} taskId={taskId} />
+      </div>
+    );
+  }
 
   return (
     <ScoutingCapture

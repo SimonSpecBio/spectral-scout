@@ -1,7 +1,8 @@
 import { desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { facilityAreas, scoutingObservations } from "@/db/schema";
+import { facilityAreas, pestEvents, scoutingObservations } from "@/db/schema";
+import { aggregateDiseaseGrid, severityFromDiseaseAggregate, type DiseaseLeaves } from "@/lib/disease";
 import { locationLabel } from "@/lib/floorplan-bays";
 import { parseMonitoringPayload } from "@/lib/monitoring";
 import { getOwnedPestEvent } from "@/lib/pest-events";
@@ -62,6 +63,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ...parsed,
     })
     .returning();
+
+  // Pathogen events never had a live severity-update path at all (severity
+  // was only ever set once, at creation) -- pest thresholds/auto-resolve/
+  // keep-an-eye-recheck below are all density-or-percent-vs-threshold logic
+  // that was never built for a disease's 0-4 % leaf-area severity scale, so
+  // this branches out before any of that runs (ticket C1). Recomputed
+  // server-side from the submitted grid rather than trusting a client-sent
+  // severity value.
+  if (event.kind === "pathogen" && row.assessmentType === "disease_severity" && Array.isArray(row.leafGrid)) {
+    const agg = aggregateDiseaseGrid(row.leafGrid as DiseaseLeaves[]);
+    const severity = severityFromDiseaseAggregate(agg);
+    await db.update(pestEvents).set({ severity }).where(eq(pestEvents.id, eventId));
+    return NextResponse.json({ ...row, autoResolvedEvent: false });
+  }
 
   // "Once an infestation is under control, the event closes itself" --
   // checked right after the session that could make it true. autoResolved
