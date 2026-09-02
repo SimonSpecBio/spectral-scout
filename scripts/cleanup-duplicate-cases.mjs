@@ -39,6 +39,7 @@ const {
   pestEventComments,
   escalations,
   shareLinks,
+  shareNotifications,
 } = await import("../db/schema.ts");
 const { resolveCanonicalPestId } = await import("../lib/treatments-catalog.ts");
 const { eq, and } = await import("drizzle-orm");
@@ -90,7 +91,12 @@ for (const [key, rows] of dupeGroups) {
       await repoint(observationPhotos, "pestEventId");
       await repoint(pestEventComments, "pestEventId");
       await repoint(escalations, "pestEventId");
+      // shareLinks is unused going forward (Airtable ticket B5 replaced it
+      // with shareNotifications) but not dropped -- its existing rows still
+      // need repointing so an old link doesn't end up pointing at a
+      // resolved/merged-away event.
       await repoint(shareLinks, "pestEventId");
+      await repoint(shareNotifications, "pestEventId");
       // tasks handled separately below (needs dedup of its own, not a
       // plain repoint, since two extras' tasks can collide once both now
       // point at the same survivor).

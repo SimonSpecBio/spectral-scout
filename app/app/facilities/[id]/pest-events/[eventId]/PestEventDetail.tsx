@@ -99,6 +99,7 @@ export default function PestEventDetail({
   isHomeGrower,
   orgState,
   isPilotTier,
+  shareableMembers,
 }: {
   facilityId: string;
   event: Event;
@@ -124,13 +125,17 @@ export default function PestEventDetail({
   // free-tier promise means staff never see a general-tier event, so the
   // button itself is hidden rather than shown-then-rejected.
   isPilotTier: boolean;
+  // Team-only sharing (ticket B5) replaces the old external read-only
+  // link -- excludes the current user (server-computed in page.tsx).
+  shareableMembers: { userId: string; name: string | null; email: string }[];
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(event.status);
-  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [showSharePicker, setShowSharePicker] = useState(false);
+  const [selectedShareUserIds, setSelectedShareUserIds] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [shareConfirmation, setShareConfirmation] = useState<string | null>(null);
   const [escalation, setEscalation] = useState<{ note: string | null; createdAt: string; resolvedAt: string | null; staffResponse: string | null } | null>(null);
   const [showEscalateConfirm, setShowEscalateConfirm] = useState(false);
   const [escalateNote, setEscalateNote] = useState("");
@@ -275,27 +280,39 @@ export default function PestEventDetail({
     }
   }
 
-  async function createShareLink() {
+  function toggleShareUser(userId: string) {
+    setSelectedShareUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+
+  // Team-only sharing (ticket B5) -- notifies each picked teammate instead
+  // of generating an external read-only link.
+  async function submitShare() {
+    if (selectedShareUserIds.size === 0) return;
     setSharing(true);
     setShareError(null);
     try {
-      const res = await fetch(`${base}/share-links`, { method: "POST" });
+      const res = await fetch(`${base}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toUserIds: [...selectedShareUserIds] }),
+      });
       if (res.ok) {
-        const row = await res.json();
-        setShareLink(`${window.location.origin}/share/${row.token}`);
-        setCopied(false);
+        const count = selectedShareUserIds.size;
+        setShareConfirmation(`Shared with ${count} teammate${count === 1 ? "" : "s"}`);
+        setSelectedShareUserIds(new Set());
+        setShowSharePicker(false);
       } else {
-        setShareError("Couldn't create a share link. Check your connection and try again.");
+        setShareError("Couldn't share this event. Check your connection and try again.");
       }
     } catch {
-      setShareError("Couldn't create a share link. Check your connection and try again.");
+      setShareError("Couldn't share this event. Check your connection and try again.");
     }
     setSharing(false);
-  }
-
-  async function revokeShareLinks() {
-    await fetch(`${base}/share-links`, { method: "DELETE" });
-    setShareLink(null);
   }
 
   // The page used to be a tab bar (initialTab picked the starting tab, for
@@ -331,16 +348,6 @@ export default function PestEventDetail({
       setEscalateError("Couldn't send this to our team. Check your connection and try again.");
     }
     setEscalating(false);
-  }
-
-  async function copyShareLink() {
-    if (!shareLink) return;
-    try {
-      await navigator.clipboard.writeText(shareLink);
-      setCopied(true);
-    } catch {
-      /* clipboard unavailable -- the link is still shown for manual copy */
-    }
   }
 
   async function postComment(e: React.FormEvent) {
@@ -474,9 +481,17 @@ export default function PestEventDetail({
           >
             <span className="capitalize">{event.severity}</span> severity
           </span>
-          <button onClick={createShareLink} disabled={sharing} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)] disabled:opacity-50">
-            {sharing ? "…" : "Share"}
-          </button>
+          {shareableMembers.length > 0 && (
+            <button
+              onClick={() => {
+                setShowSharePicker((v) => !v);
+                setShareConfirmation(null);
+              }}
+              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]"
+            >
+              Share
+            </button>
+          )}
           <button
             onClick={toggleStatus}
             className={`rounded-md border px-3 py-1.5 text-sm ${
@@ -508,17 +523,37 @@ export default function PestEventDetail({
         </div>
       )}
 
-      {shareLink && (
-        <div className="card flex flex-col gap-2 p-3.5">
-          <div className="label-mono">Read-only link -- expires in 30 days</div>
-          <div className="flex items-center gap-2">
-            <input readOnly value={shareLink} className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-xs" />
-            <button onClick={copyShareLink} className="shrink-0 rounded-md border border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--text-dim)]">
-              {copied ? "Copied" : "Copy"}
+      {showSharePicker && (
+        <div className="card flex flex-col gap-3 p-3.5">
+          <div className="label-mono">Share with teammates</div>
+          <div className="flex flex-col gap-2">
+            {shareableMembers.map((m) => (
+              <label key={m.userId} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={selectedShareUserIds.has(m.userId)} onChange={() => toggleShareUser(m.userId)} />
+                {m.name ?? m.email}
+              </label>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={submitShare}
+              disabled={sharing || selectedShareUserIds.size === 0}
+              className="self-start rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
+            >
+              {sharing ? "Sharing…" : "Share"}
+            </button>
+            <button onClick={() => setShowSharePicker(false)} className="text-sm text-[var(--text-dim)]">
+              Cancel
             </button>
           </div>
-          <button onClick={revokeShareLinks} className="self-start text-xs text-[var(--danger)]">
-            Revoke access
+        </div>
+      )}
+
+      {shareConfirmation && (
+        <div className="card flex items-center justify-between gap-3 p-3.5 text-sm" style={{ color: "var(--success)" }}>
+          {shareConfirmation}
+          <button type="button" onClick={() => setShareConfirmation(null)} className="shrink-0 text-[var(--text-dim)]">
+            Dismiss
           </button>
         </div>
       )}

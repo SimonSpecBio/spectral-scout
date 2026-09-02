@@ -25,6 +25,7 @@ const KIND_COLOR: Record<NotificationKind, string> = {
   order_placed: "#8FA2BD",
   event_auto_resolved: "var(--success)",
   escalation: "var(--danger)",
+  shared_event: "#8FA2BD",
 };
 
 function relativeTime(iso: string): string {

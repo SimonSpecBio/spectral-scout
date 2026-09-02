@@ -1,11 +1,13 @@
 import { and, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { facilities, inventoryItems, inventoryOrders, pestEvents, tasks, treatments } from "@/db/schema";
+import { users as authUsers } from "@/db/auth-schema";
+import { facilities, inventoryItems, inventoryOrders, pestEvents, shareNotifications, tasks, treatments } from "@/db/schema";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-alerts";
 import { computeEscalationAlerts, computeMonitoringAlerts, metricLabel } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { taskActionHref, taskUrgency } from "@/lib/tasks";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 
 export type NotificationKind =
   | "threshold"
@@ -17,7 +19,8 @@ export type NotificationKind =
   | "rei_cleared"
   | "order_placed"
   | "event_auto_resolved"
-  | "escalation";
+  | "escalation"
+  | "shared_event";
 
 export interface Notification {
   id: string; // stable across renders -- localStorage read-state keys off this, not array index
@@ -173,6 +176,34 @@ export async function computeNotifications(organizationId: string, userId: strin
         href: "/app/inventory",
       });
     }
+  }
+
+  // Team-member sharing (ticket B5) -- unlike every other notification in
+  // this feed, this one is genuinely toUserId-scoped, not org-wide: only
+  // the person a teammate shared WITH should see it, same as myTasks below.
+  const sharedWithMe = await db
+    .select({
+      id: shareNotifications.id,
+      pestEventId: shareNotifications.pestEventId,
+      createdAt: shareNotifications.createdAt,
+      facilityId: pestEvents.facilityId,
+      pestSpecies: pestEvents.pestSpecies,
+      fromName: authUsers.name,
+      fromEmail: authUsers.email,
+    })
+    .from(shareNotifications)
+    .innerJoin(pestEvents, eq(shareNotifications.pestEventId, pestEvents.id))
+    .leftJoin(authUsers, eq(shareNotifications.fromUserId, authUsers.id))
+    .where(and(eq(shareNotifications.organizationId, organizationId), eq(shareNotifications.toUserId, userId)));
+  for (const s of sharedWithMe) {
+    notifications.push({
+      id: `shared-${s.id}`,
+      kind: "shared_event",
+      title: `${displayNameForPestSpecies(s.pestSpecies)} shared with you`,
+      sub: `by ${s.fromName ?? s.fromEmail ?? "a teammate"}`,
+      at: s.createdAt,
+      href: `/app/facilities/${s.facilityId}/pest-events/${s.pestEventId}`,
+    });
   }
 
   const myTasks = await db.select().from(tasks).where(and(eq(tasks.organizationId, organizationId), eq(tasks.assigneeUserId, userId)));

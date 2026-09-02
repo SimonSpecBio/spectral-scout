@@ -9,6 +9,7 @@ import { getOwnedFacility } from "@/lib/facilities";
 import { isHomeGrower } from "@/lib/grower-type";
 import { computeFollowUpSuggestions } from "@/lib/recommendations";
 import { requireGrowerSession } from "@/lib/session";
+import { getTeam } from "@/lib/team";
 import { getSpeciesThresholds, sessionMetric } from "@/lib/threshold-engine";
 import PestEventDetail from "./PestEventDetail";
 
@@ -108,6 +109,12 @@ export default async function PestEventPage({
         })
       : [];
 
+  // For the team-member share picker (Airtable ticket B5, replacing the
+  // old external share link) -- excludes the current user, sharing with
+  // yourself isn't a real action.
+  const { members: teamMembers } = await getTeam(session.organizationId!);
+  const shareableMembers = teamMembers.filter((m) => m.userId !== session.user!.id!);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -168,6 +175,7 @@ export default async function PestEventPage({
         }))}
         thresholds={thresholds}
         showThresholdConfidence={!hasOrgThresholdOverride}
+        shareableMembers={shareableMembers.map((m) => ({ userId: m.userId, name: m.name, email: m.email }))}
       />
     </div>
   );

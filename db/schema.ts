@@ -406,6 +406,35 @@ export const shareLinks = pgTable(
   ]
 ).enableRLS();
 
+// Replaces the external read-only share link above for team members
+// (Airtable ticket B5, Simon's explicit call: "team-only sharing, no
+// external link at all" -- shareLinks stays in place, unused, only
+// because dropping a table is a destructive migration this ticket didn't
+// ask for). A one-off human action ("look at this"), not a recomputed
+// signal like every other row lib/notifications.ts's computeNotifications()
+// produces -- there's no live query that would ever regenerate "so-and-so
+// shared this with you" on its own, so unlike the rest of that feed, this
+// one genuinely needs to be persisted.
+export const shareNotifications = pgTable(
+  "scout_share_notification",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    pestEventId: uuid("pest_event_id")
+      .notNull()
+      .references(() => pestEvents.id, { onDelete: "cascade" }),
+    fromUserId: uuid("from_user_id").notNull(),
+    toUserId: uuid("to_user_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("scout_share_notification_to_user_id_idx").on(table.toUserId),
+    index("scout_share_notification_pest_event_id_idx").on(table.pestEventId),
+  ]
+).enableRLS();
+
 // "Ask a person" (ticket 96) -- a grower flags one pest event for a human
 // Spectral agronomist to look at, instead of relying only on the app's own
 // recommendation engine. PILOT-TIER ORGS ONLY (enforced in the API route,

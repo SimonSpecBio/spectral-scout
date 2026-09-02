@@ -232,6 +232,13 @@
       "when": 1788326674949,
       "tag": "0032_conscious_captain_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788327445954,
+      "tag": "0033_wooden_forgotten_one",
+      "breakpoints": true
     }
   ]
 }
