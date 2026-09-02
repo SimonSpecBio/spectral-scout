@@ -76,9 +76,6 @@ interface Event {
   loggedBy: string | null;
 }
 
-const TABS = ["timeline", "recommended", "treatments", "photos", "monitoring", "comments"] as const;
-type Tab = (typeof TABS)[number];
-
 export default function PestEventDetail({
   facilityId,
   event,
@@ -125,7 +122,6 @@ export default function PestEventDetail({
   isPilotTier: boolean;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>(initialTab && (TABS as readonly string[]).includes(initialTab) ? (initialTab as Tab) : "timeline");
   const [status, setStatus] = useState(event.status);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
@@ -291,6 +287,17 @@ export default function PestEventDetail({
     await fetch(`${base}/share-links`, { method: "DELETE" });
     setShareLink(null);
   }
+
+  // The page used to be a tab bar (initialTab picked the starting tab, for
+  // deep links like the dashboard's "?tab=recommended"); now every section
+  // renders at once in one scroll, so initialTab instead scrolls that
+  // section into view on load. Ids below match the query values those
+  // links already send (lib/notifications.ts, app/api/search/route.ts,
+  // app/app/page.tsx) -- no caller needed to change.
+  useEffect(() => {
+    if (!initialTab) return;
+    document.getElementById(initialTab)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [initialTab]);
 
   useEffect(() => {
     if (!isPilotTier) return;
@@ -725,21 +732,8 @@ export default function PestEventDetail({
         </div>
       )}
 
-      <div className="flex gap-4 overflow-x-auto border-b border-[var(--border)]">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`shrink-0 border-b-2 px-1 pb-2 text-sm capitalize ${
-              tab === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text-dim)]"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {tab === "timeline" && (
+      <section id="timeline" className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Timeline</h2>
         <div className="card flex flex-col divide-y divide-[var(--border)]">
           {timeline.map((item, i) => (
             <div key={i} className="flex items-center justify-between px-4 py-3 text-sm capitalize">
@@ -753,9 +747,10 @@ export default function PestEventDetail({
             </Link>
           )}
         </div>
-      )}
+      </section>
 
-      {tab === "recommended" && (
+      <section id="recommended" className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Recommended protocols</h2>
         <RecommendationsPanel
           facilityId={facilityId}
           eventId={event.id}
@@ -764,9 +759,10 @@ export default function PestEventDetail({
           isHomeGrower={isHomeGrower}
           orgState={orgState}
         />
-      )}
+      </section>
 
-      {tab === "treatments" && (
+      <section id="treatments" className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Log treatment</h2>
         <div className="flex flex-col gap-4">
           <form onSubmit={applyTreatment} className="card flex flex-col gap-2 p-4">
             <div className="text-sm font-medium">Apply treatment</div>
@@ -939,9 +935,10 @@ export default function PestEventDetail({
             ))}
           </div>
         </div>
-      )}
+      </section>
 
-      {tab === "photos" && (
+      <section id="photos" className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Photos</h2>
         <div className="flex flex-col gap-4">
           {photos.length === 0 ? (
             // Empty state: no "No photos yet" text needed -- a big, centered
@@ -966,9 +963,10 @@ export default function PestEventDetail({
           )}
           {photoQueued && <div className="text-xs text-[var(--text-dim)]">Photo saved offline. Will upload once you're back online.</div>}
         </div>
-      )}
+      </section>
 
-      {tab === "monitoring" && (
+      <section id="monitoring" className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Monitor hotspot</h2>
         <div className="flex flex-col gap-4">
           <Link
             href={`/app/facilities/${facilityId}/pest-events/${event.id}/monitoring`}
@@ -1008,9 +1006,10 @@ export default function PestEventDetail({
             </div>
           )}
         </div>
-      )}
+      </section>
 
-      {tab === "comments" && (
+      <section id="comments" className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Comments</h2>
         <div className="flex flex-col gap-4">
           {comments.length === 0 ? (
             <div className="card p-4 text-sm text-[var(--text-dim)]">No comments yet -- add one below.</div>
@@ -1054,7 +1053,7 @@ export default function PestEventDetail({
           </form>
           {commentQueued && <div className="text-xs text-[var(--text-dim)]">Comment saved offline. Will post once you're back online.</div>}
         </div>
-      )}
+      </section>
     </div>
   );
 }

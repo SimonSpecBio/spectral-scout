@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { ProductBenchmark } from "@/lib/benchmarks";
 import { costPerUnit, matchInventoryStock, type StockStatus } from "@/lib/recommendations";
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
@@ -15,6 +15,27 @@ import { AGENTS, findPestProgram, legalityFor, PRODUCTS } from "@/lib/treatments
 // getting long/detailed enough to clear this bar.
 function isSubstantialCulturalEntry(entry: string): boolean {
   return entry.length > 200;
+}
+
+// Each recommendation category (Spectral/Beneficials/Pesticides/Preventive/
+// Cautions) starts collapsed behind its item count and expands on tap
+// (Airtable ticket B1) -- a resolved/inactive event's recommendations aren't
+// something most growers need open by default, and collapsing them all
+// keeps the page scannable now that they sit in one continuous scroll
+// instead of behind a "Recommended" tab.
+function CollapsibleSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card overflow-hidden">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between p-4 text-left">
+        <span className="label-mono">
+          {title} ({count})
+        </span>
+        <span className="text-xs text-[var(--text-dim)]">{open ? "−" : "+"}</span>
+      </button>
+      {open && <div className="flex flex-col divide-y divide-[var(--border)] border-t border-[var(--border)] px-4">{children}</div>}
+    </div>
+  );
 }
 
 const STOCK_LABEL: Record<StockStatus, string> = { in_stock: "IN STOCK", low: "LOW STOCK", out: "OUT OF STOCK", unknown: "NOT IN INVENTORY" };
@@ -126,7 +147,7 @@ export default function RecommendationsPanel({
   if (!program) {
     return (
       <div className="card p-4 text-sm text-[var(--text-dim)]">
-        No preset program for &ldquo;{pestSpecies}&rdquo; yet -- log treatments manually from the Treatments tab.
+        No preset program for &ldquo;{pestSpecies}&rdquo; yet -- log treatments manually from the Log treatment section below.
       </div>
     );
   }
@@ -242,8 +263,7 @@ export default function RecommendationsPanel({
           </button>
         </div>
       )}
-      <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
-        <div className="label-mono pb-1">Spectral</div>
+      <CollapsibleSection title="Spectral" count={lightProtocol.applicability === "not_indicated" ? 0 : 1}>
         {lightProtocol.applicability === "not_indicated" ? (
           <div className="py-3 text-sm text-[var(--text-dim)]">{lightProtocol.summary}</div>
         ) : (
@@ -255,11 +275,10 @@ export default function RecommendationsPanel({
             hideStock
           />
         )}
-      </div>
+      </CollapsibleSection>
 
       {beneficials.length > 0 && (
-        <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
-          <div className="label-mono pb-1">Beneficials</div>
+        <CollapsibleSection title="Beneficials" count={beneficials.length}>
           {beneficials.map((a) => (
             <OptionRow
               key={a!.id}
@@ -269,12 +288,11 @@ export default function RecommendationsPanel({
               caution={a!.notes}
             />
           ))}
-        </div>
+        </CollapsibleSection>
       )}
 
       {pesticides.length > 0 && (
-        <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
-          <div className="label-mono pb-1">Pesticides</div>
+        <CollapsibleSection title="Pesticides" count={pesticides.length}>
           {benchmark && (
             <div className="py-2 text-xs text-[var(--text-dim)]">
               <span className="label-mono mr-1.5" style={{ color: "var(--success)" }}>
@@ -305,18 +323,17 @@ export default function RecommendationsPanel({
               />
             );
           })}
-        </div>
+        </CollapsibleSection>
       )}
 
       {program.preventive.length > 0 && (
-        <div className="card flex flex-col gap-2 p-4">
-          <div className="label-mono">Preventive</div>
-          <ul className="flex flex-col gap-1 text-sm text-[var(--text-dim)]">
+        <CollapsibleSection title="Preventive" count={program.preventive.length}>
+          <ul className="flex flex-col gap-1 py-3 text-sm text-[var(--text-dim)]">
             {program.preventive.map((p, i) => (
               <li key={i}>• {p}</li>
             ))}
           </ul>
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* Hidden for now -- every current catalog entry is a terse one-line
@@ -337,11 +354,13 @@ export default function RecommendationsPanel({
       )}
 
       {program.cautions.length > 0 && (
-        <div className="flex flex-col gap-1 text-xs text-[var(--text-dim)]">
+        <CollapsibleSection title="Cautions" count={program.cautions.length}>
           {program.cautions.map((c, i) => (
-            <div key={i}>⚠ {c}</div>
+            <div key={i} className="py-2 text-xs text-[var(--text-dim)]">
+              ⚠ {c}
+            </div>
           ))}
-        </div>
+        </CollapsibleSection>
       )}
     </div>
   );
