@@ -21,16 +21,32 @@ interface EventInput {
 // knowable: the trend itself, and the change over the window.
 const WEEKDAY_LETTER = ["S", "M", "T", "W", "T", "F", "S"];
 
+// Small, unobtrusive range control -- events itself is already the org's
+// full unbounded pest-event history (page.tsx has no date filter on that
+// query), so widening the window is just changing how many days this
+// reconstructs from data already in hand, not a new fetch/prop.
+type RangeOption = 7 | 30 | "all";
+const RANGE_OPTIONS: { value: RangeOption; label: string }[] = [
+  { value: 7, label: "7d" },
+  { value: 30, label: "30d" },
+  { value: "all", label: "All" },
+];
+
 export default function PressureGraph({ events }: { events: EventInput[] }) {
   const [showAxisInfo, setShowAxisInfo] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [range, setRange] = useState<RangeOption>(7);
 
   const today = new Date();
   today.setHours(23, 59, 59, 999);
 
+  const earliestEventMs = events.length > 0 ? Math.min(...events.map((e) => e.createdAt.getTime())) : today.getTime();
+  const daysSinceEarliest = Math.max(1, Math.ceil((today.getTime() - earliestEventMs) / DAY_MS) + 1);
+  const numDays = range === "all" ? daysSinceEarliest : range;
+
   const days: number[] = [];
   const dayLabels: string[] = [];
-  for (let i = 6; i >= 0; i--) {
+  for (let i = numDays - 1; i >= 0; i--) {
     const dayEnd = new Date(today.getTime() - i * DAY_MS);
     const dayStart = new Date(dayEnd);
     dayStart.setHours(0, 0, 0, 0);
@@ -42,9 +58,13 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
   }
 
   const latest = days[days.length - 1];
-  const weekAgo = days[0];
-  const delta = latest - weekAgo;
+  const baseline = days[0];
+  const delta = latest - baseline;
   const max = Math.max(...days, 1);
+  // Every weekday letter at 7 days is readable; past that it's just visual
+  // noise (30+ crammed single letters) -- thin to about 6 evenly-spaced
+  // labels instead once the range grows.
+  const labelStride = Math.max(1, Math.ceil(numDays / 6));
 
   // Same w/h/pad the polyline below is drawn with (sparkPoints(days, 226, 44,
   // 4)) -- replicated here (not imported from sparkPoints, which only
@@ -76,12 +96,30 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
   return (
     <div className="card p-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="label-mono">Pest pressure &middot; 7D</span>
-        {delta !== 0 && (
-          <span className="label-mono" style={{ color: delta > 0 ? "var(--danger)" : "var(--success)" }}>
-            {delta > 0 ? "▲" : "▼"} {Math.abs(delta)} vs last week
-          </span>
-        )}
+        <span className="label-mono">Pest pressure</span>
+        <div className="flex items-center gap-2">
+          {delta !== 0 && (
+            <span className="label-mono" style={{ color: delta > 0 ? "var(--danger)" : "var(--success)" }}>
+              {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}
+            </span>
+          )}
+          <div className="flex gap-1">
+            {RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  setActiveIndex(null);
+                  setRange(opt.value);
+                }}
+                className="label-mono px-1"
+                style={{ color: range === opt.value ? "var(--text)" : "var(--text-faint)" }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       <svg viewBox="0 0 252 72" className="block w-full" onClick={handleChartClick} style={{ cursor: "pointer" }}>
         <g fontFamily="ui-monospace, monospace" fontSize="8" fill="var(--map-label)">
@@ -112,11 +150,13 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
           transform="translate(22, 4)"
         />
         <g fontFamily="ui-monospace, monospace" fontSize="7" fill="var(--map-label-dim)" textAnchor="middle">
-          {dayLabels.map((label, i) => (
-            <text key={i} x={22 + 4 + (i * 218) / 6} y="68">
-              {label}
-            </text>
-          ))}
+          {dayLabels.map((label, i) =>
+            i % labelStride === 0 || i === dayLabels.length - 1 ? (
+              <text key={i} x={22 + 4 + (i * 218) / (numDays - 1 || 1)} y="68">
+                {label}
+              </text>
+            ) : null
+          )}
         </g>
 
         {activeIndex != null && (() => {
