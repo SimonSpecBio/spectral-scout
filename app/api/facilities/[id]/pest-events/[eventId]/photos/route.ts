@@ -41,7 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const [row] = await db
     .insert(observationPhotos)
-    .values({ pestEventId: eventId, blobUrl: blob.url })
+    .values({ pestEventId: eventId, blobUrl: blob.url, uploadedByUserId: session.user!.id! })
     .returning();
   return NextResponse.json(row);
 }

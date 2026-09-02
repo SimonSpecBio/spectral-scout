@@ -629,6 +629,12 @@ export const observationPhotos = pgTable(
     blobUrl: text("blob_url").notNull(),
     caption: text("caption"),
     uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+    // Matched-by-value, same convention as treatments.operatorUserId/
+    // tasks.assigneeUserId -- not a real FK. Nullable: photos uploaded
+    // before this column existed have no way to know who added them
+    // (ticket B6/B7 -- the Photos tab shows "Unknown" for those rather
+    // than guessing).
+    uploadedByUserId: uuid("uploaded_by_user_id"),
   },
   (table) => [
     index("scout_observation_photo_observation_id_idx").on(table.observationId),

@@ -47,6 +47,11 @@ interface Photo {
   id: string;
   blobUrl: string;
   caption: string | null;
+  uploadedAt: string;
+  // Null for photos uploaded before this was tracked, or a since-deleted
+  // account -- the tap-to-reveal overlay shows "Unknown" for those rather
+  // than a broken name (ticket B6/B7).
+  uploadedByName: string | null;
 }
 
 interface Comment {
@@ -143,6 +148,7 @@ export default function PestEventDetail({
   const [escalateError, setEscalateError] = useState<string | null>(null);
   const [treatmentsList, setTreatmentsList] = useState(initialTreatments);
   const [photos, setPhotos] = useState(initialPhotos);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [photoQueued, setPhotoQueued] = useState(false);
   const [comments, setComments] = useState(initialComments);
   const [newComment, setNewComment] = useState("");
@@ -422,7 +428,15 @@ export default function PestEventDetail({
     const result = await queuedFileFetch(`${base}/photos`, file, "file", "Photo");
     if (result.ok) {
       if (result.queued) setPhotoQueued(true);
-      else if (result.data) setPhotos((prev) => [...prev, result.data as Photo]);
+      else if (result.data) {
+        // The raw insert response has no uploader-name join -- "You" is
+        // accurate here (this upload really was the current viewer), same
+        // convention the Comments list already uses for own-authored rows.
+        // router.refresh() reconciles with the server-joined name after.
+        const raw = result.data as { id: string; blobUrl: string; caption: string | null; uploadedAt: string };
+        setPhotos((prev) => [...prev, { id: raw.id, blobUrl: raw.blobUrl, caption: raw.caption, uploadedAt: raw.uploadedAt, uploadedByName: "You" }]);
+        router.refresh();
+      }
     }
     setUploading(false);
   }
@@ -984,18 +998,32 @@ export default function PestEventDetail({
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
             </label>
           ) : (
-            <>
-              <label className="w-fit cursor-pointer rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
-                {uploading ? "Uploading…" : "Add photo"}
+            // Add is the next tile in the grid's own flow (ticket B6/B7),
+            // not a separate control above it -- it reflows automatically
+            // as photos.length grows since it's just the last grid child.
+            <div className="grid grid-cols-3 gap-2">
+              {photos.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedPhotoId((prev) => (prev === p.id ? null : p.id))}
+                  className="relative aspect-square overflow-hidden rounded-md"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary Blob-hosted URLs, not a local/static asset */}
+                  <img src={p.blobUrl} alt={p.caption ?? ""} className="h-full w-full object-cover" />
+                  {selectedPhotoId === p.id && (
+                    <div className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-black/60 px-2 py-1.5 text-left text-white">
+                      <span className="text-xs">{p.uploadedByName ?? "Unknown"}</span>
+                      <span className="text-[10px] opacity-80">{new Date(p.uploadedAt).toLocaleString()}</span>
+                    </div>
+                  )}
+                </button>
+              ))}
+              <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-[var(--border)] text-center text-xs text-[var(--text-dim)]">
+                {uploading ? "Uploading…" : "+ Add photo"}
                 <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {photos.map((p) => (
-                  // eslint-disable-next-line @next/next/no-img-element -- arbitrary Blob-hosted URLs, not a local/static asset
-                  <img key={p.id} src={p.blobUrl} alt={p.caption ?? ""} className="aspect-square rounded-md object-cover" />
-                ))}
-              </div>
-            </>
+            </div>
           )}
           {photoQueued && <div className="text-xs text-[var(--text-dim)]">Photo saved offline. Will upload once you're back online.</div>}
         </div>

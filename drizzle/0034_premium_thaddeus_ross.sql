@@ -1,0 +1,1 @@
+ALTER TABLE "scout_observation_photo" ADD COLUMN "uploaded_by_user_id" uuid;

@@ -53,7 +53,21 @@ export default async function PestEventPage({
     .from(treatments)
     .leftJoin(authUsers, eq(treatments.operatorUserId, authUsers.id))
     .where(eq(treatments.pestEventId, eventId));
-  const photos = await db.select().from(observationPhotos).where(eq(observationPhotos.pestEventId, eventId));
+  // Left-joined for the Photos tab's tap-to-reveal uploader name (Airtable
+  // ticket B6/B7) -- null for photos uploaded before uploadedByUserId
+  // existed, or a since-deleted account; the UI shows "Unknown" for those.
+  const photos = await db
+    .select({
+      id: observationPhotos.id,
+      blobUrl: observationPhotos.blobUrl,
+      caption: observationPhotos.caption,
+      uploadedAt: observationPhotos.uploadedAt,
+      uploaderName: authUsers.name,
+      uploaderEmail: authUsers.email,
+    })
+    .from(observationPhotos)
+    .leftJoin(authUsers, eq(observationPhotos.uploadedByUserId, authUsers.id))
+    .where(eq(observationPhotos.pestEventId, eventId));
   const monitoringSessions = await db
     .select()
     .from(scoutingObservations)
@@ -155,7 +169,13 @@ export default async function PestEventPage({
           appliedAt: t.appliedAt.toISOString(),
           loggedBy: t.operatorName ?? t.operatorEmail ?? null,
         }))}
-        initialPhotos={photos.map((p) => ({ id: p.id, blobUrl: p.blobUrl, caption: p.caption }))}
+        initialPhotos={photos.map((p) => ({
+          id: p.id,
+          blobUrl: p.blobUrl,
+          caption: p.caption,
+          uploadedAt: p.uploadedAt.toISOString(),
+          uploadedByName: p.uploaderName ?? p.uploaderEmail ?? null,
+        }))}
         initialComments={comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
         currentUserId={session.user!.id!}
         isHomeGrower={isHomeGrower(session.growerType)}
