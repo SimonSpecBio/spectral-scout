@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getOwnedFacility } from "@/lib/facilities";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import ScoutingCapture from "../../../../../ScoutingCapture";
 import type { ScoutingMethod } from "../../../../../MethodChoice";
 
@@ -34,7 +35,7 @@ export default async function MonitoringPage({
     <ScoutingCapture
       header={
         <Link href={redirectHref} className="text-sm text-[var(--text-dim)]">
-          ← {event.pestSpecies}
+          ← {displayNameForPestSpecies(event.pestSpecies)}
         </Link>
       }
       postUrl={postUrl}

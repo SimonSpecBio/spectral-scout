@@ -39,8 +39,7 @@ export default function CompleteTaskForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="card flex flex-col gap-3 p-4">
         <div className="flex items-center justify-between">
-          <span className="label-mono">Time spent</span>
-          <span className="label-mono text-[var(--text-faint)]">FOR LABOUR TRACKING</span>
+          <span className="label-mono">Total application time</span>
         </div>
         <div className="flex items-center justify-center gap-3">
           <Stepper value={minutes} onChange={setMinutes} min={0} step={5} />

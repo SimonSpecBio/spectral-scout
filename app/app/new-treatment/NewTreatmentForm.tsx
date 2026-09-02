@@ -192,7 +192,7 @@ export default function NewTreatmentForm({
               className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
             />
           </FormField>
-          <FormField label="Time spent (minutes, for labor tracking)" layout="row">
+          <FormField label="Total application time" layout="row">
             <Stepper value={minutesSpent} onChange={setMinutesSpent} min={0} step={5} />
           </FormField>
           <FormField label="Notes (optional)">
