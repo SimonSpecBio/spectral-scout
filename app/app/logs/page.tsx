@@ -64,22 +64,34 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
         ))}
       </div>
 
-      <form className="flex flex-wrap items-end gap-2" method="GET">
-        <input type="hidden" name="type" value={type} />
-        <label className="flex flex-col gap-1 text-xs text-[var(--text-dim)]">
-          From
-          <input type="date" name="from" defaultValue={from} className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm" />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-[var(--text-dim)]">
-          To
-          <input type="date" name="to" defaultValue={to} className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm" />
-        </label>
-        <button type="submit" className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
-          Apply
-        </button>
+      <form className="flex flex-col gap-3" method="GET">
+        <div className="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="type" value={type} />
+          <label className="flex flex-col gap-1 text-xs text-[var(--text-dim)]">
+            From
+            <input
+              type="date"
+              name="from"
+              defaultValue={from}
+              className="w-[9.5rem] rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-[var(--text-dim)]">
+            To
+            <input
+              type="date"
+              name="to"
+              defaultValue={to}
+              className="w-[9.5rem] rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm"
+            />
+          </label>
+          <button type="submit" className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
+            Apply
+          </button>
+        </div>
         <a
           href={`/api/logs/export?${exportParams.toString()}`}
-          className="ml-auto rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]"
+          className="self-center rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]"
         >
           Export CSV
         </a>

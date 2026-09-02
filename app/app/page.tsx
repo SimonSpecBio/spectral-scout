@@ -14,6 +14,7 @@ import { requireGrowerSession } from "@/lib/session";
 import LayoutPicker from "./facilities/[id]/areas/[areaId]/LayoutPicker";
 import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
 import MapLensSwitcher, { type BayLensEntry } from "./MapLensSwitcher";
+import OutbreaksStat from "./OutbreaksStat";
 import PressureGraph from "./PressureGraph";
 
 // Next.js's Router Cache can reuse a cached render for this route on a
@@ -180,7 +181,8 @@ export default async function HomePage({
   // A real sense of momentum, especially for home growers who might not
   // otherwise notice it, without inventing a number the app can't back up.
   const WEEK_MS = 7 * DAY_MS;
-  const outbreaksThisWeek = events.filter((e) => Date.now() - e.createdAt.getTime() < WEEK_MS).length;
+  const outbreaksThisWeekEvents = events.filter((e) => Date.now() - e.createdAt.getTime() < WEEK_MS);
+  const outbreaksThisWeek = outbreaksThisWeekEvents.length;
   const outbreaksLastWeek = events.filter((e) => {
     const age = Date.now() - e.createdAt.getTime();
     return age >= WEEK_MS && age < 2 * WEEK_MS;
@@ -438,14 +440,17 @@ export default async function HomePage({
         </Link>
       ) : (
         (outbreaksThisWeek > 0 || outbreaksLastWeek > 0) && (
-          <div className="card flex items-center gap-2 p-4 text-sm">
-            <span
-              style={{ color: outbreaksThisWeek < outbreaksLastWeek ? "var(--success)" : "var(--text)" }}
-            >
-              {outbreaksThisWeek} new {outbreaksThisWeek === 1 ? "outbreak" : "outbreaks"} this week
-            </span>
-            <span className="text-[var(--text-dim)]">vs {outbreaksLastWeek} last week</span>
-          </div>
+          <OutbreaksStat
+            outbreaksThisWeek={outbreaksThisWeek}
+            outbreaksLastWeek={outbreaksLastWeek}
+            thisWeekEvents={outbreaksThisWeekEvents.map((e) => ({
+              id: e.id,
+              facilityId: e.facilityId,
+              pestSpecies: e.pestSpecies,
+              facilityName: e.facilityName,
+              areaName: e.areaName,
+            }))}
+          />
         )
       )}
     </>
