@@ -13,6 +13,7 @@ import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scou
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { thresholdSourceFor } from "@/lib/threshold-sources";
 import { displayNameForPestSpecies, findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
+import TimePicker from "@/app/app/TimePicker";
 import RecommendationsPanel from "./RecommendationsPanel";
 
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
@@ -149,10 +150,13 @@ export default function PestEventDetail({
   const [inventoryItemId, setInventoryItemId] = useState("");
   const [product, setProduct] = useState("");
   const [quantityUsed, setQuantityUsed] = useState<number | "">("");
-  const [minutesSpent, setMinutesSpent] = useState<number | "">("");
+  // Plain number, not number|"" -- TimePicker always has a real value (it
+  // starts at 0, same as NewTreatmentForm's identical fields), there's no
+  // "empty" state to represent once it's a wheel instead of a text input.
+  const [minutesSpent, setMinutesSpent] = useState(0);
   const [fixtureId, setFixtureId] = useState("");
-  const [minutesAfterDark, setMinutesAfterDark] = useState<number | "">("");
-  const [durationMin, setDurationMin] = useState<number | "">("");
+  const [minutesAfterDark, setMinutesAfterDark] = useState(0);
+  const [durationMin, setDurationMin] = useState(0);
   const [pulseCount, setPulseCount] = useState<number | "">("");
   const [treatmentNotes, setTreatmentNotes] = useState("");
   const [submittingTreatment, setSubmittingTreatment] = useState(false);
@@ -343,10 +347,10 @@ export default function PestEventDetail({
         inventoryItemId: inventoryItemId || null,
         product: selectedItem?.name ?? product,
         quantityUsed: quantityUsed === "" ? null : quantityUsed,
-        minutesSpent: minutesSpent === "" ? null : minutesSpent,
+        minutesSpent: minutesSpent || null,
         fixtureId: fixtureId || null,
-        minutesAfterDark: minutesAfterDark === "" ? null : minutesAfterDark,
-        durationMin: durationMin === "" ? null : durationMin,
+        minutesAfterDark: minutesAfterDark || null,
+        durationMin: durationMin || null,
         pulseCount: pulseCount === "" ? null : pulseCount,
         notes: treatmentNotes,
       },
@@ -367,10 +371,10 @@ export default function PestEventDetail({
       setInventoryItemId("");
       setProduct("");
       setQuantityUsed("");
-      setMinutesSpent("");
+      setMinutesSpent(0);
       setFixtureId("");
-      setMinutesAfterDark("");
-      setDurationMin("");
+      setMinutesAfterDark(0);
+      setDurationMin(0);
       setPulseCount("");
       setTreatmentNotes("");
     }
@@ -826,25 +830,15 @@ export default function PestEventDetail({
                   placeholder="Fixture ID (optional)"
                   className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
                 />
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    value={minutesAfterDark}
-                    onChange={(e) => setMinutesAfterDark(e.target.value === "" ? "" : Number(e.target.value))}
-                    placeholder="Mins after dark"
-                    className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    value={durationMin}
-                    onChange={(e) => setDurationMin(e.target.value === "" ? "" : Number(e.target.value))}
-                    placeholder="Duration (mins)"
-                    className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-                  />
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+                    Mins after dark
+                    <TimePicker valueMinutes={minutesAfterDark} onChange={setMinutesAfterDark} mode="minutesOnly" />
+                  </label>
+                  <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+                    Duration
+                    <TimePicker valueMinutes={durationMin} onChange={setDurationMin} mode="minutesOnly" />
+                  </label>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -870,16 +864,11 @@ export default function PestEventDetail({
                   className="w-28 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
                 />
               )}
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                value={minutesSpent}
-                onChange={(e) => setMinutesSpent(e.target.value === "" ? "" : Number(e.target.value))}
-                placeholder="Minutes spent"
-                className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-              />
             </div>
+            <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+              Total application time
+              <TimePicker valueMinutes={minutesSpent} onChange={setMinutesSpent} mode="hoursMinutes" />
+            </label>
             <input
               value={treatmentNotes}
               onChange={(e) => setTreatmentNotes(e.target.value)}

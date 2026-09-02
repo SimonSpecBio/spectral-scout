@@ -179,6 +179,16 @@ body {
   font-size: 0.75rem;
 }
 
+/* TimePicker.tsx's scroll-snap wheels -- native scroll physics, just
+   without the visible scrollbar a picker-style control shouldn't show. */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* The floating pill used by every "continue to place location" / "log
    location" action across the event, treatment, trap, and scouting
    creation flows -- was six copies of the same inline style object before

@@ -8,6 +8,7 @@ import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import { Stepper } from "../Stepper";
 import SubmitButton from "../SubmitButton";
+import TimePicker from "../TimePicker";
 
 const TYPES = ["biological", "pesticide", "spectral_light"] as const;
 const DRAFT_KEY = "scout-new-treatment-draft";
@@ -174,10 +175,10 @@ export default function NewTreatmentForm({
                 />
               </FormField>
               <FormField label="Minutes after dark" layout="row">
-                <Stepper value={minutesAfterDark} onChange={setMinutesAfterDark} min={0} step={5} />
+                <TimePicker valueMinutes={minutesAfterDark} onChange={setMinutesAfterDark} mode="minutesOnly" />
               </FormField>
               <FormField label="Duration (minutes)" layout="row">
-                <Stepper value={durationMin} onChange={setDurationMin} min={0} step={5} />
+                <TimePicker valueMinutes={durationMin} onChange={setDurationMin} mode="minutesOnly" />
               </FormField>
               <FormField label="Pulse count" layout="row">
                 <Stepper value={pulseCount} onChange={setPulseCount} min={0} step={1} />
@@ -193,7 +194,7 @@ export default function NewTreatmentForm({
             />
           </FormField>
           <FormField label="Total application time" layout="row">
-            <Stepper value={minutesSpent} onChange={setMinutesSpent} min={0} step={5} />
+            <TimePicker valueMinutes={minutesSpent} onChange={setMinutesSpent} mode="hoursMinutes" />
           </FormField>
           <FormField label="Notes (optional)">
             <input
