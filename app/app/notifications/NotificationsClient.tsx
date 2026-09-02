@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { NotificationKind } from "@/lib/notifications";
+import { loadRead, saveRead } from "@/lib/notifications-read";
 
 interface Notification {
   id: string;
@@ -25,23 +26,6 @@ const KIND_COLOR: Record<NotificationKind, string> = {
   event_auto_resolved: "var(--success)",
   escalation: "var(--danger)",
 };
-
-const READ_KEY = "spectral-notifications-read";
-
-function loadRead(): Set<string> {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(READ_KEY) ?? "[]"));
-  } catch {
-    return new Set();
-  }
-}
-function saveRead(read: Set<string>) {
-  try {
-    localStorage.setItem(READ_KEY, JSON.stringify([...read]));
-  } catch {
-    /* ignore */
-  }
-}
 
 function relativeTime(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
