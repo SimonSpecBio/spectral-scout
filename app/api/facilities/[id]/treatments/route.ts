@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { treatmentTypeEnum } from "@/db/schema";
-import { insertTreatmentAndDecrementStock } from "@/lib/apply-treatment";
+import { insertTreatmentAndDecrementStock, secondPulseFieldsFrom } from "@/lib/apply-treatment";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     fixtureId: typeof body.fixtureId === "string" && body.fixtureId ? body.fixtureId : null,
     minutesAfterDark: typeof body.minutesAfterDark === "number" ? body.minutesAfterDark : null,
     durationMin: typeof body.durationMin === "number" ? body.durationMin : null,
-    pulseCount: typeof body.pulseCount === "number" ? body.pulseCount : null,
+    ...secondPulseFieldsFrom(body),
   });
   return NextResponse.json(row);
 }

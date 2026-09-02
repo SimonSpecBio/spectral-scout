@@ -44,7 +44,19 @@ export default function NewTreatmentForm({
   const [fixtureId, setFixtureId] = useState(typeof draft?.fixtureId === "string" ? draft.fixtureId : "");
   const [minutesAfterDark, setMinutesAfterDark] = useState(typeof draft?.minutesAfterDark === "number" ? draft.minutesAfterDark : 0);
   const [durationMin, setDurationMin] = useState(typeof draft?.durationMin === "number" ? draft.durationMin : 0);
-  const [pulseCount, setPulseCount] = useState(typeof draft?.pulseCount === "number" ? draft.pulseCount : 0);
+  // Replaces the old bare "pulse count" number, which had nowhere to
+  // record a second pulse's OWN timing (Airtable ticket C3). Second-pulse
+  // duration defaults to the first pulse's duration the moment the toggle
+  // is switched on, per the ticket's own spec -- see the onClick below.
+  const [hasSecondPulse, setHasSecondPulse] = useState(
+    typeof draft?.secondPulseOffsetMinutes === "number" && typeof draft?.secondPulseDurationMinutes === "number"
+  );
+  const [secondPulseOffsetMinutes, setSecondPulseOffsetMinutes] = useState(
+    typeof draft?.secondPulseOffsetMinutes === "number" ? draft.secondPulseOffsetMinutes : 0
+  );
+  const [secondPulseDurationMinutes, setSecondPulseDurationMinutes] = useState(
+    typeof draft?.secondPulseDurationMinutes === "number" ? draft.secondPulseDurationMinutes : 0
+  );
   const [notes, setNotes] = useState(typeof draft?.notes === "string" ? draft.notes : "");
   const [placingLocation, setPlacingLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -54,12 +66,37 @@ export default function NewTreatmentForm({
     try {
       localStorage.setItem(
         DRAFT_KEY,
-        JSON.stringify({ type, inventoryItemId, quantityUsed, targetPest, minutesSpent, fixtureId, minutesAfterDark, durationMin, pulseCount, notes })
+        JSON.stringify({
+          type,
+          inventoryItemId,
+          quantityUsed,
+          targetPest,
+          minutesSpent,
+          fixtureId,
+          minutesAfterDark,
+          durationMin,
+          secondPulseOffsetMinutes: hasSecondPulse ? secondPulseOffsetMinutes : undefined,
+          secondPulseDurationMinutes: hasSecondPulse ? secondPulseDurationMinutes : undefined,
+          notes,
+        })
       );
     } catch {
       /* storage full or unavailable */
     }
-  }, [type, inventoryItemId, quantityUsed, targetPest, minutesSpent, fixtureId, minutesAfterDark, durationMin, pulseCount, notes]);
+  }, [
+    type,
+    inventoryItemId,
+    quantityUsed,
+    targetPest,
+    minutesSpent,
+    fixtureId,
+    minutesAfterDark,
+    durationMin,
+    hasSecondPulse,
+    secondPulseOffsetMinutes,
+    secondPulseDurationMinutes,
+    notes,
+  ]);
 
   const selectedItem = items.find((i) => i.id === inventoryItemId);
 
@@ -78,7 +115,8 @@ export default function NewTreatmentForm({
         fixtureId: fixtureId || null,
         minutesAfterDark: minutesAfterDark || null,
         durationMin: durationMin || null,
-        pulseCount: pulseCount || null,
+        secondPulseOffsetMinutes: hasSecondPulse ? secondPulseOffsetMinutes : null,
+        secondPulseDurationMinutes: hasSecondPulse ? secondPulseDurationMinutes : null,
         notes: notes || null,
         x,
         y,
@@ -180,9 +218,32 @@ export default function NewTreatmentForm({
               <FormField label="Duration (minutes)" layout="row">
                 <TimePicker valueMinutes={durationMin} onChange={setDurationMin} mode="minutesOnly" />
               </FormField>
-              <FormField label="Pulse count" layout="row">
-                <Stepper value={pulseCount} onChange={setPulseCount} min={0} step={1} />
-              </FormField>
+              <label className="flex items-center gap-2 text-sm text-[var(--text-dim)]">
+                <input
+                  type="checkbox"
+                  checked={hasSecondPulse}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setHasSecondPulse(checked);
+                    // Defaults the second pulse's duration to the first's,
+                    // the moment the toggle switches on -- not a fabricated
+                    // number, just a reasonable starting point to edit
+                    // (Airtable ticket C3's own spec).
+                    if (checked && secondPulseDurationMinutes === 0) setSecondPulseDurationMinutes(durationMin);
+                  }}
+                />
+                Multiple nightly treatments?
+              </label>
+              {hasSecondPulse && (
+                <>
+                  <FormField label="Second treatment starts (after first)" layout="row">
+                    <TimePicker valueMinutes={secondPulseOffsetMinutes} onChange={setSecondPulseOffsetMinutes} mode="minutesOnly" />
+                  </FormField>
+                  <FormField label="Second treatment duration" layout="row">
+                    <TimePicker valueMinutes={secondPulseDurationMinutes} onChange={setSecondPulseDurationMinutes} mode="minutesOnly" />
+                  </FormField>
+                </>
+              )}
             </>
           )}
           <FormField label="Target pest (optional)">

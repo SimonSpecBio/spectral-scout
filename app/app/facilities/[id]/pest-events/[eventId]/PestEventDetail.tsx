@@ -157,7 +157,11 @@ export default function PestEventDetail({
   const [fixtureId, setFixtureId] = useState("");
   const [minutesAfterDark, setMinutesAfterDark] = useState(0);
   const [durationMin, setDurationMin] = useState(0);
-  const [pulseCount, setPulseCount] = useState<number | "">("");
+  // Replaces the old bare "pulse count" number, which had nowhere to
+  // record a second pulse's OWN timing (Airtable ticket C3).
+  const [hasSecondPulse, setHasSecondPulse] = useState(false);
+  const [secondPulseOffsetMinutes, setSecondPulseOffsetMinutes] = useState(0);
+  const [secondPulseDurationMinutes, setSecondPulseDurationMinutes] = useState(0);
   const [treatmentNotes, setTreatmentNotes] = useState("");
   const [submittingTreatment, setSubmittingTreatment] = useState(false);
   const [treatmentQueued, setTreatmentQueued] = useState(false);
@@ -351,7 +355,8 @@ export default function PestEventDetail({
         fixtureId: fixtureId || null,
         minutesAfterDark: minutesAfterDark || null,
         durationMin: durationMin || null,
-        pulseCount: pulseCount === "" ? null : pulseCount,
+        secondPulseOffsetMinutes: hasSecondPulse ? secondPulseOffsetMinutes : null,
+        secondPulseDurationMinutes: hasSecondPulse ? secondPulseDurationMinutes : null,
         notes: treatmentNotes,
       },
       "Treatment"
@@ -375,7 +380,9 @@ export default function PestEventDetail({
       setFixtureId("");
       setMinutesAfterDark(0);
       setDurationMin(0);
-      setPulseCount("");
+      setHasSecondPulse(false);
+      setSecondPulseOffsetMinutes(0);
+      setSecondPulseDurationMinutes(0);
       setTreatmentNotes("");
     }
     setSubmittingTreatment(false);
@@ -839,15 +846,34 @@ export default function PestEventDetail({
                     Duration
                     <TimePicker valueMinutes={durationMin} onChange={setDurationMin} mode="minutesOnly" />
                   </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    value={pulseCount}
-                    onChange={(e) => setPulseCount(e.target.value === "" ? "" : Number(e.target.value))}
-                    placeholder="Pulse count"
-                    className="w-28 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-                  />
+                  <label className="flex items-center gap-2 text-sm text-[var(--text-dim)]">
+                    <input
+                      type="checkbox"
+                      checked={hasSecondPulse}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setHasSecondPulse(checked);
+                        // Defaults the second pulse's duration to the
+                        // first's the moment the toggle switches on -- not
+                        // a fabricated number, just a starting point to
+                        // edit (Airtable ticket C3's own spec).
+                        if (checked && secondPulseDurationMinutes === 0) setSecondPulseDurationMinutes(durationMin);
+                      }}
+                    />
+                    Multiple nightly treatments?
+                  </label>
+                  {hasSecondPulse && (
+                    <>
+                      <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+                        Second treatment starts (after first)
+                        <TimePicker valueMinutes={secondPulseOffsetMinutes} onChange={setSecondPulseOffsetMinutes} mode="minutesOnly" />
+                      </label>
+                      <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+                        Second treatment duration
+                        <TimePicker valueMinutes={secondPulseDurationMinutes} onChange={setSecondPulseDurationMinutes} mode="minutesOnly" />
+                      </label>
+                    </>
+                  )}
                 </div>
               </>
             )}

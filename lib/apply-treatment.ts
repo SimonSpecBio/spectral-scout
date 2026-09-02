@@ -2,6 +2,22 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { establishmentChecks, inventoryItems, tasks, treatments } from "@/db/schema";
 
+// Shared by both treatment POST routes -- a request body's secondPulse*
+// fields (from the "Multiple nightly treatments?" toggle, Airtable ticket
+// C3) only mean anything together: an offset with no duration (or vice
+// versa) isn't a real second pulse, so pulseCount is DERIVED from both
+// being present rather than trusted as a client-sent number.
+export function secondPulseFieldsFrom(body: { secondPulseOffsetMinutes?: unknown; secondPulseDurationMinutes?: unknown }) {
+  const secondPulseOffsetMinutes = typeof body.secondPulseOffsetMinutes === "number" ? body.secondPulseOffsetMinutes : null;
+  const secondPulseDurationMinutes = typeof body.secondPulseDurationMinutes === "number" ? body.secondPulseDurationMinutes : null;
+  const hasSecondPulse = secondPulseOffsetMinutes != null && secondPulseDurationMinutes != null;
+  return {
+    secondPulseOffsetMinutes: hasSecondPulse ? secondPulseOffsetMinutes : null,
+    secondPulseDurationMinutes: hasSecondPulse ? secondPulseDurationMinutes : null,
+    pulseCount: hasSecondPulse ? 2 : 1,
+  };
+}
+
 const DAY_MS = 86_400_000;
 // A week is the common IPM middle-ground for a first establishment read --
 // long enough for a released predator/parasitoid to start visibly working

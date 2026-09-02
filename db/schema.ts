@@ -655,7 +655,15 @@ export const treatments = pgTable(
   fixtureId: text("fixture_id"),
   minutesAfterDark: integer("minutes_after_dark"),
   durationMin: integer("duration_min"),
+  // pulseCount alone couldn't represent a real second nightly treatment --
+  // there was nowhere to record ITS OWN timing (Airtable ticket C3, "Multiple
+  // nightly treatments?" toggle replacing a bare, confusing pulse-count
+  // number). secondPulse* stay null for a single-pulse treatment; pulseCount
+  // itself keeps meaning "how many," now just derived as 2 when both are
+  // set rather than freely typed.
   pulseCount: integer("pulse_count").default(1),
+  secondPulseOffsetMinutes: integer("second_pulse_offset_minutes"),
+  secondPulseDurationMinutes: integer("second_pulse_duration_minutes"),
   },
   (table) => [
     index("scout_treatment_facility_id_idx").on(table.facilityId),
