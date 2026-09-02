@@ -155,7 +155,7 @@ export default function MapEditor({
   // any container narrower than that and gets clipped on the right, which
   // is exactly the "square gets cut off as I move it right" bug: the shape
   // was never actually off-canvas, the canvas itself just didn't fit.
-  const [scale, setScale] = useState(1);
+  const [baseScale, setBaseScale] = useState(1);
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -163,11 +163,48 @@ export default function MapEditor({
       // Capped at 1.4x, not 1x -- the map should fill most of its card on
       // a normal desktop width, not stay pinned to 900px with dead space
       // around it, but an ultrawide monitor shouldn't blow it up absurdly.
-      setScale(Math.min(1.4, entry.contentRect.width / CANVAS_WIDTH));
+      setBaseScale(Math.min(1.4, entry.contentRect.width / CANVAS_WIDTH));
     });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  // User-driven zoom multiplier on top of the responsive baseScale above --
+  // separate state so a container resize (which recomputes baseScale) never
+  // clobbers a zoom level the grower is actively using. Page-wide native
+  // pinch/double-tap zoom is disabled (app/layout.tsx's viewport export,
+  // ticket C2), so this + the touch pinch handler below are what replace it
+  // specifically for the map.
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 3;
+  const [zoom, setZoom] = useState(1);
+  const scale = baseScale * zoom;
+  const pinchState = useRef<{ distance: number; zoom: number } | null>(null);
+
+  function touchDistance(touches: TouchList): number {
+    const [a, b] = [touches[0], touches[1]];
+    return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+  }
+
+  function handleTouchMove(e: Konva.KonvaEventObject<TouchEvent>) {
+    const touches = e.evt.touches;
+    if (touches.length !== 2) {
+      pinchState.current = null;
+      return;
+    }
+    e.evt.preventDefault();
+    const distance = touchDistance(touches);
+    if (!pinchState.current) {
+      pinchState.current = { distance, zoom };
+      return;
+    }
+    const next = (pinchState.current.zoom * distance) / pinchState.current.distance;
+    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next)));
+  }
+
+  function handleTouchEnd(e: Konva.KonvaEventObject<TouchEvent>) {
+    if (e.evt.touches.length < 2) pinchState.current = null;
+  }
 
   const base = `/api/facilities/${facilityId}/areas/${area.id}`;
   const eventsBase = `/api/facilities/${facilityId}/pest-events`;
@@ -335,7 +372,33 @@ export default function MapEditor({
           -- and everything drawn on it -- pushed into the left portion of a
           too-wide bordered frame. That mismatch was the real cause of "zones
           crushed to the left," not a spacing bug in the zones themselves. */}
-      <div className="relative map-canvas-frame" style={{ width: CANVAS_WIDTH * scale, height: CANVAS_HEIGHT * scale }}>
+      {/* Zoom buttons are the primary control (reliable on every device);
+          the Stage below also handles real two-finger pinch on touch
+          devices, both replacing the native pinch this page disables
+          (ticket C2). overflow-auto lets a zoomed-in map be panned by
+          scroll/drag, same as any oversized scrollable content. */}
+      <div className="flex items-center gap-2 self-end">
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - 0.25))}
+          disabled={zoom <= MIN_ZOOM}
+          className="rounded-md border border-[var(--border)] px-2.5 py-1 text-sm text-[var(--text-dim)] disabled:opacity-40"
+        >
+          −
+        </button>
+        <span className="label-mono w-10 text-center">{Math.round(zoom * 100)}%</span>
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + 0.25))}
+          disabled={zoom >= MAX_ZOOM}
+          className="rounded-md border border-[var(--border)] px-2.5 py-1 text-sm text-[var(--text-dim)] disabled:opacity-40"
+        >
+          +
+        </button>
+      </div>
+
+      <div className="max-w-full overflow-auto">
+        <div className="relative map-canvas-frame" style={{ width: CANVAS_WIDTH * scale, height: CANVAS_HEIGHT * scale }}>
         <div className="map-canvas-grid" />
         <Stage
           width={CANVAS_WIDTH * scale}
@@ -343,6 +406,8 @@ export default function MapEditor({
           scaleX={scale}
           scaleY={scale}
           onMouseDown={handleMouseDown}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           <Layer>
             {bgImage && (
@@ -646,6 +711,7 @@ export default function MapEditor({
             </button>
           </div>
         )}
+        </div>
       </div>
       {mode === "edit" && (
         <p className="text-xs text-[var(--text-dim)]">

@@ -1,6 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import { BAYS } from "@/lib/floorplan-bays";
 
 const IDLE_FILL = "var(--idle-fill)";
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 2.5;
 
 // The shared bay-bar canvas underneath every dashboard map lens (Pests,
 // Last scouted, Temp, Humidity) -- same 20 shared bay slots, same layout,
@@ -21,6 +26,11 @@ export default function BayBarMap({
   // same as tapping it in the Attention Required list.
   hrefByBay?: Map<string, string>;
 }) {
+  // Explicit +/- zoom (ticket C2) replaces the native pinch-zoom this page
+  // disables app-wide -- a simple CSS scale is enough here (unlike
+  // MapEditor's Konva canvas, there's no drag/resize editing to keep
+  // working underneath it, just a fixed abstract chart).
+  const [zoom, setZoom] = useState(1);
   const rowA = BAYS.filter((b) => b.row === "A");
   const rowB = BAYS.filter((b) => b.row === "B");
   const barYs = [32, 60, 88, 116, 144, 172, 200, 228, 256, 284];
@@ -31,8 +41,31 @@ export default function BayBarMap({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-hidden" style={{ background: "var(--map-canvas-bg)", borderRadius: "var(--radius-md)" }}>
-        <svg viewBox="0 0 296 322" className="block w-full">
+      <div className="flex items-center gap-2 self-end">
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - 0.25))}
+          disabled={zoom <= MIN_ZOOM}
+          className="rounded-md border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-dim)] disabled:opacity-40"
+        >
+          −
+        </button>
+        <span className="label-mono w-8 text-center text-xs">{Math.round(zoom * 100)}%</span>
+        <button
+          type="button"
+          onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + 0.25))}
+          disabled={zoom >= MAX_ZOOM}
+          className="rounded-md border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-dim)] disabled:opacity-40"
+        >
+          +
+        </button>
+      </div>
+      <div className="overflow-auto" style={{ background: "var(--map-canvas-bg)", borderRadius: "var(--radius-md)" }}>
+        <svg
+          viewBox="0 0 296 322"
+          className="block"
+          style={{ width: `${zoom * 100}%`, minWidth: zoom === 1 ? "100%" : `${zoom * 100}%` }}
+        >
           <defs>
             <radialGradient id="heatGlow" cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="var(--danger)" stopOpacity="0.34" />
