@@ -95,9 +95,10 @@ export default async function PestEventPage({
       <div>
         <Link
           href={area ? `/app/facilities/${id}/areas/${area.id}` : `/app/facilities/${id}`}
-          className="text-sm text-[var(--text-dim)]"
+          className="inline-flex items-center gap-1 text-sm text-[var(--text-dim)]"
         >
-          ← {area ? area.name : facility.name}
+          <span>←</span>
+          <span>{area ? area.name : facility.name}</span>
         </Link>
       </div>
 

@@ -419,14 +419,14 @@ export default function PestEventDetail({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-y-2">
-        <div className="flex items-center gap-3">
-          <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[event.severity] }} />
+        <div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-semibold capitalize">{displayNameForPestSpecies(event.pestSpecies)}</h1>
               {event.kind === "pathogen" && (
                 <span className="label-mono rounded border border-[var(--border-soft)] px-1.5 py-0.5">Disease</span>
               )}
+              <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[event.severity] }} />
             </div>
             {event.scientificName && <div className="text-sm italic text-[var(--text-dim)]">{event.scientificName}</div>}
             <div className="text-sm text-[var(--text-dim)]">{locationLabel}</div>
@@ -437,9 +437,15 @@ export default function PestEventDetail({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="badge capitalize" style={{ background: `${SEVERITY_COLOR[event.severity]}33`, color: SEVERITY_COLOR[event.severity] }}>
-            {event.severity}
+          <span
+            className="rounded-md border px-3 py-1.5 text-sm"
+            style={{ borderColor: SEVERITY_COLOR[event.severity], color: SEVERITY_COLOR[event.severity] }}
+          >
+            <span className="capitalize">{event.severity}</span> severity
           </span>
+          <button onClick={createShareLink} disabled={sharing} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)] disabled:opacity-50">
+            {sharing ? "…" : "Share"}
+          </button>
           <button
             onClick={toggleStatus}
             className={`rounded-md border px-3 py-1.5 text-sm ${
@@ -447,9 +453,6 @@ export default function PestEventDetail({
             }`}
           >
             {status === "active" ? "Mark resolved" : "Reopen"}
-          </button>
-          <button onClick={createShareLink} disabled={sharing} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)] disabled:opacity-50">
-            {sharing ? "…" : "Share"}
           </button>
           {isPilotTier && !escalation && (
             <button
@@ -461,6 +464,33 @@ export default function PestEventDetail({
           )}
         </div>
       </div>
+
+      {shareError && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
+          style={{ background: "var(--danger-bg)", color: "var(--danger)" }}
+        >
+          {shareError}
+          <button type="button" onClick={() => setShareError(null)} className="shrink-0 text-[var(--text-dim)]">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {shareLink && (
+        <div className="card flex flex-col gap-2 p-3.5">
+          <div className="label-mono">Read-only link -- expires in 30 days</div>
+          <div className="flex items-center gap-2">
+            <input readOnly value={shareLink} className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-xs" />
+            <button onClick={copyShareLink} className="shrink-0 rounded-md border border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--text-dim)]">
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <button onClick={revokeShareLinks} className="self-start text-xs text-[var(--danger)]">
+            Revoke access
+          </button>
+        </div>
+      )}
 
       {densities.length >= MIN_SESSIONS_FOR_CHART && chartMetricKind ? (
         <div className="card flex flex-col gap-3 p-4">
@@ -627,33 +657,6 @@ export default function PestEventDetail({
       {escalationQueued && !escalation && (
         <div className="card flex flex-col gap-1 p-3.5">
           <div className="label-mono">Saved offline. Will send to Spectral once you're back online.</div>
-        </div>
-      )}
-
-      {shareError && (
-        <div
-          className="flex items-center justify-between gap-3 rounded-md p-3.5 text-sm"
-          style={{ background: "var(--danger-bg)", color: "var(--danger)" }}
-        >
-          {shareError}
-          <button type="button" onClick={() => setShareError(null)} className="shrink-0 text-[var(--text-dim)]">
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {shareLink && (
-        <div className="card flex flex-col gap-2 p-3.5">
-          <div className="label-mono">Read-only link -- expires in 30 days</div>
-          <div className="flex items-center gap-2">
-            <input readOnly value={shareLink} className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-xs" />
-            <button onClick={copyShareLink} className="shrink-0 rounded-md border border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--text-dim)]">
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </div>
-          <button onClick={revokeShareLinks} className="self-start text-xs text-[var(--danger)]">
-            Revoke access
-          </button>
         </div>
       )}
 
@@ -925,21 +928,28 @@ export default function PestEventDetail({
 
       {tab === "photos" && (
         <div className="flex flex-col gap-4">
-          <label className="w-fit cursor-pointer rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
-            {uploading ? "Uploading…" : "Add photo"}
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
-          </label>
-          {photoQueued && <div className="text-xs text-[var(--text-dim)]">Photo saved offline. Will upload once you're back online.</div>}
           {photos.length === 0 ? (
-            <div className="text-sm text-[var(--text-dim)]">No photos yet.</div>
+            // Empty state: no "No photos yet" text needed -- a big, centered
+            // Add button already says everything there is to say here.
+            <label className="card flex cursor-pointer flex-col items-center justify-center gap-2 p-10 text-center text-sm text-[var(--text-dim)]">
+              {uploading ? "Uploading…" : "+ Add photo"}
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
+            </label>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {photos.map((p) => (
-                // eslint-disable-next-line @next/next/no-img-element -- arbitrary Blob-hosted URLs, not a local/static asset
-                <img key={p.id} src={p.blobUrl} alt={p.caption ?? ""} className="aspect-square rounded-md object-cover" />
-              ))}
-            </div>
+            <>
+              <label className="w-fit cursor-pointer rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
+                {uploading ? "Uploading…" : "Add photo"}
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {photos.map((p) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- arbitrary Blob-hosted URLs, not a local/static asset
+                  <img key={p.id} src={p.blobUrl} alt={p.caption ?? ""} className="aspect-square rounded-md object-cover" />
+                ))}
+              </div>
+            </>
           )}
+          {photoQueued && <div className="text-xs text-[var(--text-dim)]">Photo saved offline. Will upload once you're back online.</div>}
         </div>
       )}
 
