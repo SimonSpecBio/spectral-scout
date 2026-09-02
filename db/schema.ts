@@ -631,6 +631,13 @@ export const treatments = pgTable(
   y: numeric("y", { mode: "number" }),
   type: treatmentTypeEnum("type").notNull(),
   product: text("product"),
+  // Pesticide-only (ticket B3) -- what the grower actually mixed/applied,
+  // free text since real label rates vary in units (oz/gal, %v/v, lb/acre
+  // all appear in lib/treatments-catalog.ts's own sourced typicalDosage
+  // strings). Split out of the old catch-all "Rate, area, notes..." field,
+  // which read as ambiguous ("rate" meaning what, exactly?) -- see notes
+  // below for the freeform remainder.
+  dosage: text("dosage"),
   targetPest: text("target_pest"),
   // Links to the real stock record when the product was picked from
   // Inventory (vs. typed freehand) -- this is what lets applying a

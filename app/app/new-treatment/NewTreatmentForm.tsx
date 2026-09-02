@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import { findProductByName } from "@/lib/treatments-catalog";
 import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import { Stepper } from "../Stepper";
@@ -38,6 +39,13 @@ export default function NewTreatmentForm({
     draft?.type && TYPES.includes(draft.type) ? draft.type : "biological"
   );
   const [inventoryItemId, setInventoryItemId] = useState(typeof draft?.inventoryItemId === "string" ? draft.inventoryItemId : "");
+  // Auto-filled from the matched catalog product's sourced label rate the
+  // moment a pesticide item is picked from Inventory, but only while still
+  // at that suggestion -- dosageTouched flips true on the first manual edit
+  // so picking a different item afterward never clobbers what the grower
+  // typed (Airtable ticket B3, adding this field to the pesticide branch).
+  const [dosage, setDosage] = useState(typeof draft?.dosage === "string" ? draft.dosage : "");
+  const [dosageTouched, setDosageTouched] = useState(false);
   const [quantityUsed, setQuantityUsed] = useState(typeof draft?.quantityUsed === "number" ? draft.quantityUsed : 0);
   const [targetPest, setTargetPest] = useState(typeof draft?.targetPest === "string" ? draft.targetPest : "");
   const [minutesSpent, setMinutesSpent] = useState(typeof draft?.minutesSpent === "number" ? draft.minutesSpent : 0);
@@ -69,6 +77,7 @@ export default function NewTreatmentForm({
         JSON.stringify({
           type,
           inventoryItemId,
+          dosage,
           quantityUsed,
           targetPest,
           minutesSpent,
@@ -86,6 +95,7 @@ export default function NewTreatmentForm({
   }, [
     type,
     inventoryItemId,
+    dosage,
     quantityUsed,
     targetPest,
     minutesSpent,
@@ -109,6 +119,7 @@ export default function NewTreatmentForm({
         type,
         inventoryItemId: inventoryItemId || null,
         product: selectedItem?.name ?? null,
+        dosage: type === "pesticide" && dosage ? dosage : null,
         quantityUsed: quantityUsed || null,
         targetPest: targetPest || null,
         minutesSpent: minutesSpent || null,
@@ -179,7 +190,19 @@ export default function NewTreatmentForm({
             <FormField label="Product from inventory (optional)">
               <select
                 value={inventoryItemId}
-                onChange={(e) => setInventoryItemId(e.target.value)}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setInventoryItemId(id);
+                  // Auto-fills the sourced label rate the moment a catalog
+                  // match is picked, same rule as everywhere else in this
+                  // codebase that defaults an editable field: only while
+                  // still untouched, never overwriting a manual edit.
+                  if (!dosageTouched) {
+                    const matched = items.find((i) => i.id === id);
+                    const catalogProduct = matched ? findProductByName(matched.name) : undefined;
+                    setDosage(catalogProduct?.typicalDosage ?? "");
+                  }
+                }}
                 className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
               >
                 <option value="" style={{ background: "var(--surface)" }}>
@@ -191,6 +214,19 @@ export default function NewTreatmentForm({
                   </option>
                 ))}
               </select>
+            </FormField>
+          )}
+          {type === "pesticide" && (
+            <FormField label="Dosage (optional)">
+              <input
+                value={dosage}
+                onChange={(e) => {
+                  setDosageTouched(true);
+                  setDosage(e.target.value);
+                }}
+                placeholder="e.g. 1-2 oz/gal"
+                className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+              />
             </FormField>
           )}
           {inventoryItemId && (

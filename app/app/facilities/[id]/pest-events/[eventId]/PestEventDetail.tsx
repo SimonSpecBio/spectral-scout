@@ -11,7 +11,7 @@ import type { FollowUpSuggestion } from "@/lib/recommendations";
 import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { thresholdSourceFor } from "@/lib/threshold-sources";
-import { displayNameForPestSpecies, findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
+import { displayNameForPestSpecies, findAgent, findPestProgram, findProduct, findProductByName } from "@/lib/treatments-catalog";
 import TimePicker from "@/app/app/TimePicker";
 import EventChart from "./EventChart";
 import RecommendationsPanel from "./RecommendationsPanel";
@@ -149,6 +149,12 @@ export default function PestEventDetail({
   const [treatmentType, setTreatmentType] = useState<TreatmentType>("biological");
   const [inventoryItemId, setInventoryItemId] = useState("");
   const [product, setProduct] = useState("");
+  // Auto-filled from the matched catalog product's sourced label rate,
+  // but only while untouched -- same rule as NewTreatmentForm's identical
+  // field (Airtable ticket B3, splitting the old "Rate, area, notes..."
+  // catch-all into this field plus the Notes input below).
+  const [dosage, setDosage] = useState("");
+  const [dosageTouched, setDosageTouched] = useState(false);
   const [quantityUsed, setQuantityUsed] = useState<number | "">("");
   // Plain number, not number|"" -- TimePicker always has a real value (it
   // starts at 0, same as NewTreatmentForm's identical fields), there's no
@@ -361,6 +367,7 @@ export default function PestEventDetail({
         type: treatmentType,
         inventoryItemId: inventoryItemId || null,
         product: selectedItem?.name ?? product,
+        dosage: treatmentType === "pesticide" && dosage ? dosage : null,
         quantityUsed: quantityUsed === "" ? null : quantityUsed,
         minutesSpent: minutesSpent || null,
         fixtureId: fixtureId || null,
@@ -386,6 +393,8 @@ export default function PestEventDetail({
       }
       setInventoryItemId("");
       setProduct("");
+      setDosage("");
+      setDosageTouched(false);
       setQuantityUsed("");
       setMinutesSpent(0);
       setFixtureId("");
@@ -745,7 +754,19 @@ export default function PestEventDetail({
             {inventoryItems.length > 0 && (
               <select
                 value={inventoryItemId}
-                onChange={(e) => setInventoryItemId(e.target.value)}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setInventoryItemId(id);
+                  // Auto-fills the sourced label rate the moment a catalog
+                  // match is picked, only while still untouched -- same
+                  // rule as the freeform input below and NewTreatmentForm's
+                  // identical field (Airtable ticket B3).
+                  if (!dosageTouched) {
+                    const matched = inventoryItems.find((i) => i.id === id);
+                    const catalogProduct = matched ? findProductByName(matched.name) : undefined;
+                    setDosage(catalogProduct?.typicalDosage ?? "");
+                  }
+                }}
                 className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
               >
                 <option value="" style={{ background: "var(--surface)" }}>
@@ -761,8 +782,26 @@ export default function PestEventDetail({
             {!inventoryItemId && (
               <input
                 value={product}
-                onChange={(e) => setProduct(e.target.value)}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  setProduct(name);
+                  if (!dosageTouched) {
+                    const catalogProduct = findProductByName(name);
+                    if (catalogProduct?.typicalDosage) setDosage(catalogProduct.typicalDosage);
+                  }
+                }}
                 placeholder="Product (e.g. Beauveria bassiana)"
+                className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+              />
+            )}
+            {treatmentType === "pesticide" && (
+              <input
+                value={dosage}
+                onChange={(e) => {
+                  setDosageTouched(true);
+                  setDosage(e.target.value);
+                }}
+                placeholder="Dosage (e.g. 1-2 oz/gal)"
                 className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
               />
             )}
@@ -856,7 +895,7 @@ export default function PestEventDetail({
             <input
               value={treatmentNotes}
               onChange={(e) => setTreatmentNotes(e.target.value)}
-              placeholder="Rate, area, notes..."
+              placeholder="Notes (optional)"
               className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
             />
             {treatmentType === "spectral_light" && spectralProtocol.applicability !== "not_indicated" && (

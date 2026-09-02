@@ -1,0 +1,1 @@
+ALTER TABLE "scout_treatment" ADD COLUMN "dosage" text;

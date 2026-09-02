@@ -31,6 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     y,
     type: body.type,
     product: typeof body.product === "string" && body.product ? body.product : null,
+    dosage: typeof body.dosage === "string" && body.dosage ? body.dosage : null,
     targetPest: typeof body.targetPest === "string" && body.targetPest ? body.targetPest : null,
     inventoryItemId: typeof body.inventoryItemId === "string" ? body.inventoryItemId : null,
     quantityUsed: typeof body.quantityUsed === "number" ? body.quantityUsed : null,
