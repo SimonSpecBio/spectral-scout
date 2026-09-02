@@ -6,6 +6,17 @@ import { costPerUnit, matchInventoryStock, type StockStatus } from "@/lib/recomm
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { AGENTS, findPestProgram, legalityFor, PRODUCTS } from "@/lib/treatments-catalog";
 
+// Every Cultural entry in the catalog today is a terse one-line reminder
+// ("Remove alate sources") rather than real actionable guidance (SOP-style,
+// e.g. a bleach-tray sanitation step) -- 200 chars is comfortably above the
+// longest current entry, so this evaluates false for everything today.
+// Deliberately a length check rather than deleting the Cultural section:
+// a future genuinely-rewritten entry re-enables its own section just by
+// getting long/detailed enough to clear this bar.
+function isSubstantialCulturalEntry(entry: string): boolean {
+  return entry.length > 200;
+}
+
 const STOCK_LABEL: Record<StockStatus, string> = { in_stock: "IN STOCK", low: "LOW STOCK", out: "OUT OF STOCK", unknown: "NOT IN INVENTORY" };
 const STOCK_COLOR: Record<StockStatus, string> = {
   in_stock: "var(--success)",
@@ -133,7 +144,8 @@ export default function RecommendationsPanel({
         const { tasks } = await res.json();
         const recheck = tasks.find((t: { type: string }) => t.type === "monitor");
         const release = tasks.find((t: { type: string }) => t.type === "release");
-        const parts = [`${name} logged`];
+        const appliedAtTime = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        const parts = [`${name} logged at ${appliedAtTime}`];
         if (recheck) parts.push(`recheck scheduled ${new Date(recheck.dueAt).toLocaleDateString()}`);
         if (release) parts.push(`recurring release scheduled`);
         setApplied((prev) => ({ ...prev, [name]: parts.join(" · ") }));
@@ -191,7 +203,7 @@ export default function RecommendationsPanel({
             disabled={applying === name}
             className="self-start rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-dim)] disabled:opacity-50"
           >
-            {applying === name ? "Applying…" : "Apply"}
+            {applying === name ? "Logging…" : "Quick log application"}
           </button>
         )}
       </div>
@@ -245,17 +257,6 @@ export default function RecommendationsPanel({
         )}
       </div>
 
-      {program.preventive.length > 0 && (
-        <div className="card flex flex-col gap-2 p-4">
-          <div className="label-mono">Preventive</div>
-          <ul className="flex flex-col gap-1 text-sm text-[var(--text-dim)]">
-            {program.preventive.map((p, i) => (
-              <li key={i}>• {p}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {beneficials.length > 0 && (
         <div className="card flex flex-col divide-y divide-[var(--border)] p-4">
           <div className="label-mono pb-1">Beneficials</div>
@@ -307,7 +308,24 @@ export default function RecommendationsPanel({
         </div>
       )}
 
-      {program.cultural.length > 0 && (
+      {program.preventive.length > 0 && (
+        <div className="card flex flex-col gap-2 p-4">
+          <div className="label-mono">Preventive</div>
+          <ul className="flex flex-col gap-1 text-sm text-[var(--text-dim)]">
+            {program.preventive.map((p, i) => (
+              <li key={i}>• {p}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Hidden for now -- every current catalog entry is a terse one-line
+          reminder ("Remove alate sources"), not real actionable guidance
+          (Simon, ticket A11). isSubstantial is a placeholder that currently
+          evaluates false for everything; a future genuinely-rewritten
+          cultural entry can flip this condition to re-enable its own
+          section without touching the surrounding structure. */}
+      {program.cultural.some(isSubstantialCulturalEntry) && (
         <div className="card flex flex-col gap-2 p-4">
           <div className="label-mono">Cultural</div>
           <ul className="flex flex-col gap-1 text-sm text-[var(--text-dim)]">

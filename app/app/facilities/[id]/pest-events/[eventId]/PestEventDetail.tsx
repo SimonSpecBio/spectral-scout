@@ -801,24 +801,22 @@ export default function PestEventDetail({
                 fuzzy match to a catalog product's numbers here would be
                 worse than no match at all (a wrong REI/PHI window is a
                 safety problem, not just a missing feature), so this warns
-                instead of inferring. */}
-            {treatmentType === "pesticide" && !inventoryItemId && (
-              <div className="rounded-md p-2.5 text-xs" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
-                Not linked to inventory -- this won&apos;t get re-entry/harvest (REI/PHI) tracking. Pick it from the list above if it&apos;s in stock.
-              </div>
-            )}
+                instead of inferring. Only once there's actually a typed
+                name to warn about, and not when it happens to match a real
+                inventory item by name (even if not picked from the
+                dropdown) -- an empty field or a real match isn't a warning
+                about anything. */}
+            {treatmentType === "pesticide" &&
+              !inventoryItemId &&
+              product.trim().length > 0 &&
+              !inventoryItems.some((i) => i.name.toLowerCase() === product.trim().toLowerCase()) && (
+                <div className="rounded-md p-2.5 text-xs" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
+                  &ldquo;{product.trim()}&rdquo; isn&apos;t in your inventory list, so this application won&apos;t get re-entry/harvest (REI/PHI)
+                  tracking. Add it to Inventory first if you want that tracked.
+                </div>
+              )}
             {treatmentType === "spectral_light" && (
               <>
-                {spectralProtocol.applicability !== "not_indicated" && (
-                  // The suggested schedule stays a plain description here,
-                  // never a pre-filled field value -- lib/spectral-light.ts's
-                  // "60 minutes mid-dark" default is a starting point for the
-                  // grower to read and act on, not a fact this form should
-                  // write to the record on their behalf.
-                  <div className="rounded-md p-2.5 text-xs" style={{ background: "var(--surface-raised)", color: "var(--text-dim)" }}>
-                    Suggested: {spectralProtocol.schedule}
-                  </div>
-                )}
                 <input
                   value={fixtureId}
                   onChange={(e) => setFixtureId(e.target.value)}
@@ -885,13 +883,25 @@ export default function PestEventDetail({
               placeholder="Rate, area, notes..."
               className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
             />
+            {treatmentType === "spectral_light" && spectralProtocol.applicability !== "not_indicated" && (
+              // The suggested schedule stays a plain description here,
+              // never a pre-filled field value -- lib/spectral-light.ts's
+              // "60 minutes mid-dark" default is a starting point for the
+              // grower to read and act on, not a fact this form should
+              // write to the record on their behalf. Positioned just above
+              // Save (not above the inputs) so it reads as a final sanity
+              // check against what was just typed, not a value to copy in.
+              <div className="rounded-md p-2.5 text-xs" style={{ background: "var(--surface-raised)", color: "var(--text-dim)" }}>
+                Suggested: {spectralProtocol.schedule}
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <button
                 type="submit"
                 disabled={submittingTreatment}
                 className="self-start rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
               >
-                {submittingTreatment ? "Saving…" : "Save"}
+                {submittingTreatment ? "Logging…" : "Log application"}
               </button>
               {treatmentQueued && <span className="text-xs text-[var(--text-dim)]">Saved offline — will sync</span>}
             </div>
