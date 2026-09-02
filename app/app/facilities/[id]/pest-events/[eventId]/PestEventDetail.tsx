@@ -12,6 +12,7 @@ import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scou
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { thresholdSourceFor } from "@/lib/threshold-sources";
 import { displayNameForPestSpecies, findAgent, findPestProgram, findProduct, findProductByName } from "@/lib/treatments-catalog";
+import LocalDate from "@/app/app/LocalDate";
 import TimePicker from "@/app/app/TimePicker";
 import EventChart from "./EventChart";
 import RecommendationsPanel from "./RecommendationsPanel";
@@ -483,7 +484,7 @@ export default function PestEventDetail({
             {event.scientificName && <div className="text-sm italic text-[var(--text-dim)]">{event.scientificName}</div>}
             <div className="text-sm text-[var(--text-dim)]">{locationLabel}</div>
             <div className="text-xs text-[var(--text-faint)]">
-              Detected {new Date(event.createdAt).toLocaleDateString()}
+              Detected <LocalDate date={event.createdAt} format={(d) => d.toLocaleDateString()} />
               {event.loggedBy && <> by {event.loggedBy}</>}
             </div>
           </div>
@@ -625,7 +626,10 @@ export default function PestEventDetail({
             </div>
             <div className="text-xs text-[var(--text-dim)]">
               {chartMetricKind === "density" ? "latest pests/leaf" : "latest infested"} ·{" "}
-              {new Date(chronological[chronological.length - 1].date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              <LocalDate
+                date={chronological[chronological.length - 1].date}
+                format={(d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              />
             </div>
           </div>
           {SHOW_MORE_SESSIONS_HINT && (
@@ -758,7 +762,9 @@ export default function PestEventDetail({
           {timeline.map((item, i) => (
             <div key={i} className="flex items-center justify-between px-4 py-3 text-sm capitalize">
               <span>{item.label}</span>
-              <span className="text-[var(--text-dim)]">{new Date(item.at).toLocaleDateString()}</span>
+              <span className="text-[var(--text-dim)]">
+                <LocalDate date={item.at} format={(d) => d.toLocaleDateString()} />
+              </span>
             </div>
           ))}
           {mapHref && (
@@ -980,7 +986,9 @@ export default function PestEventDetail({
                   {t.product && ` -- ${t.product}`}
                 </div>
                 {t.notes && <div className="text-[var(--text-dim)]">{t.notes}</div>}
-                <div className="text-xs text-[var(--text-dim)]">{new Date(t.appliedAt).toLocaleDateString()}</div>
+                <div className="text-xs text-[var(--text-dim)]">
+                  <LocalDate date={t.appliedAt} format={(d) => d.toLocaleDateString()} />
+                </div>
               </div>
             ))}
           </div>
@@ -1055,7 +1063,9 @@ export default function PestEventDetail({
                 const prevValue = prev && prev.metricKind === s.metricKind ? prev.value : null;
                 return (
                   <div key={s.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                    <span>{new Date(s.date).toLocaleDateString()}</span>
+                    <span>
+                      <LocalDate date={s.date} format={(d) => d.toLocaleDateString()} />
+                    </span>
                     <span className="flex items-center gap-2">
                       {metricLabel({ kind: s.metricKind, value: s.value })}
                       {prevValue != null && (
@@ -1092,7 +1102,9 @@ export default function PestEventDetail({
                       <span className="font-medium text-[var(--text)]">
                         {c.authorUserId ? (c.authorUserId === currentUserId ? "You" : (c.authorName ?? c.authorEmail ?? "Someone")) : "Migrated note"}
                       </span>
-                      <span>{new Date(c.createdAt).toLocaleString()}</span>
+                      <span>
+                        <LocalDate date={c.createdAt} format={(d) => d.toLocaleString()} />
+                      </span>
                     </div>
                     <div className="text-sm">{c.body}</div>
                   </div>

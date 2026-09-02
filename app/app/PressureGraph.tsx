@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { sparkPoints } from "@/lib/density";
 
 type Severity = "low" | "moderate" | "high" | "severe";
@@ -36,6 +36,28 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
   const [showAxisInfo, setShowAxisInfo] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [range, setRange] = useState<RangeOption>(7);
+  // This whole reconstruction anchors on "today" -- computing that directly
+  // in the render body is a confirmed hydration-mismatch source (React
+  // error #418): this Client Component still gets server-rendered once
+  // (the SERVER's timezone, UTC on Vercel) before hydrating in the
+  // browser (the visitor's real timezone), and "today" can be a different
+  // calendar date between the two whenever the visitor is far enough west
+  // of UTC. Deferring the real chart to after mount keeps the first
+  // client render identical to the server's (both the placeholder below).
+  const [mounted, setMounted] = useState(false);
+  // Same justified "flip to true once mounted" pattern as app/app/LocalDate.tsx.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setMounted(true), []);
+  if (!mounted) {
+    return (
+      <div className="card p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="label-mono">Pest pressure</span>
+        </div>
+        <div style={{ height: 72 }} />
+      </div>
+    );
+  }
 
   const today = new Date();
   today.setHours(23, 59, 59, 999);

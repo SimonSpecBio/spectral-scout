@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import LocalDate from "@/app/app/LocalDate";
 import type { MetricKind } from "@/lib/scout-metric";
 
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
@@ -134,11 +135,14 @@ export default function EventChart({
       {chronological.length > 0 && (
         <g fontFamily="ui-monospace, monospace" fontSize="7" fill="var(--text-faint)">
           <text x={pointX(sessionMs[0])} y={DATE_LABEL_Y} textAnchor="start">
-            {new Date(chronological[0].date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            <LocalDate date={chronological[0].date} format={(d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
           </text>
           {chronological.length > 1 && (
             <text x={pointX(sessionMs[sessionMs.length - 1])} y={DATE_LABEL_Y} textAnchor="end">
-              {new Date(chronological[chronological.length - 1].date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              <LocalDate
+                date={chronological[chronological.length - 1].date}
+                format={(d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              />
             </text>
           )}
         </g>
