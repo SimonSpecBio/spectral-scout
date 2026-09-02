@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
-import { scaledPoints } from "@/lib/density";
 import { queuedFetch, queuedFileFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
@@ -14,6 +13,7 @@ import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { thresholdSourceFor } from "@/lib/threshold-sources";
 import { displayNameForPestSpecies, findAgent, findPestProgram, findProduct } from "@/lib/treatments-catalog";
 import TimePicker from "@/app/app/TimePicker";
+import EventChart from "./EventChart";
 import RecommendationsPanel from "./RecommendationsPanel";
 
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
@@ -37,6 +37,10 @@ interface Treatment {
   targetPest: string | null;
   notes: string | null;
   appliedAt: string;
+  // Null for treatments logged before operatorUserId existed, or a
+  // since-deleted account -- the chart's treatment-marker tooltip just
+  // omits it rather than showing a broken name (ticket B4).
+  loggedBy: string | null;
 }
 
 interface Photo {
@@ -516,77 +520,35 @@ export default function PestEventDetail({
             <span className="label-mono">Infestation over time</span>
             <span className="text-xs text-[var(--text-dim)]">{chartMetricKind === "density" ? "Pests/leaf" : "% infested"}</span>
           </div>
-          <div className="flex flex-col items-start gap-4 overflow-x-auto sm:flex-row sm:items-center sm:gap-6">
-            <svg width={220} height={64} className="shrink-0">
-              {(() => {
-                const scaled = scaledPoints(densities, chartThreshold, 220, 46);
-                // scaledPoints only returns the joined polyline string -- a
-                // single-session event has no line segment to draw at all
-                // (nothing visible), and even a multi-point line reads better
-                // with the actual readings marked, so recompute per-point
-                // coordinates here to drop a dot at each one.
-                const w = 220, h = 46, pad = 4;
-                const span = Math.max(...densities, chartThreshold) - Math.min(...densities, chartThreshold) || 1;
-                const minAll = Math.min(...densities, chartThreshold);
-                const toY = (v: number) => h - pad - ((v - minAll) / span) * (h - 2 * pad);
-                const toX = (i: number) => (densities.length === 1 ? w / 2 : pad + (i * (w - 2 * pad)) / (densities.length - 1));
-                return (
-                  <>
-                    <line x1={0} y1={scaled.refY} x2={220} y2={scaled.refY} stroke="var(--text-faint)" strokeWidth={1} strokeDasharray="3 3" />
-                    <text x={2} y={scaled.refY - 3} className="font-mono" fontSize={8} fill="var(--text-faint)">
-                      {thresholds.presenceTriggered
-                        ? "Alert on any detection"
-                        : chartMetricKind === "density"
-                          ? `${chartThreshold}/leaf threshold`
-                          : `${chartThreshold}% threshold`}
-                    </text>
-                    <polyline points={scaled.points} fill="none" stroke="var(--danger)" strokeWidth={2} />
-                    {densities.map((v, i) => (
-                      <circle key={i} cx={toX(i)} cy={toY(v)} r={2.5} fill="var(--danger)" />
-                    ))}
-                    {chronological.map((s, i) => {
-                      if (i !== 0 && i !== chronological.length - 1) return null;
-                      const x = chronological.length === 1 ? 110 : 4 + (i * (220 - 8)) / (chronological.length - 1);
-                      return (
-                        <text
-                          key={s.id}
-                          x={x}
-                          y={60}
-                          textAnchor={i === 0 ? "start" : "end"}
-                          className="font-mono"
-                          fontSize={7}
-                          fill="var(--text-faint)"
-                        >
-                          {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                        </text>
-                      );
-                    })}
-                  </>
-                );
-              })()}
-            </svg>
-            <div className="flex flex-wrap gap-6">
-              <div>
-                <div className="text-2xl font-semibold">
-                  {chartMetricKind === "density" ? latestDensity.toFixed(1) : `${Math.round(latestDensity)}%`}
-                </div>
-                <div className="text-xs text-[var(--text-dim)]">{chartMetricKind === "density" ? "latest pests/leaf" : "latest infested"}</div>
+          <EventChart
+            chronological={chronological.map((s) => ({ id: s.id, date: s.date, value: s.value }))}
+            metricKind={chartMetricKind}
+            threshold={chartThreshold}
+            presenceTriggered={thresholds.presenceTriggered}
+            treatments={treatmentsList.map((t) => ({ id: t.id, type: t.type, product: t.product, loggedBy: t.loggedBy, appliedAt: t.appliedAt }))}
+            detectedAt={event.createdAt}
+          />
+          <div className="flex flex-wrap gap-6">
+            <div>
+              <div className="text-2xl font-semibold">
+                {chartMetricKind === "density" ? latestDensity.toFixed(1) : `${Math.round(latestDensity)}%`}
               </div>
-              {changeVsBaseline != null && (
-                <div>
-                  <div className={`text-2xl font-semibold ${changeVsBaseline >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
-                    {changeVsBaseline >= 0 ? "▼" : "▲"} {Math.abs(changeVsBaseline)}%
-                  </div>
-                  <div className="text-xs text-[var(--text-dim)]">vs first session</div>
-                </div>
-              )}
-              {SHOW_SESSIONS_LOGGED_STAT && (
-                <div>
-                  <div className="text-2xl font-semibold">{densities.length}</div>
-                  <div className="text-xs text-[var(--text-dim)]">sessions logged</div>
-                </div>
-              )}
+              <div className="text-xs text-[var(--text-dim)]">{chartMetricKind === "density" ? "latest pests/leaf" : "latest infested"}</div>
             </div>
+            {changeVsBaseline != null && (
+              <div>
+                <div className={`text-2xl font-semibold ${changeVsBaseline >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
+                  {changeVsBaseline >= 0 ? "▼" : "▲"} {Math.abs(changeVsBaseline)}%
+                </div>
+                <div className="text-xs text-[var(--text-dim)]">vs first session</div>
+              </div>
+            )}
+            {SHOW_SESSIONS_LOGGED_STAT && (
+              <div>
+                <div className="text-2xl font-semibold">{densities.length}</div>
+                <div className="text-xs text-[var(--text-dim)]">sessions logged</div>
+              </div>
+            )}
           </div>
           {SHOW_THRESHOLD_CONFIDENCE && thresholdConfidenceLabel && (
             <div className="text-xs text-[var(--text-faint)]">Threshold confidence: {thresholdConfidenceLabel}</div>

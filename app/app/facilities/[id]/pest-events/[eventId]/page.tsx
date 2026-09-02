@@ -33,7 +33,25 @@ export default async function PestEventPage({
   const area = event.facilityAreaId
     ? (await db.select().from(facilityAreas).where(eq(facilityAreas.id, event.facilityAreaId)))[0]
     : null;
-  const eventTreatments = await db.select().from(treatments).where(eq(treatments.pestEventId, eventId));
+  // Left-joined for the per-event chart's treatment markers (Airtable
+  // ticket B4, "tapping shows date/logger/product") -- null for treatments
+  // logged before operatorUserId existed, or a since-deleted account, same
+  // "just omit rather than show a broken name" rule as loggedByName below.
+  const eventTreatments = await db
+    .select({
+      id: treatments.id,
+      type: treatments.type,
+      product: treatments.product,
+      targetPest: treatments.targetPest,
+      notes: treatments.notes,
+      appliedAt: treatments.appliedAt,
+      inventoryItemId: treatments.inventoryItemId,
+      operatorName: authUsers.name,
+      operatorEmail: authUsers.email,
+    })
+    .from(treatments)
+    .leftJoin(authUsers, eq(treatments.operatorUserId, authUsers.id))
+    .where(eq(treatments.pestEventId, eventId));
   const photos = await db.select().from(observationPhotos).where(eq(observationPhotos.pestEventId, eventId));
   const monitoringSessions = await db
     .select()
@@ -128,6 +146,7 @@ export default async function PestEventPage({
           targetPest: t.targetPest,
           notes: t.notes,
           appliedAt: t.appliedAt.toISOString(),
+          loggedBy: t.operatorName ?? t.operatorEmail ?? null,
         }))}
         initialPhotos={photos.map((p) => ({ id: p.id, blobUrl: p.blobUrl, caption: p.caption }))}
         initialComments={comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
