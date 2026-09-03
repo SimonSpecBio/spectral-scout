@@ -70,6 +70,7 @@ interface MonitoringSession {
   date: string;
   metricKind: MetricKind;
   value: number;
+  assessmentType: "pest_count" | "disease_severity";
 }
 
 interface Event {
@@ -460,9 +461,22 @@ export default function PestEventDetail({
   // both on one line would be meaningless. Keep only the run of sessions
   // that share the LATEST session's metric kind, same "skip rather than
   // mix scales" rule computeEscalationAlerts applies.
+  //
+  // A pathogen event needs a stronger rule than "match the latest kind":
+  // its real trend is always the disease_severity assessment (a leafGrid
+  // occupancy %), so a single stray pest_count reading logged against it
+  // (the generic "+New" monitoring flow doesn't force disease events into
+  // the disease-specific form) was enough to either get excluded itself or,
+  // worse, silently keep the whole event under MIN_SESSIONS_FOR_CHART
+  // forever even with real disease history (found in QA, 2026-09-03: a
+  // pathogen event with 3 real sessions -- 2 disease, 1 stray pest_count --
+  // never showed a chart at all). Pathogen events only ever chart their own
+  // disease_severity sessions; pest events keep the original behavior.
   const chronologicalAll = [...initialMonitoring].reverse();
-  const chartMetricKind: MetricKind | null = chronologicalAll.length > 0 ? chronologicalAll[chronologicalAll.length - 1].metricKind : null;
-  const chronological = chartMetricKind ? chronologicalAll.filter((s) => s.metricKind === chartMetricKind) : [];
+  const relevantSessions =
+    event.kind === "pathogen" ? chronologicalAll.filter((s) => s.assessmentType === "disease_severity") : chronologicalAll;
+  const chartMetricKind: MetricKind | null = relevantSessions.length > 0 ? relevantSessions[relevantSessions.length - 1].metricKind : null;
+  const chronological = chartMetricKind ? relevantSessions.filter((s) => s.metricKind === chartMetricKind) : [];
   const densities = chronological.map((s) => s.value);
   // 0 for a presence-triggered species -- draws the reference line at the
   // floor instead of a numeric threshold that isn't the real rule for

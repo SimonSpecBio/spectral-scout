@@ -185,7 +185,7 @@ export default async function PestEventPage({
         isPilotTier={session.accountTier === "pilot"}
         initialMonitoring={monitoringSessions.flatMap((s) => {
           const metric = sessionMetric(s);
-          return metric ? [{ id: s.id, date: s.date, metricKind: metric.kind, value: metric.value }] : [];
+          return metric ? [{ id: s.id, date: s.date, metricKind: metric.kind, value: metric.value, assessmentType: s.assessmentType }] : [];
         })}
         inventoryItems={items.map((i) => ({
           id: i.id,
