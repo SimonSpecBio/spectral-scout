@@ -192,7 +192,7 @@ export default function CountsFlow({
           : total === 0 && confirmingZero
             ? "Confirm 0 pests found"
             : facilities
-              ? "Log location"
+              ? "Select location"
               : "Submit session"}
       </button>
       <div className="text-center text-xs text-[var(--text-dim)]">

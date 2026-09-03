@@ -213,7 +213,7 @@ export default function NewEventForm({
           </div>
         )}
         <SubmitButton disabled={submitting || !species.trim() || facilities.length === 0} variant="floating">
-          {submitting ? "Logging…" : "Log location"}
+          {submitting ? "Logging…" : "Select location"}
         </SubmitButton>
         <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
       </form>

@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 const VALUE_PROPS = [
   "Log scouting rounds and map hotspots in seconds",
   "Track treatments, REI/PHI, and inventory automatically",
-  "Free forever",
+  "Free, no card required.",
 ];
 
 // Public landing page -- unlike the other three apps, this one is a

@@ -17,11 +17,7 @@ export default async function PreventivePage() {
           ← Home
         </Link>
         <h1 className="text-2xl font-semibold">Preventive checklist</h1>
-        <p className="mt-1 text-sm text-[var(--text-dim)]">
-          No infestation history yet, so there&apos;s nothing personalized to show you -- these are the same early-warning
-          signs and preventive practices the app recommends after a pest event, surfaced up front instead of only
-          reactively.
-        </p>
+        <p className="mt-1 text-sm text-[var(--text-dim)]">General checklist for common pests and pathogens.</p>
       </div>
 
       {pests.length > 0 && (

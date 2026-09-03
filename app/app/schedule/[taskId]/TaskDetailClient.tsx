@@ -70,7 +70,7 @@ export default function TaskDetailClient({
             className="flex h-9 w-9 items-center justify-center rounded-full text-xs"
             style={{ background: "var(--chip-bg)", color: "var(--text-dim)" }}
           >
-            {current ? initialsFor(current.name, current.email) : "—"}
+            {current ? initialsFor(current.name, current.email) : "-"}
           </span>
           <span className="text-sm">{current ? (current.name ?? current.email) : "Unassigned"}</span>
         </div>

@@ -186,7 +186,7 @@ export async function maybeScheduleKeepAnEyeRecheck(params: {
   const assigneeUserId = await assignLeastLoadedWorker(organizationId);
   await db.insert(tasks).values({
     organizationId,
-    title: `Keep an eye on ${[pestSpecies, locationLabel].filter(Boolean).join(" — ") || "this area"}`,
+    title: `Keep an eye on ${[pestSpecies, locationLabel].filter(Boolean).join(", ") || "this area"}`,
     type: "monitor",
     facilityId,
     facilityAreaId,

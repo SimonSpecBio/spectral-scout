@@ -251,7 +251,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // own condition, so the area is always resolvable here.
     const [severeArea] = await db.select({ name: facilityAreas.name }).from(facilityAreas).where(eq(facilityAreas.id, facilityAreaId));
     const location = locationLabel(row.x, row.y, severeArea?.name ?? null);
-    const suffix = location ? ` — ${location}` : "";
+    const suffix = location ? `, ${location}` : "";
     const assigneeUserId = await assignLeastLoadedWorker(session.organizationId!);
 
     const [recheckTask] = await db

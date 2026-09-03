@@ -498,7 +498,11 @@ export default function PestEventDetail({
             className="rounded-md border px-3 py-1.5 text-sm"
             style={{ borderColor: SEVERITY_COLOR[event.severity], color: SEVERITY_COLOR[event.severity] }}
           >
-            <span className="capitalize">{event.severity}</span> severity
+            {/* "Severe severity" reads redundantly -- only append the word
+                "severity" for the non-severe levels (ticket feedback,
+                2026-09-03). */}
+            <span className="capitalize">{event.severity}</span>
+            {event.severity !== "severe" && " severity"}
           </span>
           {shareableMembers.length > 0 && (
             <button
@@ -580,7 +584,7 @@ export default function PestEventDetail({
       {densities.length >= MIN_SESSIONS_FOR_CHART && chartMetricKind ? (
         <div className="card flex flex-col gap-3 p-4">
           <div className="flex items-center justify-between">
-            <span className="label-mono">Infestation over time</span>
+            <span className="label-mono">Pest event history</span>
             <span className="text-xs text-[var(--text-dim)]">{chartMetricKind === "density" ? "Pests/leaf" : "% infested"}</span>
           </div>
           <EventChart
@@ -603,7 +607,7 @@ export default function PestEventDetail({
                 <div className={`text-2xl font-semibold ${changeVsBaseline >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
                   {changeVsBaseline >= 0 ? "▼" : "▲"} {Math.abs(changeVsBaseline)}%
                 </div>
-                <div className="text-xs text-[var(--text-dim)]">vs first session</div>
+                <div className="text-xs text-[var(--text-dim)]">since detection</div>
               </div>
             )}
             {SHOW_SESSIONS_LOGGED_STAT && (
@@ -713,7 +717,7 @@ export default function PestEventDetail({
           className="card flex items-center justify-between p-4 text-left disabled:opacity-60"
         >
           <div>
-            <div className="label-mono">{lastTreatment?.product ? "Quick log — repeat last" : "Quick log — recommended"}</div>
+            <div className="label-mono">{lastTreatment?.product ? "Quick log: repeat last" : "Quick log: recommended"}</div>
             <div className="text-sm">{quickLog.product}</div>
           </div>
           <span className="shrink-0 rounded-md bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--on-accent)]">
@@ -726,7 +730,7 @@ export default function PestEventDetail({
         <div className="card flex items-center gap-3 p-4" style={{ background: "var(--success-bg)", border: "0.5px solid var(--success-border)" }}>
           <span style={{ color: "var(--success)" }}>✓</span>
           <div className="flex-1 text-sm">
-            Auto-resolved — the last two monitoring sessions came back under threshold, no infestation left to track.
+            Auto-resolved. The last two monitoring sessions came back under threshold, no infestation left to track.
           </div>
           <button onClick={toggleStatus} className="shrink-0 text-xs text-[var(--text-dim)] underline">
             Not resolved? Reopen
@@ -887,12 +891,15 @@ export default function PestEventDetail({
               )}
             {treatmentType === "spectral_light" && (
               <>
-                <input
-                  value={fixtureId}
-                  onChange={(e) => setFixtureId(e.target.value)}
-                  placeholder="Fixture ID (optional)"
-                  className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-                />
+                <label className="flex flex-col gap-1 text-sm text-[var(--text-dim)]">
+                  Fixture ID (optional)
+                  <input
+                    value={fixtureId}
+                    onChange={(e) => setFixtureId(e.target.value)}
+                    placeholder="e.g. RL-890013"
+                    className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
+                  />
+                </label>
                 <div className="flex flex-col gap-2">
                   <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
                     Mins after dark
@@ -977,7 +984,7 @@ export default function PestEventDetail({
               >
                 {submittingTreatment ? "Logging…" : "Log application"}
               </button>
-              {treatmentQueued && <span className="text-xs text-[var(--text-dim)]">Saved offline — will sync</span>}
+              {treatmentQueued && <span className="text-xs text-[var(--text-dim)]">Saved offline, will sync</span>}
             </div>
           </form>
 
@@ -1101,7 +1108,7 @@ export default function PestEventDetail({
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs"
                     style={{ background: "var(--chip-bg)", color: "var(--text-dim)" }}
                   >
-                    {c.authorUserId ? initialsFor(c.authorName, c.authorEmail ?? "") : "—"}
+                    {c.authorUserId ? initialsFor(c.authorName, c.authorEmail ?? "") : "-"}
                   </span>
                   <div className="flex flex-col gap-0.5">
                     <div className="flex items-center gap-2 text-xs text-[var(--text-dim)]">

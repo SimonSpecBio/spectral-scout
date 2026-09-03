@@ -73,7 +73,7 @@ export default function OnboardingForm({ initialName, needsProfile }: { initialN
           </div>
         )}
         <SubmitButton onClick={acceptAndSubmit} disabled={submitting}>
-          {submitting ? "Saving…" : "I Agree — Continue"}
+          {submitting ? "Saving…" : "I Agree & Continue"}
         </SubmitButton>
       </div>
     );
@@ -150,7 +150,7 @@ export default function OnboardingForm({ initialName, needsProfile }: { initialN
                 Cancel
               </button>
               <SubmitButton onClick={acceptAndSubmit} disabled={submitting}>
-                {submitting ? "Saving…" : "I Agree — Continue"}
+                {submitting ? "Saving…" : "I Agree & Continue"}
               </SubmitButton>
             </div>
           </div>

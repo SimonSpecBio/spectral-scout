@@ -98,7 +98,7 @@ export default function PwaRegister() {
         transform: stackPosition > 0 ? `translateY(-${stackPosition * 4.5}rem)` : undefined,
       }}
     >
-      Update available — tap to refresh
+      Update available. Tap to refresh
     </button>
   );
 }

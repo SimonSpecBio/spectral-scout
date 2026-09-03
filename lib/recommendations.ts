@@ -70,7 +70,7 @@ export function computeFollowUpSuggestions(params: {
       label: `Preventive ${agent.name} release`,
       sub: `Recurring every ${agent.reintroDays} days`,
       task: {
-        title: `Preventive release: ${agent.name} — ${params.locationLabel}`,
+        title: `Preventive release: ${agent.name}, ${params.locationLabel}`,
         type: "release",
         dueInDays: agent.reintroDays,
         repeatEveryDays: agent.reintroDays,
@@ -83,7 +83,7 @@ export function computeFollowUpSuggestions(params: {
     label: "Weekly scouting cadence",
     sub: `Keep an eye on ${params.locationLabel} going forward`,
     task: {
-      title: `Scout — ${params.locationLabel}`,
+      title: `Scout: ${params.locationLabel}`,
       type: "scout",
       dueInDays: 7,
       repeatEveryDays: 7,

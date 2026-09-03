@@ -392,7 +392,9 @@ export default async function HomePage({
           <div className="flex min-w-0 flex-col gap-2">
             {facilitiesNeedingAttention > 0 && (
               <span className="label-mono whitespace-nowrap" style={{ color: "var(--accent)" }}>
-                {facilitiesNeedingAttention} of {orgFacilities.length} sites need attention
+                {facilitiesNeedingAttention === orgFacilities.length
+                  ? "All sites need attention"
+                  : `${facilitiesNeedingAttention} of ${orgFacilities.length} sites need attention`}
               </span>
             )}
             <div className="flex gap-2 overflow-x-auto">
@@ -512,7 +514,7 @@ export default async function HomePage({
                       style={{ background: SEVERITY_COLOR[bandFromMetric(a.metricKind, a.value)] }}
                     />
                     <div className="flex-1">
-                      <div className="text-sm">Scouting log over threshold — confirm?</div>
+                      <div className="text-sm">Scouting log over threshold. Confirm?</div>
                       <div className="label-mono">
                         {(trapAreaNameById.get(a.facilityAreaId) ?? "").toUpperCase()} &middot;{" "}
                         {metricLabel({ kind: a.metricKind, value: a.value }).toUpperCase()}
@@ -558,7 +560,7 @@ export default async function HomePage({
                       style={{ background: SEVERITY_COLOR[eventSeverityById.get(a.eventId) ?? bandFromMetric(a.metricKind, a.latestValue)] }}
                     />
                     <div className="flex-1">
-                      <div className="text-sm">{displayNameForPestSpecies(a.pestSpecies)} not improving — try a different tier?</div>
+                      <div className="text-sm">{displayNameForPestSpecies(a.pestSpecies)} not improving. Try a different tier?</div>
                       <div className="label-mono">
                         {metricLabel({ kind: a.metricKind, value: a.baselineValue }).toUpperCase()} →{" "}
                         {metricLabel({ kind: a.metricKind, value: a.latestValue }).toUpperCase()} AFTER {a.daysSinceTreatment}D

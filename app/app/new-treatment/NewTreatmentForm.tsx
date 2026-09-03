@@ -244,7 +244,7 @@ export default function NewTreatmentForm({
                 <input
                   value={fixtureId}
                   onChange={(e) => setFixtureId(e.target.value)}
-                  placeholder="Fixture ID (optional)"
+                  placeholder="e.g. RL-890013"
                   className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
                 />
               </FormField>
@@ -286,7 +286,7 @@ export default function NewTreatmentForm({
             <input
               value={targetPest}
               onChange={(e) => setTargetPest(e.target.value)}
-              placeholder="Target pest (optional)"
+              placeholder="e.g. spider mites"
               className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
             />
           </FormField>
@@ -316,7 +316,7 @@ export default function NewTreatmentForm({
         )}
 
         <SubmitButton disabled={submitting || facilities.length === 0} variant="floating">
-          {submitting ? "Logging…" : "Log location"}
+          {submitting ? "Logging…" : "Select location"}
         </SubmitButton>
         <div className="text-center text-xs text-[var(--text-dim)]">Draft saves automatically as you go.</div>
       </form>

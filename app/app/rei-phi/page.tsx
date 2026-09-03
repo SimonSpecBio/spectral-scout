@@ -76,7 +76,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--danger)" }} />
-                      <span className="truncate">{r.bay} — no entry</span>
+                      <span className="truncate">{r.bay}: no entry</span>
                     </div>
                     <div className="truncate text-xs text-[var(--text-dim)]">
                       {r.product} applied {r.appliedAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} · REI {r.reiHours}h
@@ -95,7 +95,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--warning)" }} />
-                      <span className="truncate">{r.bay} — no harvest</span>
+                      <span className="truncate">{r.bay}: no harvest</span>
                     </div>
                     <div className="truncate text-xs text-[var(--text-dim)]">
                       {r.product} · PHI {r.phiDays}d

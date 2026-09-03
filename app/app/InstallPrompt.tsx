@@ -87,7 +87,7 @@ export default function InstallPrompt() {
     >
       {showIosTip ? (
         <div className="flex-1 text-xs text-[var(--text-dim)]">
-          Add Spectral to your home screen — tap <span className="text-[var(--text)]">Share ↗</span> then{" "}
+          Add Spectral to your home screen: tap <span className="text-[var(--text)]">Share ↗</span> then{" "}
           <span className="text-[var(--text)]">&ldquo;Add to Home Screen&rdquo;</span>.
         </div>
       ) : (

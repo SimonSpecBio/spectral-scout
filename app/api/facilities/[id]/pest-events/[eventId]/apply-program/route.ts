@@ -70,7 +70,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     ? (await db.select({ name: facilityAreas.name }).from(facilityAreas).where(eq(facilityAreas.id, event.facilityAreaId)))[0]
     : null;
   const location = locationLabel(event.x, event.y, area?.name ?? null);
-  const suffix = location ? ` — ${location}` : "";
+  const suffix = location ? `, ${location}` : "";
   const createdTasks = [];
 
   if (program?.followUp) {

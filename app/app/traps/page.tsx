@@ -155,7 +155,7 @@ export default async function TrapsPage({
                   )}
                   <div className="text-right">
                     <div className="text-sm" style={{ color: s.overThreshold ? "var(--danger)" : undefined }}>
-                      {latest ? latest.catchPerDay.toFixed(1) : "—"}
+                      {latest ? latest.catchPerDay.toFixed(1) : "-"}
                     </div>
                     <div className="label-mono">/DAY</div>
                   </div>

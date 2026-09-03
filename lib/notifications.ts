@@ -62,7 +62,7 @@ export async function computeNotifications(organizationId: string, userId: strin
     notifications.push({
       id: `trap-${a.trapId}`,
       kind: "trap",
-      title: `${a.trapLabel} spike — confirm?`,
+      title: `${a.trapLabel} spike. Confirm?`,
       sub: `${a.catchPerDay.toFixed(1)}/day ${a.pestSpecies}`,
       at: a.readingAt,
       href: `/app/traps?facility=${a.facilityId}`,
@@ -74,7 +74,7 @@ export async function computeNotifications(organizationId: string, userId: strin
     notifications.push({
       id: `scouting-${a.observationId}`,
       kind: "scouting",
-      title: `Scouting log over threshold — confirm?`,
+      title: `Scouting log over threshold. Confirm?`,
       sub: metricLabel({ kind: a.metricKind, value: a.value }),
       at: a.at,
       href: scoutingAlertConfirmHref(a),
@@ -86,7 +86,7 @@ export async function computeNotifications(organizationId: string, userId: strin
     notifications.push({
       id: `escalation-${a.eventId}`,
       kind: "escalation",
-      title: `${a.pestSpecies} not improving — try a different tier?`,
+      title: `${a.pestSpecies} not improving. Try a different tier?`,
       sub: `${metricLabel({ kind: a.metricKind, value: a.baselineValue })} → ${metricLabel({ kind: a.metricKind, value: a.latestValue })} after ${a.daysSinceTreatment}d`,
       at: a.at,
       href: `/app/facilities/${a.facilityId}/pest-events/${a.eventId}?tab=recommended`,
@@ -100,7 +100,7 @@ export async function computeNotifications(organizationId: string, userId: strin
       id: `lowstock-${i.id}`,
       kind: "lowstock",
       title: `${i.name} low stock`,
-      sub: `${Number(i.quantity)} ${i.unit === "units" ? "" : i.unit} left — reorder`,
+      sub: `${Number(i.quantity)} ${i.unit === "units" ? "" : i.unit} left, reorder`,
       at: i.createdAt,
       href: "/app/inventory",
     });

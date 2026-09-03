@@ -363,7 +363,7 @@ export default function MonitoringFlow({
         disabled={submitting || agg.leavesChecked === 0 || (!!facilities && facilities.length === 0)}
         className="btn-location fixed inset-x-4 bottom-24 z-40 mx-auto max-w-xs rounded-xl py-3.5 text-sm font-medium shadow-lg disabled:opacity-50 lg:bottom-6"
       >
-        {submitting ? (facilities ? "Logging…" : "Submitting…") : facilities ? "Log location" : "Submit session"}
+        {submitting ? (facilities ? "Logging…" : "Submitting…") : facilities ? "Select location" : "Submit session"}
       </button>
       <div className="text-center text-xs text-[var(--text-dim)]">
         {/* Unlike Counts' fixed 5-leaf tally (a 0 total is still a real,

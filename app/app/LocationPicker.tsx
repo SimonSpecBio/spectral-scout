@@ -54,7 +54,6 @@ export default function LocationPicker({
   initialAreaId,
   initialX,
   initialY,
-  step,
   pinRequired = true,
 }: {
   facilities: PickerFacility[];
@@ -72,11 +71,9 @@ export default function LocationPicker({
   // location selected," same "starting point, not a lock" rule as above.
   initialX?: number;
   initialY?: number;
-  // Every creation flow that hands off here is "fill the form, then place
-  // location" -- the only cue that a further step exists used to be the
-  // form's own button label ("Log location"). Optional so callers with no
-  // real multi-step context (a deep link that skips straight here) aren't
-  // forced to fake one.
+  // No longer rendered ("Step X of Y" wasn't useful information to the
+  // grower, per direct feedback 2026-09-03) -- kept accepted-but-unused
+  // rather than ripped out of every caller for a purely cosmetic removal.
   step?: { current: number; total: number };
   // Trap readings log against every trap already placed in an area, not one
   // new pin -- there's nothing to tap on the bay map for that caller, just
@@ -141,11 +138,6 @@ export default function LocationPicker({
         </button>
         <div className="flex flex-col items-center">
           <span className="text-sm font-medium">Place location</span>
-          {step && (
-            <span className="label-mono text-[var(--text-faint)]">
-              STEP {step.current} OF {step.total}
-            </span>
-          )}
         </div>
         <span className="w-9" />
       </div>

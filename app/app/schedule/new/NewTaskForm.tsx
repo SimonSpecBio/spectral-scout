@@ -70,7 +70,7 @@ export default function NewTaskForm({
             autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Release P. persimilis — Bay A1"
+            placeholder="Release P. persimilis, Bay A1"
             required
             className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
           />
@@ -162,7 +162,7 @@ export default function NewTaskForm({
               className="flex h-9 w-9 items-center justify-center rounded-full border text-xs"
               style={{ borderColor: assigneeUserId === "" ? "var(--accent)" : "var(--border-soft)", color: "var(--text-dim)" }}
             >
-              —
+              -
             </span>
             <span className="text-[10px] text-[var(--text-dim)]">Unassigned</span>
           </button>
