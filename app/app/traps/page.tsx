@@ -138,7 +138,10 @@ export default async function TrapsPage({
             const alert = alertByTrapId.get(s.trap.id);
             return (
               <div key={s.trap.id} className="flex flex-col" style={s.overThreshold ? { background: "var(--danger-bg)" } : undefined}>
-                <div className="flex items-center gap-3 p-3.5">
+                <Link
+                  href={`/app/log-trap-readings?facility=${selectedFacility.id}&area=${s.trap.facilityAreaId}`}
+                  className="flex items-center gap-3 p-3.5"
+                >
                   {s.overThreshold && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--danger)" }} />}
                   <div className="flex-1">
                     <div className="text-sm">{s.trap.label}</div>
@@ -160,7 +163,7 @@ export default async function TrapsPage({
                     </div>
                     <div className="label-mono">/DAY</div>
                   </div>
-                </div>
+                </Link>
                 {alert && (
                   <Link
                     href={

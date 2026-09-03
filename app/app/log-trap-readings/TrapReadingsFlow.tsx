@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
@@ -24,31 +24,48 @@ export default function TrapReadingsFlow({
   presetAreaId?: string;
 }) {
   const router = useRouter();
-  const [target, setTarget] = useState<{ facilityId: string; areaId: string } | null>(null);
+  // Arriving here already knowing exactly which area's traps to log (tapped
+  // in from the Traps page, which always has both preset) skips the picker
+  // entirely instead of making the grower re-confirm a site/area they just
+  // came from -- ticket found in QA, 2026-09-03: the count-entry screen
+  // existed all along, it just took too many taps to discover/reach.
+  const [target, setTarget] = useState<{ facilityId: string; areaId: string } | null>(() =>
+    presetFacilityId && presetAreaId ? { facilityId: presetFacilityId, areaId: presetAreaId } : null
+  );
   const [traps, setTraps] = useState<Trap[] | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Derived, not a separate state var to manually toggle -- "loading" is
+  // exactly "have a target, but no traps and no error back yet".
+  const loading = target !== null && traps === null && error === null;
 
-  async function handleConfirm(facilityId: string, areaId: string) {
-    setTarget({ facilityId, areaId });
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/facilities/${facilityId}/areas/${areaId}/traps`);
-      if (!res.ok) throw new Error();
-      const rows = (await res.json()) as { id: string; label: string; x: number; y: number }[];
-      setTraps(rows.map((t) => ({ id: t.id, label: t.label, bay: bayLabel(nearestBay(t.x, t.y)) })));
-    } catch {
-      setError("Couldn't load traps for this area. Check your connection and try again.");
-    }
-    setLoading(false);
-  }
+  useEffect(() => {
+    if (!target) return;
+    let cancelled = false;
+    fetch(`/api/facilities/${target.facilityId}/areas/${target.areaId}/traps`)
+      .then((res) => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then((rows: { id: string; label: string; x: number; y: number }[]) => {
+        if (cancelled) return;
+        setTraps(rows.map((t) => ({ id: t.id, label: t.label, bay: bayLabel(nearestBay(t.x, t.y)) })));
+      })
+      .catch(() => {
+        if (!cancelled) setError("Couldn't load traps for this area. Check your connection and try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [target]);
 
   if (!target) {
     return (
       <LocationPicker
         facilities={facilities}
-        onConfirm={handleConfirm}
+        onConfirm={(facilityId, areaId) => {
+          setError(null);
+          setTarget({ facilityId, areaId });
+        }}
         onCancel={() => router.back()}
         pinRequired={false}
         initialFacilityId={presetFacilityId}
