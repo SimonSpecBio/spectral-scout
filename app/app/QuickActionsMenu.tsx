@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 // Exactly four items per ARCHITECTURE.md section 5b's create sheet -- trap
 // reading isn't a separate entry here anymore: it's reached from the Traps
@@ -24,6 +25,14 @@ const ACTIONS = [
 export default function QuickActionsMenu({ variant }: { variant: "center" | "sidebar" }) {
   const [open, setOpen] = useState(false);
   const isSidebar = variant === "sidebar";
+  // This menu lives in the persistent nav shell, not the page it opens over
+  // -- navigating away any other way than clicking one of its own Links
+  // (a different bottom-nav tab, the browser back button) left it still
+  // rendered on top of the new screen, since nothing was watching for the
+  // route itself changing (ticket found in QA, 2026-09-03).
+  const pathname = usePathname();
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setOpen(false), [pathname]);
 
   if (isSidebar) {
     return (
