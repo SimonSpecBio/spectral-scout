@@ -268,7 +268,7 @@ export const PRODUCTS: Product[] = [
 
 export const PESTS: PestProgram[] = [
   {
-    id: "pest_tssm", commonName: "Two-spotted spider mite", latin: "Tetranychus urticae", kind: "pest",
+    id: "pest_tssm", commonName: "Two-spotted spider mites", latin: "Tetranychus urticae", kind: "pest",
     preventive: ["Scout undersides weekly (hand lens)", "Keep humidity up / avoid hot-dry stress", "Release Neoseiulus californicus or Amblyseius andersoni preventively"],
     primaryBiocontrol: ["ag_persimilis", "ag_feltiella"],
     biopesticideRotation: ["pr_insecticidal_soap", "pr_hort_oil", "pr_beauveria"],
@@ -289,7 +289,7 @@ export const PESTS: PestProgram[] = [
     defaultDensityThreshold: 7,
   },
   {
-    id: "pest_broadmite", commonName: "Broad / hemp russet mite", latin: "Polyphagotarsonemus latus / Aculops cannabicola", kind: "pest",
+    id: "pest_broadmite", commonName: "Broad / hemp russet mites", latin: "Polyphagotarsonemus latus / Aculops cannabicola", kind: "pest",
     preventive: ["Inspect new growth (30-60x scope)", "Quarantine incoming clones", "Preventive Amblyseius swirskii / Amblyseius andersoni"],
     primaryBiocontrol: ["ag_swirskii", "ag_cucumeris"],
     biopesticideRotation: ["pr_sulfur", "pr_hort_oil", "pr_isaria"],
@@ -303,7 +303,7 @@ export const PESTS: PestProgram[] = [
     presenceTriggered: true,
   },
   {
-    id: "pest_thrips", commonName: "Western flower thrips", latin: "Frankliniella occidentalis", kind: "pest",
+    id: "pest_thrips", commonName: "Thrips", latin: "Frankliniella occidentalis", kind: "pest",
     preventive: ["Blue sticky cards for monitoring", "Preventive Neoseiulus cucumeris / Amblyseius swirskii sachets", "Steinernema feltiae or Stratiolaelaps scimitus for soil pupae"],
     primaryBiocontrol: ["ag_swirskii", "ag_orius", "ag_cucumeris"],
     biopesticideRotation: ["pr_beauveria", "pr_spinosad", "pr_insecticidal_soap"],
@@ -313,7 +313,7 @@ export const PESTS: PestProgram[] = [
     cautions: ["Vectors viruses", "Spinosad: rotate, limited uses, harms beneficials when wet"],
   },
   {
-    id: "pest_aphid", commonName: "Aphids (green peach / cannabis aphid)", latin: "Myzus persicae / Phorodon cannabis", kind: "pest",
+    id: "pest_aphid", commonName: "Aphids", latin: "Myzus persicae / Phorodon cannabis", kind: "pest",
     preventive: ["Yellow cards", "Banker plants for Aphidius colemani", "Scout growing tips + undersides"],
     primaryBiocontrol: ["ag_aphidius_col", "ag_aphidoletes", "ag_lacewing"],
     biopesticideRotation: ["pr_insecticidal_soap", "pr_hort_oil", "pr_beauveria"],
@@ -323,7 +323,7 @@ export const PESTS: PestProgram[] = [
     cautions: ["Cannabis aphid can be cryptic on stems", "Preserve mummies (parasitized aphids) -- don't spray over them"],
   },
   {
-    id: "pest_whitefly", commonName: "Whitefly", latin: "Trialeurodes vaporariorum / Bemisia tabaci", kind: "pest",
+    id: "pest_whitefly", commonName: "Whiteflies", latin: "Trialeurodes vaporariorum / Bemisia tabaci", kind: "pest",
     preventive: ["Yellow cards", "Preventive Encarsia formosa / Amblyseius swirskii", "Screen intakes; inspect clones"],
     primaryBiocontrol: ["ag_encarsia", "ag_eretmocerus", "ag_delphastus", "ag_swirskii"],
     biopesticideRotation: ["pr_beauveria", "pr_isaria", "pr_insecticidal_soap", "pr_hort_oil"],
@@ -381,7 +381,7 @@ export const PESTS: PestProgram[] = [
     defaultOccupancyPctThreshold: 2,
   },
   {
-    id: "path_botrytis", commonName: "Botrytis / gray mold (bud rot)", latin: "Botrytis cinerea", kind: "pathogen",
+    id: "path_botrytis", commonName: "Botrytis / gray mold", latin: "Botrytis cinerea", kind: "pathogen",
     preventive: ["RH <50% in flower + airflow", "Defoliate/open canopy", "Preventive Bacillus subtilis / B. amyloliquefaciens or Clonostachys rosea"],
     primaryBiocontrol: ["ag_clonostachys"],
     biopesticideRotation: ["pr_bacillus_sub"],

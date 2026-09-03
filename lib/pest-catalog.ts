@@ -22,7 +22,7 @@ export interface CatalogPest {
 export const PEST_CATALOG: CatalogPest[] = [
   {
     id: "pest_tssm",
-    commonName: "Two-spotted spider mite",
+    commonName: "Two-spotted spider mites",
     latin: "Tetranychus urticae",
     kind: "pest",
     monitoringMethod: "plant_sampling",
@@ -30,7 +30,7 @@ export const PEST_CATALOG: CatalogPest[] = [
   },
   {
     id: "pest_broadmite",
-    commonName: "Broad / hemp russet mite",
+    commonName: "Broad / hemp russet mites",
     latin: "Polyphagotarsonemus latus / Aculops cannabicola",
     kind: "pest",
     monitoringMethod: "plant_sampling",
@@ -38,7 +38,7 @@ export const PEST_CATALOG: CatalogPest[] = [
   },
   {
     id: "pest_thrips",
-    commonName: "Western flower thrips",
+    commonName: "Thrips",
     latin: "Frankliniella occidentalis",
     kind: "pest",
     monitoringMethod: "sticky_trap",
@@ -46,7 +46,7 @@ export const PEST_CATALOG: CatalogPest[] = [
   },
   {
     id: "pest_aphid",
-    commonName: "Aphids (green peach / cannabis aphid)",
+    commonName: "Aphids",
     latin: "Myzus persicae / Phorodon cannabis",
     kind: "pest",
     monitoringMethod: "plant_sampling",
@@ -54,7 +54,7 @@ export const PEST_CATALOG: CatalogPest[] = [
   },
   {
     id: "pest_whitefly",
-    commonName: "Whitefly",
+    commonName: "Whiteflies",
     latin: "Trialeurodes vaporariorum / Bemisia tabaci",
     kind: "pest",
     monitoringMethod: "sticky_trap",
@@ -86,7 +86,7 @@ export const PEST_CATALOG: CatalogPest[] = [
   },
   {
     id: "path_botrytis",
-    commonName: "Botrytis / gray mold (bud rot)",
+    commonName: "Botrytis / gray mold",
     latin: "Botrytis cinerea",
     kind: "pathogen",
     monitoringMethod: "disease_assessment",

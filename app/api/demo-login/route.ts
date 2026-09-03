@@ -192,7 +192,7 @@ async function ensureDemoFacility(organizationId: string, userId: string) {
       pestEventId: tssmEvent.id,
       type: "biological",
       product: "Phytoseiulus persimilis",
-      targetPest: "Two-spotted spider mite",
+      targetPest: "Two-spotted spider mites",
       operatorUserId: userId,
       minutesSpent: 15,
     });
@@ -201,7 +201,7 @@ async function ensureDemoFacility(organizationId: string, userId: string) {
       pestEventId: tssmEvent.id,
       type: "spectral_light",
       product: "Spectral Pesticidal Light",
-      targetPest: "Two-spotted spider mite",
+      targetPest: "Two-spotted spider mites",
       operatorUserId: userId,
       minutesSpent: 5,
     });
