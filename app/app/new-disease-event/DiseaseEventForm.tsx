@@ -155,6 +155,7 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
             }}
             placeholder="Powdery mildew"
             bare
+            autoFocus
           />
           <input
             value={scientificName}

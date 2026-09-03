@@ -20,6 +20,7 @@ import {
   findProductByName,
 } from "@/lib/treatments-catalog";
 import LocalDate from "@/app/app/LocalDate";
+import ProductPicker from "@/app/app/ProductPicker";
 import TimePicker from "@/app/app/TimePicker";
 import EventChart from "./EventChart";
 import RecommendationsPanel from "./RecommendationsPanel";
@@ -928,19 +929,19 @@ export default function PestEventDetail({
                 ))}
               </select>
             )}
-            {!inventoryItemId && (
-              <input
+            {!inventoryItemId && treatmentType !== "spectral_light" && (
+              <ProductPicker
+                type={treatmentType === "pesticide" ? "pesticide" : "biological"}
                 value={product}
-                onChange={(e) => {
-                  const name = e.target.value;
+                onChange={(name) => {
                   setProduct(name);
                   if (!dosageTouched) {
                     const catalogProduct = findProductByName(name);
                     if (catalogProduct?.typicalDosage) setDosage(catalogProduct.typicalDosage);
                   }
                 }}
+                inventoryItems={inventoryItems}
                 placeholder="Product (e.g. Beauveria bassiana)"
-                className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
               />
             )}
             {treatmentType === "pesticide" && (

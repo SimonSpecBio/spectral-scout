@@ -178,6 +178,7 @@ export default function NewEventForm({
             setScientificName(latin);
           }}
           placeholder="Pest species (e.g. spider mites)"
+          autoFocus
         />
         <div className="flex gap-2">
           {SEVERITIES.map((s) => (

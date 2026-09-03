@@ -62,7 +62,7 @@ export default function LogTrapReadingsForm({
       <div className="card flex flex-col gap-3 p-4">
         <label className="flex flex-col gap-1 text-sm">
           Species
-          <SpeciesPicker kind="pest" value={species} onChange={(name) => setSpecies(name)} placeholder="Whiteflies" />
+          <SpeciesPicker kind="pest" value={species} onChange={(name) => setSpecies(name)} placeholder="Whiteflies" autoFocus />
         </label>
 
         <div className="flex flex-col gap-1">

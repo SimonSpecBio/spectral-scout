@@ -7,6 +7,8 @@ import { markEngaged } from "@/lib/pwa-engagement";
 import { displayNameForTreatmentType, findProductByName } from "@/lib/treatments-catalog";
 import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
+import ProductPicker from "../ProductPicker";
+import SpeciesPicker from "../SpeciesPicker";
 import { Stepper } from "../Stepper";
 import SubmitButton from "../SubmitButton";
 import TimePicker from "../TimePicker";
@@ -39,6 +41,11 @@ export default function NewTreatmentForm({
     draft?.type && TYPES.includes(draft.type) ? draft.type : "biological"
   );
   const [inventoryItemId, setInventoryItemId] = useState(typeof draft?.inventoryItemId === "string" ? draft.inventoryItemId : "");
+  // Freeform fallback for a product not yet in Inventory -- this form had
+  // no way at all to record what was actually used once nothing matched a
+  // stocked item; matches the identical field PestEventDetail's inline
+  // treatment form already has (Airtable ticket recjBltxmd1lWeRr7).
+  const [productName, setProductName] = useState(typeof draft?.productName === "string" ? draft.productName : "");
   // Auto-filled from the matched catalog product's sourced label rate the
   // moment a pesticide item is picked from Inventory, but only while still
   // at that suggestion -- dosageTouched flips true on the first manual edit
@@ -77,6 +84,7 @@ export default function NewTreatmentForm({
         JSON.stringify({
           type,
           inventoryItemId,
+          productName,
           dosage,
           quantityUsed,
           targetPest,
@@ -95,6 +103,7 @@ export default function NewTreatmentForm({
   }, [
     type,
     inventoryItemId,
+    productName,
     dosage,
     quantityUsed,
     targetPest,
@@ -118,7 +127,7 @@ export default function NewTreatmentForm({
       {
         type,
         inventoryItemId: inventoryItemId || null,
-        product: selectedItem?.name ?? null,
+        product: selectedItem?.name ?? (productName.trim() || null),
         dosage: type === "pesticide" && dosage ? dosage : null,
         quantityUsed: quantityUsed || null,
         targetPest: targetPest || null,
@@ -216,6 +225,23 @@ export default function NewTreatmentForm({
               </select>
             </FormField>
           )}
+          {!inventoryItemId && type !== "spectral_light" && (
+            <FormField label="Product (optional)">
+              <ProductPicker
+                type={type === "pesticide" ? "pesticide" : "biological"}
+                value={productName}
+                onChange={(name) => {
+                  setProductName(name);
+                  if (!dosageTouched) {
+                    const catalogProduct = findProductByName(name);
+                    if (catalogProduct?.typicalDosage) setDosage(catalogProduct.typicalDosage);
+                  }
+                }}
+                inventoryItems={items}
+                placeholder="e.g. Beauveria bassiana"
+              />
+            </FormField>
+          )}
           {type === "pesticide" && (
             <FormField label="Dosage (optional)">
               <input
@@ -283,12 +309,7 @@ export default function NewTreatmentForm({
             </>
           )}
           <FormField label="Target pest (optional)">
-            <input
-              value={targetPest}
-              onChange={(e) => setTargetPest(e.target.value)}
-              placeholder="e.g. spider mites"
-              className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-            />
+            <SpeciesPicker kind="pest" value={targetPest} onChange={(name) => setTargetPest(name)} placeholder="e.g. spider mites" />
           </FormField>
           <FormField label="Total application time" layout="row">
             <TimePicker valueMinutes={minutesSpent} onChange={setMinutesSpent} mode="hoursMinutes" />

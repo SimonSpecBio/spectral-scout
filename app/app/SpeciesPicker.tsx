@@ -22,6 +22,7 @@ export default function SpeciesPicker({
   onChange,
   placeholder,
   bare,
+  autoFocus,
 }: {
   kind: "pest" | "pathogen";
   value: string;
@@ -31,6 +32,12 @@ export default function SpeciesPicker({
   // already-styled container (e.g. DiseaseEventForm's two-field species
   // box) instead of a standalone field.
   bare?: boolean;
+  // Opt-in, not the default -- only the field that's genuinely the first
+  // thing on its screen (NewEventForm, DiseaseEventForm, LogTrapReadingsForm)
+  // should grab focus on mount; a SpeciesPicker used lower in a longer form
+  // (e.g. NewTreatmentForm's Target pest) would otherwise hijack focus away
+  // from wherever the grower actually is.
+  autoFocus?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   const [custom, setCustom] = useState<CustomSpeciesRow[]>([]);
@@ -71,7 +78,7 @@ export default function SpeciesPicker({
     <div className="relative">
       <input
         ref={inputRef}
-        autoFocus
+        autoFocus={autoFocus}
         value={value}
         onChange={(e) => onChange(e.target.value, null)}
         onFocus={() => setFocused(true)}
