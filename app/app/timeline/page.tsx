@@ -57,12 +57,12 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
         <h1 className="text-2xl font-semibold">Timeline</h1>
       </div>
 
-      <div className="flex gap-2">
+      <div className="hide-scrollbar flex gap-2 overflow-x-auto">
         {SCOPES.map((s) => (
           <Link
             key={s.value}
             href={`/app/timeline?scope=${s.value}`}
-            className={`rounded-full px-3 py-1.5 text-sm ${
+            className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${
               scope === s.value ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
             }`}
           >

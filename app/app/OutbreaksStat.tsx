@@ -26,6 +26,20 @@ export default function OutbreaksStat({
   thisWeekEvents: OutbreakEventRow[];
 }) {
   const [expanded, setExpanded] = useState(false);
+  // Color-coded by the actual count, not just whether it's trending down --
+  // a plain trend comparison called 5-this-week-vs-6-last-week "improving"
+  // (var(--text), no different from 0-vs-0) even though 5 new outbreaks in
+  // a week is still a lot (ticket found in QA, 2026-09-03). Zero is always
+  // the good state regardless of last week; 3+ is enough to flag as a busy
+  // week outright; otherwise fall back to the trend-vs-last-week read.
+  const color =
+    outbreaksThisWeek === 0
+      ? "var(--success)"
+      : outbreaksThisWeek >= 3
+        ? "var(--danger)"
+        : outbreaksThisWeek < outbreaksLastWeek
+          ? "var(--success)"
+          : "var(--text)";
 
   return (
     <div className="card flex flex-col gap-2 p-4 text-sm">
@@ -35,7 +49,7 @@ export default function OutbreaksStat({
         disabled={thisWeekEvents.length === 0}
         className="flex items-center gap-2 text-left disabled:cursor-default"
       >
-        <span style={{ color: outbreaksThisWeek < outbreaksLastWeek ? "var(--success)" : "var(--text)" }}>
+        <span style={{ color }}>
           {outbreaksThisWeek} new {outbreaksThisWeek === 1 ? "outbreak" : "outbreaks"} this week
         </span>
         <span className="text-[var(--text-dim)]">vs {outbreaksLastWeek} last week</span>

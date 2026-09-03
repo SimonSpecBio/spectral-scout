@@ -411,14 +411,14 @@ export default async function HomePage({
                   : `${facilitiesNeedingAttention} of ${orgFacilities.length} sites need attention`}
               </span>
             )}
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="hide-scrollbar flex snap-x gap-2 overflow-x-auto pr-4">
               {orgFacilities.map((f) => {
                 const count = activeCountByFacility.get(f.id) ?? 0;
                 return (
                   <Link
                     key={f.id}
                     href={`/app?facility=${f.id}`}
-                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${
+                    className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${
                       f.id === selectedFacility.id ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
                     }`}
                   >
