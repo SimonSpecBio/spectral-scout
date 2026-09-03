@@ -121,6 +121,17 @@ export function onMutationSettled(cb: () => void): () => void {
 // failure instead, since retrying that later would never succeed and
 // silently queuing it would hide a real problem from the person entering
 // data right now.
+// A tab backgrounded mid-request (switching apps on a phone mid-submit,
+// ticket found in QA 2026-09-03: "Setting..." stuck for a long time, then
+// stuck on "pending sync" after reopening) can leave the underlying fetch
+// neither resolving nor rejecting for as long as the OS keeps the tab
+// suspended -- no thrown error to fall into the queue path below, no
+// response to return either, just an indefinitely hung await. Aborting
+// after a generous timeout turns that hang into the same "queue it"
+// outcome a real network failure already gets, instead of leaving the
+// submit button reading "Setting..." forever.
+const FETCH_TIMEOUT_MS = 20_000;
+
 export async function queuedFetch(
   url: string,
   body: unknown,
@@ -130,13 +141,23 @@ export async function queuedFetch(
   inFlightMutations++;
   try {
     if (typeof navigator !== "undefined" && navigator.onLine) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
       try {
-        const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
         if (res.ok) return { ok: true, queued: false, data: await res.json() };
         return { ok: false, queued: false };
       } catch {
         // network failure while the browser thought it was online (flaky
-        // signal) -- fall through and queue instead of surfacing an error.
+        // signal), or the timeout above firing -- fall through and queue
+        // instead of surfacing an error.
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
     await enqueue(url, method, body, label);
@@ -159,14 +180,18 @@ export async function queuedFileFetch(
   inFlightMutations++;
   try {
     if (typeof navigator !== "undefined" && navigator.onLine) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
       try {
         const form = new FormData();
         form.append(fieldName, file);
-        const res = await fetch(url, { method: "POST", body: form });
+        const res = await fetch(url, { method: "POST", body: form, signal: controller.signal });
         if (res.ok) return { ok: true, queued: false, data: await res.json() };
         return { ok: false, queued: false };
       } catch {
         // see queuedFetch above
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
     await enqueue(url, "POST", file, label, true, fieldName);
@@ -235,5 +260,15 @@ export function initOfflineQueue(): void {
   window.addEventListener("online", () => {
     flushQueue();
   });
+  // A queued item from a backgrounded-mid-request hang (see FETCH_TIMEOUT_MS
+  // above) has no real offline->online transition to retry it on -- the
+  // network was never actually lost, so "online" never fires again. Retry
+  // on the app coming back to the foreground too (tab switch, app switcher,
+  // or a bfcache restore), which is exactly when a person would notice a
+  // stuck "pending sync" badge and expect it to resolve itself.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") flushQueue();
+  });
+  window.addEventListener("pageshow", () => flushQueue());
   if (navigator.onLine) flushQueue();
 }
