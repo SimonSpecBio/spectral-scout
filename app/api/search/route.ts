@@ -1,12 +1,13 @@
 import { and, eq, ilike, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { facilities, facilityAreas, pestEventComments, pestEvents, treatments } from "@/db/schema";
+import { facilities, facilityAreas, inventoryItems, pestEventComments, pestEvents, treatments } from "@/db/schema";
+import { preventiveChecklist } from "@/lib/preventive-checklist";
 import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import { requireGrowerSession } from "@/lib/session";
 
 export interface SearchResult {
-  type: "event" | "treatment" | "site" | "area" | "comment";
+  type: "event" | "treatment" | "site" | "area" | "comment" | "preventive" | "inventory";
   id: string;
   label: string;
   sub: string;
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
   // fuzzy reverse-match isn't attempted anywhere else in the app either.
   const qLower = q.toLowerCase();
 
-  const [matchedSites, matchedAreas, orgEvents, matchedTreatments, matchedComments] = await Promise.all([
+  const [matchedSites, matchedAreas, orgEvents, matchedTreatments, matchedComments, matchedInventory] = await Promise.all([
     db.select().from(facilities).where(and(inArray(facilities.id, facilityIds), ilike(facilities.name, pattern))),
     db.select().from(facilityAreas).where(and(inArray(facilityAreas.facilityId, facilityIds), ilike(facilityAreas.name, pattern))),
     db.select().from(pestEvents).where(inArray(pestEvents.facilityId, facilityIds)),
@@ -53,7 +54,19 @@ export async function GET(request: NextRequest) {
       .from(pestEventComments)
       .innerJoin(pestEvents, eq(pestEventComments.pestEventId, pestEvents.id))
       .where(and(inArray(pestEvents.facilityId, facilityIds), ilike(pestEventComments.body, pattern))),
+    db
+      .select()
+      .from(inventoryItems)
+      .where(and(eq(inventoryItems.organizationId, session.organizationId!), ilike(inventoryItems.name, pattern))),
   ]);
+
+  // Static, org-independent content (lib/preventive-checklist.ts) -- matched
+  // in JS against pest name and tip text, same reasoning as pestEvents
+  // above: there's no per-item page to deep-link to (one static checklist
+  // page), so every match points at /app/preventive as a whole.
+  const matchedPreventive = preventiveChecklist().filter(
+    (c) => c.commonName.toLowerCase().includes(qLower) || c.items.some((item) => item.toLowerCase().includes(qLower))
+  );
 
   const matchedEvents = orgEvents.filter(
     (e) => e.pestSpecies.toLowerCase().includes(qLower) || displayNameForPestSpecies(e.pestSpecies).toLowerCase().includes(qLower)
@@ -96,6 +109,20 @@ export async function GET(request: NextRequest) {
       label: a.name,
       sub: `Area · ${facilityNameById.get(a.facilityId) ?? ""}`,
       href: `/app/facilities/${a.facilityId}/areas/${a.id}`,
+    })),
+    ...matchedInventory.map((i) => ({
+      type: "inventory" as const,
+      id: i.id,
+      label: i.name,
+      sub: `Inventory · ${i.quantity} ${i.unit} in stock`,
+      href: `/app/inventory`,
+    })),
+    ...matchedPreventive.map((c) => ({
+      type: "preventive" as const,
+      id: c.pestId,
+      label: c.commonName,
+      sub: "Preventive checklist",
+      href: `/app/preventive`,
     })),
   ];
 

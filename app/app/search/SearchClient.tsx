@@ -10,8 +10,10 @@ const TYPE_LABEL: Record<SearchResult["type"], string> = {
   site: "Sites",
   area: "Areas",
   comment: "Comments",
+  inventory: "Inventory",
+  preventive: "Preventive",
 };
-const TYPE_ORDER: SearchResult["type"][] = ["event", "treatment", "comment", "site", "area"];
+const TYPE_ORDER: SearchResult["type"][] = ["event", "treatment", "comment", "site", "area", "inventory", "preventive"];
 
 export default function SearchClient() {
   const [query, setQuery] = useState("");
@@ -44,7 +46,7 @@ export default function SearchClient() {
         autoFocus
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search events, treatments, comments, sites…"
+        placeholder="Search events, treatments, inventory, preventive tips…"
         className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2.5 text-sm"
       />
 
