@@ -11,7 +11,19 @@ const ITEM_H = 32; // px -- each wheel's row height, also its scroll-snap unit
 // FIRST and LAST values still center in the visible window. Detecting
 // "which value is selected" just means finding the row nearest scrollTop
 // at scroll-end (debounced), then snapping there and firing onChange.
-function Wheel({ values, selected, onSelect, labelWidth }: { values: number[]; selected: number; onSelect: (v: number) => void; labelWidth: string }) {
+function Wheel({
+  values,
+  selected,
+  onSelect,
+  labelWidth,
+  formatLabel,
+}: {
+  values: number[];
+  selected: number;
+  onSelect: (v: number) => void;
+  labelWidth: string;
+  formatLabel?: (v: number) => string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const scrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // True only while this wheel's own onSelect just moved it -- otherwise a
@@ -61,7 +73,7 @@ function Wheel({ values, selected, onSelect, labelWidth }: { values: number[]; s
             fontWeight: v === selected ? 600 : 400,
           }}
         >
-          {String(v).padStart(2, "0")}
+          {formatLabel ? formatLabel(v) : String(v).padStart(2, "0")}
         </div>
       ))}
       <div style={{ height: ITEM_H }} />
@@ -71,6 +83,10 @@ function Wheel({ values, selected, onSelect, labelWidth }: { values: number[]; s
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES_5 = Array.from({ length: 12 }, (_, i) => i * 5);
+// These wheels are durations (mins after dark, application duration), not
+// clock times -- there's no AM/PM to show, but a 12-hour dial (1-12,
+// wrapping) still reads more naturally than a 24-hour one.
+const hour12Label = (h: number) => String(h % 12 === 0 ? 12 : h % 12);
 
 export interface TimePickerProps {
   valueMinutes: number;
@@ -109,7 +125,7 @@ export default function TimePicker({ valueMinutes, onChange, mode = "hoursMinute
   return (
     <div className="relative flex items-center justify-center gap-1 rounded-md border border-[var(--border)] bg-transparent px-2">
       <div className="pointer-events-none absolute inset-x-2 top-1/2 h-8 -translate-y-1/2 rounded border border-[var(--border)]" />
-      <Wheel values={HOURS} selected={hours} onSelect={(h) => onChange(h * 60 + nearestMinute)} labelWidth="2rem" />
+      <Wheel values={HOURS} selected={hours} onSelect={(h) => onChange(h * 60 + nearestMinute)} labelWidth="2rem" formatLabel={hour12Label} />
       <span className="text-sm text-[var(--text-dim)]">:</span>
       <Wheel values={MINUTES_5} selected={nearestMinute} onSelect={(m) => onChange(hours * 60 + m)} labelWidth="2rem" />
     </div>

@@ -186,7 +186,7 @@ export default function NewTreatmentForm({
             ))}
           </div>
 
-          {items.length > 0 && (
+          {items.length > 0 && type !== "spectral_light" && (
             <FormField label="Product from inventory (optional)">
               <select
                 value={inventoryItemId}
@@ -249,10 +249,10 @@ export default function NewTreatmentForm({
                 />
               </FormField>
               <FormField label="Minutes after dark" layout="row">
-                <TimePicker valueMinutes={minutesAfterDark} onChange={setMinutesAfterDark} mode="minutesOnly" />
+                <TimePicker valueMinutes={minutesAfterDark} onChange={setMinutesAfterDark} />
               </FormField>
-              <FormField label="Duration (minutes)" layout="row">
-                <TimePicker valueMinutes={durationMin} onChange={setDurationMin} mode="minutesOnly" />
+              <FormField label="Duration" layout="row">
+                <TimePicker valueMinutes={durationMin} onChange={setDurationMin} />
               </FormField>
               <label className="flex items-center gap-2 text-sm text-[var(--text-dim)]">
                 <input

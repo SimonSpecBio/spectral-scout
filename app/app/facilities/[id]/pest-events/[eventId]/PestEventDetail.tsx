@@ -895,7 +895,12 @@ export default function PestEventDetail({
                 </button>
               ))}
             </div>
-            {inventoryItems.length > 0 && (
+            {/* Spectral's hardware is never an Inventory line item (same
+                reasoning as the recommendations panel's identical spectral
+                check) -- this select showed for every treatment type
+                including Spectral, offering a product picker for something
+                that has no product (ticket found in QA, 2026-09-03). */}
+            {inventoryItems.length > 0 && treatmentType !== "spectral_light" && (
               <select
                 value={inventoryItemId}
                 onChange={(e) => {
@@ -984,11 +989,11 @@ export default function PestEventDetail({
                 <div className="flex flex-col gap-2">
                   <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
                     Mins after dark
-                    <TimePicker valueMinutes={minutesAfterDark} onChange={setMinutesAfterDark} mode="minutesOnly" />
+                    <TimePicker valueMinutes={minutesAfterDark} onChange={setMinutesAfterDark} />
                   </label>
                   <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
                     Duration
-                    <TimePicker valueMinutes={durationMin} onChange={setDurationMin} mode="minutesOnly" />
+                    <TimePicker valueMinutes={durationMin} onChange={setDurationMin} />
                   </label>
                   <label className="flex items-center gap-2 text-sm text-[var(--text-dim)]">
                     <input
