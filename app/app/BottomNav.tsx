@@ -11,7 +11,11 @@ const NAV = [
     icon: (active: boolean) => (
       <g fill="none" stroke={active ? "var(--text)" : "var(--text-faint)"} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
         <path d="M2 8 l6 -2.4 l6 2.4 l6 -2.4 v12 l-6 2.4 l-6 -2.4 l-6 2.4 z" />
-        <path d="M8 4.4 v12 M14 6 v12" />
+        {/* Creases at the same x as the roofline's own ridge points (8/14),
+            spanning exactly that ridge's top y to its mirrored bottom y --
+            they used to start above the top edge and stop short of the
+            bottom on both sides (ticket found in QA, 2026-09-03). */}
+        <path d="M8 5.6 v12 M14 8 v12" />
       </g>
     ),
   },
@@ -20,8 +24,13 @@ const NAV = [
     label: "Schedule",
     icon: (active: boolean) => (
       <g fill="none" stroke={active ? "var(--text)" : "var(--text-faint)"} strokeWidth="1.5" strokeLinecap="round">
-        <rect x="2" y="4" width="18" height="16" rx="2.5" />
-        <path d="M2 9 h18 M7 1.5 v5 M15 1.5 v5" />
+        {/* Right/bottom edges used to sit flush on the viewBox boundary
+            (x+width and y+height both = 20), so half the centered stroke
+            got clipped by the SVG's own edge -- a visibly thinner line on
+            those two sides (ticket found in QA, 2026-09-03). 2px margin
+            all around now, same as the other three nav icons. */}
+        <rect x="2" y="4" width="16" height="14" rx="2.5" />
+        <path d="M2 9 h16 M7 1.5 v5 M15 1.5 v5" />
       </g>
     ),
   },
@@ -42,10 +51,15 @@ const NAV = [
     href: "/app/logs",
     label: "Logs",
     icon: (active: boolean) => (
-      <g stroke={active ? "var(--text)" : "var(--text-faint)"} strokeWidth="1.5" strokeLinecap="round">
-        <line x1="2" y1="4" x2="18" y2="4" />
+      // A spreadsheet/table grid -- the previous version (three stacked
+      // horizontal lines) read too similarly to Timeline's own icon at nav
+      // size (ticket found in QA, 2026-09-03); Logs is the filterable
+      // table-like record, Timeline is the narrative rail, so the icons
+      // should look as different as those two screens actually are.
+      <g fill="none" stroke={active ? "var(--text)" : "var(--text-faint)"} strokeWidth="1.5" strokeLinejoin="round">
+        <rect x="2" y="3" width="16" height="14" rx="1.5" />
         <line x1="2" y1="10" x2="18" y2="10" />
-        <line x1="2" y1="16" x2="12" y2="16" />
+        <line x1="10" y1="3" x2="10" y2="17" />
       </g>
     ),
   },
