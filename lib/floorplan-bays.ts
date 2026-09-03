@@ -57,7 +57,7 @@ export function bayLabel(bay: Pick<Bay, "row" | "index">): string {
 // missing -- ticket found in a manager-persona walkthrough (2026-08-27):
 // several call sites fell back to the pest's own species name instead of a
 // real location, producing visibly duplicated text like task title
-// "Recheck Whitefly — Whitefly". app/api/facilities/[id]/areas/[areaId]/
+// "Hotspot monitoring: Whitefly — Whitefly". app/api/facilities/[id]/areas/[areaId]/
 // scouting/route.ts already had this right (falls back to the area name);
 // this just gives the other call sites the same correct fallback instead of
 // each re-deriving (or mis-deriving) their own. areaName itself can be null

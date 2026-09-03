@@ -65,8 +65,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const program = findPestProgram(event.pestSpecies);
   // Falls back to the area's name, not the pest's own species -- an event
   // with no pin (e.g. promoted from an unpinned general scouting session)
-  // used to produce a visibly duplicated title like "Recheck Whitefly —
-  // Whitefly" (ticket found in a manager-persona walkthrough, 2026-08-27).
+  // used to produce a visibly duplicated title like "Hotspot monitoring:
+  // Whitefly — Whitefly" (ticket found in a manager-persona walkthrough,
+  // 2026-08-27). "Hotspot monitoring" (not "Recheck") is the standing
+  // unified term for a follow-up monitoring visit on an existing case
+  // (Airtable ticket recOlfeOU2nW96dn0).
   const area = event.facilityAreaId
     ? (await db.select({ name: facilityAreas.name }).from(facilityAreas).where(eq(facilityAreas.id, event.facilityAreaId)))[0]
     : null;
@@ -85,7 +88,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .insert(tasks)
       .values({
         organizationId: session.organizationId!,
-        title: `Recheck ${displayNameForPestSpecies(event.pestSpecies)}${suffix}`,
+        title: `Hotspot monitoring: ${displayNameForPestSpecies(event.pestSpecies)}${suffix}`,
         type: "monitor",
         facilityId: id,
         facilityAreaId: event.facilityAreaId,

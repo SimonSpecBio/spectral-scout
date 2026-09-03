@@ -246,10 +246,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const DAY_MS = 86_400_000;
     const program = findPestProgram(pestSpecies);
     // Falls back to the area's name, not the pest's own species -- an event
-    // with no pin used to produce a visibly duplicated title like "Recheck
-    // Whitefly — Whitefly" (ticket found in a manager-persona walkthrough,
-    // 2026-08-27). facilityAreaId is guaranteed non-null by this branch's
-    // own condition, so the area is always resolvable here.
+    // with no pin used to produce a visibly duplicated title like "Hotspot
+    // monitoring: Whitefly — Whitefly" (ticket found in a manager-persona
+    // walkthrough, 2026-08-27). facilityAreaId is guaranteed non-null by
+    // this branch's own condition, so the area is always resolvable here.
+    // "Hotspot monitoring" (not "Recheck") is the standing unified term for
+    // a follow-up monitoring visit on an existing case -- see the identical
+    // rename in apply-program/route.ts (Airtable ticket recOlfeOU2nW96dn0).
     const [severeArea] = await db.select({ name: facilityAreas.name }).from(facilityAreas).where(eq(facilityAreas.id, facilityAreaId));
     const location = locationLabel(row.x, row.y, severeArea?.name ?? null);
     const suffix = location ? `, ${location}` : "";
@@ -259,7 +262,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .insert(tasks)
       .values({
         organizationId: session.organizationId!,
-        title: `Recheck ${displayNameForPestSpecies(pestSpecies)}${suffix}`,
+        title: `Hotspot monitoring: ${displayNameForPestSpecies(pestSpecies)}${suffix}`,
         type: "monitor",
         facilityId: id,
         facilityAreaId,

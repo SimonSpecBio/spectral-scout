@@ -111,7 +111,7 @@ for (const [key, rows] of dupeGroups) {
 
     // Duplicate OPEN auto-created tasks that now all point at the same
     // survivor event -- keep the earliest-due one, snooze the rest so the
-    // schedule doesn't show N copies of "Recheck X" for one real case.
+    // schedule doesn't show N copies of "Hotspot monitoring: X" for one real case.
     const survivorTasks = await tx
       .select()
       .from(tasks)

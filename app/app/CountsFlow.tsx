@@ -31,7 +31,7 @@ export default function CountsFlow({
   facilities?: PickerFacility[];
   redirectHref: string;
   // Set when this session is fulfilling a specific scheduled task (a
-  // "Recheck X -- Bay Y" task from the recommendation engine's follow-up
+  // "Hotspot monitoring: X -- Bay Y" task from the recommendation engine's follow-up
   // cadence) -- logging the session also completes that task instead of
   // leaving it dangling open for the grower to separately go mark done.
   taskId?: string;
