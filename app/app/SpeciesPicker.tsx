@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PEST_CATALOG } from "@/lib/pest-catalog";
 
 interface CustomSpeciesRow {
@@ -34,12 +34,21 @@ export default function SpeciesPicker({
 }) {
   const [focused, setFocused] = useState(false);
   const [custom, setCustom] = useState<CustomSpeciesRow[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/species")
       .then((res) => (res.ok ? res.json() : []))
       .then(setCustom)
       .catch(() => {});
+    // The input's `autoFocus` attribute focuses it natively before React
+    // finishes hydrating, so the very first focus -- the one that matters
+    // most, since a grower usually starts typing the instant this field
+    // appears -- never reaches onFocus below and the dropdown just never
+    // shows up. Catching that already-focused state once on mount is what
+    // actually fixes it (bug found in QA, 2026-09-03: autocomplete appeared
+    // to never work at all).
+    if (document.activeElement === inputRef.current) setFocused(true);
   }, []);
 
   const query = value.trim().toLowerCase();
@@ -61,6 +70,7 @@ export default function SpeciesPicker({
   return (
     <div className="relative">
       <input
+        ref={inputRef}
         autoFocus
         value={value}
         onChange={(e) => onChange(e.target.value, null)}
