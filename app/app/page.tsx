@@ -276,11 +276,12 @@ export default async function HomePage({
     .flatMap((e) => {
       const loc = locationOf(e);
       const species = displayNameForPestSpecies(e.pestSpecies);
-      const list = [{ label: `${species} detected`, sub: loc, at: e.createdAt, alert: true }];
+      const href = `/app/facilities/${e.facilityId}/pest-events/${e.id}`;
+      const list = [{ label: `${species} detected`, sub: loc, at: e.createdAt, alert: true, href }];
       for (const t of treatmentsByEvent.get(e.id) ?? []) {
-        list.push({ label: `${displayNameForTreatmentType(t.type)} applied: ${species}`, sub: loc, at: t.appliedAt, alert: false });
+        list.push({ label: `${displayNameForTreatmentType(t.type)} applied: ${species}`, sub: loc, at: t.appliedAt, alert: false, href });
       }
-      if (e.resolvedAt) list.push({ label: `${species} resolved`, sub: loc, at: e.resolvedAt, alert: false });
+      if (e.resolvedAt) list.push({ label: `${species} resolved`, sub: loc, at: e.resolvedAt, alert: false, href });
       return list;
     })
     .sort((a, b) => b.at.getTime() - a.at.getTime())
@@ -692,14 +693,14 @@ export default async function HomePage({
                   />
                   {i < activity.length - 1 && <span className="mt-1 w-px flex-1" style={{ background: "var(--border-soft)" }} />}
                 </div>
-                <div className="pb-3.5">
+                <Link href={a.href} className="pb-3.5">
                   <div className="text-sm" style={{ color: a.alert ? "var(--text)" : "var(--text-dim)" }}>
                     {a.label}
                   </div>
                   <div className="label-mono">
                     {relativeTime(a.at).toUpperCase()} {a.sub && `· ${a.sub.toUpperCase()}`}
                   </div>
-                </div>
+                </Link>
               </div>
             ))}
           </div>
