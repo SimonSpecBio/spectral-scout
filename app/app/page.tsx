@@ -175,23 +175,43 @@ export default async function HomePage({
     .filter((e) => e.status === "active")
     .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
 
+  // Default facility/area: whichever has the highest-severity open hotspot.
+  const hottestEvent = active[0];
+  const selectedFacilityId = facilityParam ?? hottestEvent?.facilityId ?? orgFacilities[0].id;
+  const selectedFacility = orgFacilities.find((f) => f.id === selectedFacilityId) ?? orgFacilities[0];
+
+  // Everything below (pest-pressure chart, Attention Required, Today's
+  // Tasks, Recent Activity) scopes to selectedFacility -- these all used to
+  // show the same org-wide data no matter which site pill was selected
+  // (ticket found in QA, 2026-09-03). Inventory has no per-facility concept
+  // in the schema, so low-stock alerts stay org-wide by design. A task with
+  // no facilityId (a general, unlinked task) still shows regardless of
+  // which site is selected, rather than becoming permanently invisible.
+  const facilityEvents = events.filter((e) => e.facilityId === selectedFacility.id);
+  const facilityActive = active.filter((e) => e.facilityId === selectedFacility.id);
+  const facilityTrapAlerts = trapAlerts.filter((a) => a.facilityId === selectedFacility.id);
+  const facilityScoutingAlerts = scoutingAlerts.filter((a) => a.facilityId === selectedFacility.id);
+  const facilityEscalationAlerts = escalationAlerts.filter((a) => a.facilityId === selectedFacility.id);
+
   // Week-over-week rather than "vs last grow cycle" -- there's no cycle-
   // start-date concept in the schema to compute that honestly, and the
   // ticket's own alternative framing (week-over-week) needs nothing new.
   // A real sense of momentum, especially for home growers who might not
   // otherwise notice it, without inventing a number the app can't back up.
   const WEEK_MS = 7 * DAY_MS;
-  const outbreaksThisWeekEvents = events.filter((e) => Date.now() - e.createdAt.getTime() < WEEK_MS);
+  const outbreaksThisWeekEvents = facilityEvents.filter((e) => Date.now() - e.createdAt.getTime() < WEEK_MS);
   const outbreaksThisWeek = outbreaksThisWeekEvents.length;
-  const outbreaksLastWeek = events.filter((e) => {
+  const outbreaksLastWeek = facilityEvents.filter((e) => {
     const age = Date.now() - e.createdAt.getTime();
     return age >= WEEK_MS && age < 2 * WEEK_MS;
   }).length;
 
   const eventSeverityById = new Map(active.map((e) => [e.id, e.severity]));
-  const todaysFollowUps = active.filter((e) => needsFollowUp(e.createdAt));
-  const resolvedToday = events.filter((e) => e.status === "resolved" && e.resolvedAt && isToday(e.resolvedAt));
-  const myTasksToday = myOpenTasks.filter((t) => isToday(t.dueAt) || taskUrgency(t) === "overdue");
+  const todaysFollowUps = facilityActive.filter((e) => needsFollowUp(e.createdAt));
+  const resolvedToday = facilityEvents.filter((e) => e.status === "resolved" && e.resolvedAt && isToday(e.resolvedAt));
+  const myTasksToday = myOpenTasks.filter(
+    (t) => (t.facilityId === selectedFacility.id || t.facilityId == null) && (isToday(t.dueAt) || taskUrgency(t) === "overdue")
+  );
 
   // "Today's tasks" used to render three separate sub-lists back to back
   // (assigned tasks, overdue follow-ups, resolved-today) with only the
@@ -211,7 +231,9 @@ export default async function HomePage({
   // Both depend on results from the batch above (active, trapAlerts,
   // scoutingAlerts) but not on each other -- still worth one more
   // Promise.all rather than two sequential awaits.
-  const alertAreaIds = [...new Set([...trapAlerts.map((a) => a.facilityAreaId), ...scoutingAlerts.map((a) => a.facilityAreaId)])];
+  const alertAreaIds = [
+    ...new Set([...facilityTrapAlerts.map((a) => a.facilityAreaId), ...facilityScoutingAlerts.map((a) => a.facilityAreaId)]),
+  ];
   const [eventSignals, alertAreas] = await Promise.all([
     computeEventSignals(active.map((e) => e.id)),
     alertAreaIds.length ? db.select().from(facilityAreas).where(inArray(facilityAreas.id, alertAreaIds)) : Promise.resolve([]),
@@ -222,10 +244,11 @@ export default async function HomePage({
 
   // Excludes events the trend heuristic below already surfaced so the same
   // event doesn't show twice.
-  const trendingEventIds = new Set(
-    active.filter((e) => eventSignals.get(e.id)?.trend === "up" && (e.severity === "high" || e.severity === "severe")).map((e) => e.id)
+  const trendingActive = facilityActive.filter(
+    (e) => eventSignals.get(e.id)?.trend === "up" && (e.severity === "high" || e.severity === "severe")
   );
-  const monitoringAlerts = monitoringAlertsRaw.filter((a) => !trendingEventIds.has(a.eventId));
+  const trendingEventIds = new Set(trendingActive.map((e) => e.id));
+  const monitoringAlerts = monitoringAlertsRaw.filter((a) => !trendingEventIds.has(a.eventId) && a.facilityId === selectedFacility.id);
 
   // Attention Required: real exceptions, not a generic list -- an overdue
   // follow-up, an active event whose density is trending up (computed from
@@ -235,13 +258,11 @@ export default async function HomePage({
   // reorder level.
   const attention = [
     ...todaysFollowUps.map((e) => ({ kind: "followup" as const, event: e })),
-    ...active
-      .filter((e) => eventSignals.get(e.id)?.trend === "up" && (e.severity === "high" || e.severity === "severe"))
-      .map((e) => ({ kind: "trending" as const, event: e })),
+    ...trendingActive.map((e) => ({ kind: "trending" as const, event: e })),
     ...monitoringAlerts.map((a) => ({ kind: "threshold" as const, alert: a })),
-    ...escalationAlerts.map((a) => ({ kind: "escalation" as const, alert: a })),
-    ...trapAlerts.map((a) => ({ kind: "trap" as const, alert: a })),
-    ...scoutingAlerts.map((a) => ({ kind: "scouting" as const, alert: a })),
+    ...facilityEscalationAlerts.map((a) => ({ kind: "escalation" as const, alert: a })),
+    ...facilityTrapAlerts.map((a) => ({ kind: "trap" as const, alert: a })),
+    ...facilityScoutingAlerts.map((a) => ({ kind: "scouting" as const, alert: a })),
     ...lowStockItems.map((i) => ({ kind: "lowstock" as const, item: i })),
   ];
 
@@ -250,9 +271,8 @@ export default async function HomePage({
     if (!t.pestEventId) continue;
     treatmentsByEvent.set(t.pestEventId, [...(treatmentsByEvent.get(t.pestEventId) ?? []), t]);
   }
-  const locationOf = (e: (typeof events)[number]) =>
-    orgFacilities.length > 1 && e.areaName ? `${e.areaName}, ${e.facilityName}` : (e.areaName ?? e.facilityName);
-  const activity = events
+  const locationOf = (e: (typeof events)[number]) => e.areaName ?? e.facilityName;
+  const activity = facilityEvents
     .flatMap((e) => {
       const loc = locationOf(e);
       const species = displayNameForPestSpecies(e.pestSpecies);
@@ -265,12 +285,6 @@ export default async function HomePage({
     })
     .sort((a, b) => b.at.getTime() - a.at.getTime())
     .slice(0, 6);
-
-  // Default facility/area: whichever has the highest-severity open hotspot.
-  const hottestEvent = active[0];
-  const selectedFacilityId = facilityParam ?? hottestEvent?.facilityId ?? orgFacilities[0].id;
-  const selectedFacility = orgFacilities.find((f) => f.id === selectedFacilityId) ?? orgFacilities[0];
-  const facilityEvents = active.filter((e) => e.facilityId === selectedFacility.id);
 
   const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, selectedFacility.id));
 
@@ -288,7 +302,7 @@ export default async function HomePage({
       </div>
     );
   } else {
-    const hottestAreaEvent = [...facilityEvents].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])[0];
+    const hottestAreaEvent = [...facilityActive].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])[0];
     const selectedAreaId = areaParam ?? hottestAreaEvent?.facilityAreaId ?? areas[0].id;
     const selectedArea = areas.find((a) => a.id === selectedAreaId) ?? areas[0];
 
@@ -433,9 +447,9 @@ export default async function HomePage({
         <div className="hidden sm:block">{desktopMapSection}</div>
       </div>
 
-      <PressureGraph events={events.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
+      <PressureGraph events={facilityEvents.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
 
-      {events.length === 0 ? (
+      {facilityEvents.length === 0 ? (
         <Link href="/app/preventive" className="card flex items-center justify-between gap-3 p-4 text-sm">
           <span>New here? See a preventive starter checklist before your first pest shows up.</span>
           <span className="shrink-0 text-[var(--accent)]">View →</span>
@@ -464,8 +478,8 @@ export default async function HomePage({
   const scoutMapLink = (
     <Link href={`/app/facilities/${selectedFacility.id}`} className="card flex items-center justify-between gap-3 p-4 text-sm">
       <span>
-        {active.filter((e) => e.facilityId === selectedFacility.id).length} active hotspot
-        {active.filter((e) => e.facilityId === selectedFacility.id).length === 1 ? "" : "s"} at {selectedFacility.name}
+        {facilityActive.length} active hotspot
+        {facilityActive.length === 1 ? "" : "s"} at {selectedFacility.name}
       </span>
       <span className="shrink-0 text-[var(--accent)]">View map →</span>
     </Link>
@@ -492,7 +506,7 @@ export default async function HomePage({
                       style={{ background: SEVERITY_COLOR[bandFromRatio(a.catchPerDay / a.threshold)] }}
                     />
                     <div className="flex-1">
-                      <div className="text-sm">{a.trapLabel} spike &mdash; confirm {displayNameForPestSpecies(a.pestSpecies)}?</div>
+                      <div className="text-sm">{a.trapLabel} spike. Confirm {displayNameForPestSpecies(a.pestSpecies)}?</div>
                       <div className="label-mono">
                         {(trapAreaNameById.get(a.facilityAreaId) ?? "").toUpperCase()} &middot; {a.catchPerDay.toFixed(1)}/DAY
                       </div>
