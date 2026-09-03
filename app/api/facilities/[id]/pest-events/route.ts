@@ -284,8 +284,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // two generic placeholders (tomorrow, and a week out) the grower can
     // use as-is and complete/delete whichever doesn't fit, rather than
     // leaving Severe with nothing scheduled just because nothing matched.
-    const agent = program?.primaryBiocontrol[0] ? findAgent(program.primaryBiocontrol[0]) : undefined;
-    const productName = agent?.name ?? (program?.biopesticideRotation[0] ? findProduct(program.biopesticideRotation[0])?.name : undefined);
+    // Chemical/biopesticide first, biocontrol agent as the fallback -- same
+    // priority flip as PestEventDetail's quick-log default (Simon's call,
+    // 2026-09-03): no per-species data says biocontrol is the more common
+    // first response, so this just follows the catalog's own list order.
+    const biopesticideName = program?.biopesticideRotation[0] ? findProduct(program.biopesticideRotation[0])?.name : undefined;
+    const agent = !biopesticideName && program?.primaryBiocontrol[0] ? findAgent(program.primaryBiocontrol[0]) : undefined;
+    const productName = biopesticideName ?? agent?.name;
     const orgItems = productName
       ? await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!))
       : [];

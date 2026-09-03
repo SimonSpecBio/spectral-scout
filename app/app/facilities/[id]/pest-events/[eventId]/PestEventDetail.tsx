@@ -188,7 +188,14 @@ export default function PestEventDetail({
   const [severityNote, setSeverityNote] = useState("");
   const [changingSeverity, setChangingSeverity] = useState(false);
 
-  const [treatmentType, setTreatmentType] = useState<TreatmentType>("biological");
+  // Some species genuinely have no cataloged biocontrol agent (e.g. powdery
+  // mildew) -- offering a "Biologics" tab that can only ever end in picking
+  // a product from Inventory anyway is a dead end, not a real option
+  // (ticket found in QA, 2026-09-03: verified against the real catalog data
+  // rather than assumed -- Botrytis DOES have one, Clonostachys rosea, so
+  // it correctly keeps the tab).
+  const hasBiologicalOption = (findPestProgram(event.pestSpecies)?.primaryBiocontrol ?? []).some((id) => !!findAgent(id));
+  const [treatmentType, setTreatmentType] = useState<TreatmentType>(hasBiologicalOption ? "biological" : "pesticide");
   const [inventoryItemId, setInventoryItemId] = useState("");
   const [product, setProduct] = useState("");
   // Auto-filled from the matched catalog product's sourced label rate,
@@ -247,11 +254,17 @@ export default function PestEventDetail({
   if (lastTreatment?.product) {
     quickLog = { type: lastTreatment.type, product: lastTreatment.product };
   } else {
+    // Chemical/biopesticide first, biocontrol agent as the fallback -- a
+    // living agent isn't always the more common first response for every
+    // species, and there's no per-species "prefer biocontrol" data to rank
+    // by instead, so this just follows the catalog's own list order
+    // (Simon's call, 2026-09-03, matching the identical flip in
+    // pest-events/route.ts's auto-created severe-event task).
     const program = findPestProgram(event.pestSpecies);
-    const agent = program?.primaryBiocontrol[0] ? findAgent(program.primaryBiocontrol[0]) : undefined;
-    const prod = !agent && program?.biopesticideRotation[0] ? findProduct(program.biopesticideRotation[0]) : undefined;
-    if (agent) quickLog = { type: "biological", product: agent.name };
-    else if (prod) quickLog = { type: "pesticide", product: prod.name };
+    const prod = program?.biopesticideRotation[0] ? findProduct(program.biopesticideRotation[0]) : undefined;
+    const agent = !prod && program?.primaryBiocontrol[0] ? findAgent(program.primaryBiocontrol[0]) : undefined;
+    if (prod) quickLog = { type: "pesticide", product: prod.name };
+    else if (agent) quickLog = { type: "biological", product: agent.name };
   }
 
   async function handleQuickLog() {
@@ -973,7 +986,9 @@ export default function PestEventDetail({
           <form onSubmit={applyTreatment} className="card flex flex-col gap-2 p-4">
             <div className="text-sm font-medium">Apply treatment</div>
             <div className="flex gap-2">
-              {(["biological", "pesticide", "spectral_light"] as const).map((t) => (
+              {(["biological", "pesticide", "spectral_light"] as const)
+                .filter((t) => t !== "biological" || hasBiologicalOption)
+                .map((t) => (
                 <button
                   type="button"
                   key={t}
