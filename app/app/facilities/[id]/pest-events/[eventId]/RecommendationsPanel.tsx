@@ -17,7 +17,7 @@ function isSubstantialCulturalEntry(entry: string): boolean {
   return entry.length > 200;
 }
 
-// Each recommendation category (Spectral/Beneficials/Pesticides/Preventive/
+// Each recommendation category (Spectral/Beneficials/Chemicals/Preventive/
 // Cautions) starts collapsed behind its item count and expands on tap
 // (Airtable ticket B1) -- a resolved/inactive event's recommendations aren't
 // something most growers need open by default, and collapsing them all
@@ -60,12 +60,12 @@ interface InventoryRow {
 // The recommendation engine's UI (TREATMENTS.md/SCHEDULING.md): a Pest/
 // Disease Event's species matched against lib/treatments-catalog.ts's real
 // program data. Per Simon's taxonomy decision (2026-08-21), options render
-// as exactly 3 outward categories -- Beneficials / Pesticides / Spectral --
+// as exactly 3 outward categories -- Beneficials / Chemicals / Spectral --
 // rather than the earlier 4-way Primary-biocontrol/Biopesticide/
 // (collapsed) Chemical/Cultural split. Internally, Product.type and
 // Product.restricted still distinguish biopesticide vs. chemical -- that
 // keeps driving REI/PHI accuracy and the "verify legality" warning, it's
-// only the outward grouping that collapsed to one "Pesticides" list, sorted
+// only the outward grouping that collapsed to one "Chemicals" list, sorted
 // with restricted/uncertain-legality items last and each carrying its own
 // inline warning rather than one banner behind a toggle. A real per-state
 // (CO/CA/OR) legality gate now exists (ticket 68, lib/treatments-catalog.ts's
@@ -80,7 +80,7 @@ interface InventoryRow {
 // Also fetches a cross-org anonymized efficacy benchmark (ticket 83,
 // lib/benchmarks.ts) for whichever two of this pest's pesticide options have
 // enough pooled free-tier resolution-time data to compare honestly -- shown
-// as a single "BENCHMARK" line above the Pesticides list, or nothing at all
+// as a single "BENCHMARK" line above the Chemicals list, or nothing at all
 // when there isn't yet enough data (never a fabricated/estimated number).
 export default function RecommendationsPanel({
   facilityId,
@@ -233,7 +233,7 @@ export default function RecommendationsPanel({
 
   const beneficials = program.primaryBiocontrol.map((id) => AGENTS.find((a) => a.id === id)).filter((a) => !!a);
 
-  // One merged "Pesticides" list -- biopesticideRotation first, then
+  // One merged "Chemicals" list -- biopesticideRotation first, then
   // chemicalLastResort. Per Simon's explicit call, restricted means
   // illegal here, not "usable with caution": these are filtered out
   // entirely rather than shown de-emphasized/sorted-last. Never silently
@@ -292,7 +292,7 @@ export default function RecommendationsPanel({
       )}
 
       {pesticides.length > 0 && (
-        <CollapsibleSection title="Pesticides" count={pesticides.length}>
+        <CollapsibleSection title="Chemicals" count={pesticides.length}>
           {benchmark && (
             <div className="py-2 text-xs text-[var(--text-dim)]">
               <span className="label-mono mr-1.5" style={{ color: "var(--success)" }}>

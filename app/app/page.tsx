@@ -9,7 +9,7 @@ import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-
 import { taskActionHref, taskUrgency } from "@/lib/tasks";
 import { computeEscalationAlerts, computeMonitoringAlerts, metricLabel, type MetricKind } from "@/lib/threshold-engine";
 import { computeTrapAlerts } from "@/lib/trap-alerts";
-import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
+import { displayNameForPestSpecies, displayNameForTreatmentType } from "@/lib/treatments-catalog";
 import { requireGrowerSession } from "@/lib/session";
 import LayoutPicker from "./facilities/[id]/areas/[areaId]/LayoutPicker";
 import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
@@ -278,7 +278,7 @@ export default async function HomePage({
       const species = displayNameForPestSpecies(e.pestSpecies);
       const list = [{ label: `${species} detected`, sub: loc, at: e.createdAt, alert: true }];
       for (const t of treatmentsByEvent.get(e.id) ?? []) {
-        list.push({ label: `${t.type.replace("_", " ")} applied -- ${species}`, sub: loc, at: t.appliedAt, alert: false });
+        list.push({ label: `${displayNameForTreatmentType(t.type)} applied: ${species}`, sub: loc, at: t.appliedAt, alert: false });
       }
       if (e.resolvedAt) list.push({ label: `${species} resolved`, sub: loc, at: e.resolvedAt, alert: false });
       return list;

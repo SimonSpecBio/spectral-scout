@@ -2,10 +2,17 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents, scoutingObservations, tasks, treatments, trapReadings, traps } from "@/db/schema";
 import { metricLabel, sessionMetric } from "@/lib/threshold-engine";
-import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
+import { displayNameForPestSpecies, displayNameForTreatmentType } from "@/lib/treatments-catalog";
 
-export type LogKind = "finding" | "monitor" | "action" | "disease";
-const KIND_COLOR: Record<LogKind, string> = { finding: "#CE5D40", monitor: "#4E6280", action: "#4E9E86", disease: "#C79A3A" };
+// Simon's taxonomy decision (2026-09-03): every screen that categorizes
+// activity uses the same three names -- Events, Treatments, Monitoring.
+// Previously "finding" (pest) and "disease" were separate kinds, and a
+// resolved event was lumped in with "action" (an applied treatment or a
+// completed task) instead of counting as an Event. Now a pest OR disease
+// detection AND its resolution are both "event"; an applied treatment or
+// completed task is "treatment"; a scouting/trap session is "monitoring".
+export type LogKind = "event" | "treatment" | "monitoring";
+const KIND_COLOR: Record<LogKind, string> = { event: "#CE5D40", treatment: "#4E9E86", monitoring: "#4E6280" };
 export { KIND_COLOR };
 
 export interface LogEntry {
@@ -55,7 +62,7 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
     const loc = areaNameById.get(e.facilityAreaId ?? "") ?? facilityNameById.get(e.facilityId) ?? "";
     entries.push({
       at: e.createdAt,
-      kind: e.kind === "pathogen" ? "disease" : "finding",
+      kind: "event",
       label: `${displayNameForPestSpecies(e.pestSpecies)} detected`,
       sub: loc.toUpperCase(),
       facilityId: e.facilityId,
@@ -64,7 +71,7 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
     if (e.resolvedAt) {
       entries.push({
         at: e.resolvedAt,
-        kind: "action",
+        kind: "event",
         label: `${displayNameForPestSpecies(e.pestSpecies)} resolved`,
         sub: loc.toUpperCase(),
         facilityId: e.facilityId,
@@ -78,7 +85,7 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
     const metric = sessionMetric(s);
     entries.push({
       at: s.createdAt,
-      kind: "monitor",
+      kind: "monitoring",
       label: "Monitoring session",
       sub: [loc, metric ? metricLabel(metric) : null].filter(Boolean).join(" · ").toUpperCase(),
       facilityId: facilityIdByAreaId.get(s.facilityAreaId),
@@ -95,8 +102,8 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
     const loc = event ? (areaNameById.get(event.facilityAreaId ?? "") ?? facilityNameById.get(event.facilityId)) : facilityNameById.get(t.facilityId);
     entries.push({
       at: t.appliedAt,
-      kind: "action",
-      label: `${t.product ?? t.type.replace("_", " ")} applied`,
+      kind: "treatment",
+      label: `${t.product ?? displayNameForTreatmentType(t.type)} applied`,
       sub: (loc ?? "").toUpperCase(),
       facilityId: t.facilityId,
       eventId: t.pestEventId ?? undefined,
@@ -112,13 +119,13 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
   }
   for (const group of readingsByTrapDay.values()) {
     const loc = areaNameById.get(trapById.get(group[0].trapId)?.facilityAreaId ?? "") ?? "";
-    entries.push({ at: group[0].createdAt, kind: "monitor", label: "Trap readings logged", sub: `${group.length} TRAPS · ${loc}`.toUpperCase() });
+    entries.push({ at: group[0].createdAt, kind: "monitoring", label: "Trap readings logged", sub: `${group.length} TRAPS · ${loc}`.toUpperCase() });
   }
 
   for (const t of doneTasks) {
     if (t.status !== "done" || !t.completedAt) continue;
     const loc = areaNameById.get(t.facilityAreaId ?? "") ?? facilityNameById.get(t.facilityId ?? "") ?? "";
-    entries.push({ at: t.completedAt, kind: "action", label: t.title, sub: loc.toUpperCase() });
+    entries.push({ at: t.completedAt, kind: "treatment", label: t.title, sub: loc.toUpperCase() });
   }
 
   return entries.sort((a, b) => b.at.getTime() - a.at.getTime());

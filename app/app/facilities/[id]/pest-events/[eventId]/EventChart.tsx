@@ -3,6 +3,7 @@
 import { useState } from "react";
 import LocalDate from "@/app/app/LocalDate";
 import type { MetricKind } from "@/lib/scout-metric";
+import { displayNameForTreatmentType } from "@/lib/treatments-catalog";
 
 type TreatmentType = "pesticide" | "biological" | "spectral_light";
 
@@ -222,7 +223,7 @@ export default function EventChart({
               <rect width={boxW} height={28} rx={3} fill="var(--surface-raised)" stroke="var(--border)" strokeWidth={0.5} />
               <text x={6} y={11} fontFamily="ui-monospace, monospace" fontSize={6.5} fill="var(--text)">
                 {truncate(
-                  `${activeTreatmentData.type.replace("_", " ")}${activeTreatmentData.product ? `: ${activeTreatmentData.product}` : ""}`,
+                  `${displayNameForTreatmentType(activeTreatmentData.type)}${activeTreatmentData.product ? `: ${activeTreatmentData.product}` : ""}`,
                   20
                 )}
               </text>

@@ -11,7 +11,14 @@ import type { FollowUpSuggestion } from "@/lib/recommendations";
 import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { thresholdSourceFor } from "@/lib/threshold-sources";
-import { displayNameForPestSpecies, findAgent, findPestProgram, findProduct, findProductByName } from "@/lib/treatments-catalog";
+import {
+  displayNameForPestSpecies,
+  displayNameForTreatmentType,
+  findAgent,
+  findPestProgram,
+  findProduct,
+  findProductByName,
+} from "@/lib/treatments-catalog";
 import LocalDate from "@/app/app/LocalDate";
 import TimePicker from "@/app/app/TimePicker";
 import EventChart from "./EventChart";
@@ -449,7 +456,7 @@ export default function PestEventDetail({
 
   const timeline = [
     { label: event.loggedBy ? `Detected by ${event.loggedBy}` : "Detected", at: event.createdAt },
-    ...treatmentsList.map((t) => ({ label: `${t.type.replace("_", " ")} applied${t.product ? ` -- ${t.product}` : ""}`, at: t.appliedAt })),
+    ...treatmentsList.map((t) => ({ label: `${displayNameForTreatmentType(t.type)} applied${t.product ? `: ${t.product}` : ""}`, at: t.appliedAt })),
     ...(event.resolvedAt ? [{ label: "Resolved", at: event.resolvedAt }] : []),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
@@ -820,11 +827,11 @@ export default function PestEventDetail({
                   type="button"
                   key={t}
                   onClick={() => setTreatmentType(t)}
-                  className={`rounded-md border px-3 py-1.5 text-sm capitalize ${
+                  className={`rounded-md border px-3 py-1.5 text-sm ${
                     treatmentType === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
                   }`}
                 >
-                  {t.replace("_", " ")}
+                  {displayNameForTreatmentType(t)}
                 </button>
               ))}
             </div>
@@ -1006,9 +1013,9 @@ export default function PestEventDetail({
             {treatmentsList.length === 0 && <div className="p-4 text-sm text-[var(--text-dim)]">No treatments logged yet.</div>}
             {treatmentsList.map((t) => (
               <div key={t.id} className="px-4 py-3 text-sm">
-                <div className="capitalize">
-                  {t.type.replace("_", " ")}
-                  {t.product && ` -- ${t.product}`}
+                <div>
+                  {displayNameForTreatmentType(t.type)}
+                  {t.product && `: ${t.product}`}
                 </div>
                 {t.notes && <div className="text-[var(--text-dim)]">{t.notes}</div>}
                 <div className="text-xs text-[var(--text-dim)]">

@@ -6,10 +6,9 @@ export const dynamic = "force-dynamic";
 
 const KINDS: { value: LogKind | "all"; label: string }[] = [
   { value: "all", label: "All types" },
-  { value: "finding", label: "Findings" },
-  { value: "monitor", label: "Monitoring" },
-  { value: "action", label: "Actions" },
-  { value: "disease", label: "Disease" },
+  { value: "event", label: "Events" },
+  { value: "treatment", label: "Treatments" },
+  { value: "monitoring", label: "Monitoring" },
 ];
 
 function dayLabel(date: Date): string {
@@ -122,7 +121,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
       )}
 
       <div className="flex flex-wrap gap-4 border-t border-[var(--border)] pt-4">
-        {(["finding", "monitor", "action", "disease"] as const).map((k) => (
+        {(["event", "treatment", "monitoring"] as const).map((k) => (
           <div key={k} className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: KIND_COLOR[k] }} />
             <span className="label-mono">{k}</span>

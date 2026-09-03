@@ -4,14 +4,12 @@ import { requireGrowerSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-// A real "Applications" vs "Treatments" split (Airtable ticket B8) needs
-// Simon's own call on what distinguishes them in his mental model first --
-// today's LogEntry.kind doesn't separate them cleanly (both a real
-// pesticide/biological/spectral application AND a completed task fall
-// under "action"), so inventing a split here risked guessing at something
-// the ticket explicitly flagged to ask him about. Monitoring is added
-// since it's genuinely unambiguous (kind === "monitor" already exists as
-// its own category); the clickability fixes below apply regardless.
+// Simon's taxonomy decision (2026-09-03, resolving the ambiguity Airtable
+// ticket B8 originally flagged): three real categories everywhere activity
+// is grouped -- Events, Treatments, Monitoring. A resolved event now counts
+// as an Event, not a Treatment; a completed task and a real chemical/
+// biological/spectral application both count as a Treatment (lib/logs.ts's
+// LogKind mirrors these three names directly).
 const SCOPES = [
   { value: "all", label: "Whole org" },
   { value: "events", label: "Events" },
@@ -40,11 +38,11 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
   const entries = await getOrgLogEntries(session.organizationId!);
   const filtered =
     scope === "events"
-      ? entries.filter((e) => e.kind === "finding" || e.kind === "disease")
+      ? entries.filter((e) => e.kind === "event")
       : scope === "treatments"
-        ? entries.filter((e) => e.kind === "action")
+        ? entries.filter((e) => e.kind === "treatment")
         : scope === "monitoring"
-          ? entries.filter((e) => e.kind === "monitor")
+          ? entries.filter((e) => e.kind === "monitoring")
           : entries;
 
   const grouped = new Map<string, typeof filtered>();

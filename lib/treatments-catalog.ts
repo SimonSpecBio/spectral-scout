@@ -535,6 +535,21 @@ export function displayNameForPestSpecies(pestSpecies: string): string {
   const program = PESTS.find((p) => p.id === pestSpecies);
   return program ? program.commonName : pestSpecies;
 }
+
+// Display-only rename (ticket feedback, 2026-09-03): "Pesticide" -> "Chemical"
+// and "Spectral Light" -> "Spectral" everywhere a treatment type is shown to
+// a grower. Deliberately NOT a change to scout_treatment_type's actual enum
+// values (pesticide/biological/spectral_light) or the TreatmentType unions
+// that compare against them -- renaming the stored/compared value would be a
+// real migration for no behavioral gain; this is purely what gets rendered.
+export const TREATMENT_TYPE_LABEL: Record<"pesticide" | "biological" | "spectral_light", string> = {
+  pesticide: "Chemical",
+  biological: "Biologics",
+  spectral_light: "Spectral",
+};
+export function displayNameForTreatmentType(type: "pesticide" | "biological" | "spectral_light"): string {
+  return TREATMENT_TYPE_LABEL[type];
+}
 export function findAgent(id: string): Agent | undefined {
   return AGENTS.find((a) => a.id === id);
 }

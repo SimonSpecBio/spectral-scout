@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOrgLogEntries, type LogKind } from "@/lib/logs";
 import { requireGrowerSession } from "@/lib/session";
 
-const KINDS: LogKind[] = ["finding", "monitor", "action", "disease"];
+const KINDS: LogKind[] = ["event", "treatment", "monitoring"];
 
 function csvField(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;

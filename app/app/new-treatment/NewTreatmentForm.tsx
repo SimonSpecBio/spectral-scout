@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
-import { findProductByName } from "@/lib/treatments-catalog";
+import { displayNameForTreatmentType, findProductByName } from "@/lib/treatments-catalog";
 import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import { Stepper } from "../Stepper";
@@ -177,11 +177,11 @@ export default function NewTreatmentForm({
                 type="button"
                 key={t}
                 onClick={() => setType(t)}
-                className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize ${
+                className={`flex-1 rounded-md border px-3 py-2 text-sm ${
                   type === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
                 }`}
               >
-                {t.replace("_", " ")}
+                {displayNameForTreatmentType(t)}
               </button>
             ))}
           </div>
