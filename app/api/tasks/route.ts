@@ -5,6 +5,7 @@ import { facilityAreas, memberships, taskTypeEnum, tasks } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { getOwnedPestEvent } from "@/lib/pest-events";
+import { notifyTaskAssigned } from "@/lib/push";
 import { computeRestrictions } from "@/lib/rei-phi";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -109,5 +110,6 @@ export async function POST(request: NextRequest) {
       repeatEveryDays: typeof body.repeatEveryDays === "number" ? body.repeatEveryDays : null,
     })
     .returning();
+  await notifyTaskAssigned(row);
   return NextResponse.json(row);
 }

@@ -164,9 +164,9 @@ export async function maybeScheduleKeepAnEyeRecheck(params: {
   threshold: number;
   x: number | null;
   y: number | null;
-}): Promise<void> {
+}): Promise<typeof tasks.$inferSelect | null> {
   const { organizationId, facilityId, facilityAreaId, pestEventId, pestSpecies, locationLabel, value, threshold, x, y } = params;
-  if (value <= 0 || value >= threshold) return;
+  if (value <= 0 || value >= threshold) return null;
 
   const existing = await db
     .select({ id: tasks.id })
@@ -181,20 +181,24 @@ export async function maybeScheduleKeepAnEyeRecheck(params: {
       )
     )
     .limit(1);
-  if (existing.length > 0) return;
+  if (existing.length > 0) return null;
 
   const assigneeUserId = await assignLeastLoadedWorker(organizationId);
-  await db.insert(tasks).values({
-    organizationId,
-    title: `Keep an eye on ${[pestSpecies, locationLabel].filter(Boolean).join(", ") || "this area"}`,
-    type: "monitor",
-    facilityId,
-    facilityAreaId,
-    pestEventId,
-    x,
-    y,
-    assigneeUserId,
-    source: "auto_trigger",
-    dueAt: new Date(Date.now() + KEEP_AN_EYE_RECHECK_DAYS * DAY_MS),
-  });
+  const [row] = await db
+    .insert(tasks)
+    .values({
+      organizationId,
+      title: `Keep an eye on ${[pestSpecies, locationLabel].filter(Boolean).join(", ") || "this area"}`,
+      type: "monitor",
+      facilityId,
+      facilityAreaId,
+      pestEventId,
+      x,
+      y,
+      assigneeUserId,
+      source: "auto_trigger",
+      dueAt: new Date(Date.now() + KEEP_AN_EYE_RECHECK_DAYS * DAY_MS),
+    })
+    .returning();
+  return row;
 }

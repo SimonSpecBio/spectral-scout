@@ -5,6 +5,7 @@ import { facilityAreas, inventoryItems, tasks, treatmentTypeEnum } from "@/db/sc
 import { insertTreatmentAndDecrementStock } from "@/lib/apply-treatment";
 import { locationLabel } from "@/lib/floorplan-bays";
 import { getOwnedPestEvent } from "@/lib/pest-events";
+import { notifyTaskAssigned } from "@/lib/push";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
 import { findPestProgram } from "@/lib/treatments-catalog";
@@ -121,6 +122,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       createdTasks.push(releaseTask);
     }
   }
+
+  await Promise.all(createdTasks.map((t) => notifyTaskAssigned(t)));
 
   return NextResponse.json({ treatment, tasks: createdTasks });
 }

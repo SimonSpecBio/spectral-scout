@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import { db } from "@/db";
 import { pushSubscriptions } from "@/db/schema";
+import { taskActionHref } from "@/lib/tasks";
 
 // Self-hosted Web Push (VAPID), alongside email (lib/email.ts) rather than
 // instead of it -- ticket 91 needed SOME out-of-band channel to reach a
@@ -52,4 +53,67 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
       }
     })
   );
+}
+
+// Push for "important things" (Simon's direct instruction, 2026-09-03):
+// a new task assignment fires immediately from wherever tasks get created
+// (manual assignment, reassignment, or any of the several server-side
+// auto-trigger paths -- severe-hotspot recheck, keep-an-eye recheck,
+// apply-program's follow-ups). One shared call site so every task-creation
+// path gets this for free instead of each one remembering to wire it up
+// separately. Always best-effort: a push failure (VAPID misconfigured,
+// network blip, no subscription) must never fail the task-creation
+// request that triggered it -- ensureConfigured() throws loudly on a real
+// misconfiguration, which is exactly the kind of error a caller creating a
+// task has no business seeing or being blocked by.
+export async function notifyTaskAssigned(task: {
+  id: string;
+  title: string;
+  type: string;
+  facilityId: string | null;
+  facilityAreaId: string | null;
+  pestEventId: string | null;
+  assigneeUserId: string | null;
+}): Promise<void> {
+  if (!task.assigneeUserId) return;
+  try {
+    await sendPushToUser(task.assigneeUserId, {
+      title: "New task assigned",
+      body: task.title,
+      url: taskActionHref(task),
+    });
+  } catch {
+    // best-effort, see comment above
+  }
+}
+
+// The escalating overdue-task nudge half of "important things" (Simon's
+// direct instruction, 2026-09-03: "overdue tasks should ping every 24
+// hours after it's 24 hours late"). Called from the daily overdue-tasks
+// cron for each task that's actually due a nudge right now -- the cron
+// itself decides that using scout_task.lastOverdueNudgeAt, this function
+// just sends the push and stamps it. Same best-effort contract as
+// notifyTaskAssigned.
+export async function notifyTaskOverdue(
+  task: {
+    id: string;
+    title: string;
+    type: string;
+    facilityId: string | null;
+    facilityAreaId: string | null;
+    pestEventId: string | null;
+    assigneeUserId: string | null;
+  },
+  daysLate: number
+): Promise<void> {
+  if (!task.assigneeUserId) return;
+  try {
+    await sendPushToUser(task.assigneeUserId, {
+      title: `${task.title} is overdue`,
+      body: `${daysLate} day${daysLate === 1 ? "" : "s"} late`,
+      url: taskActionHref(task),
+    });
+  } catch {
+    // best-effort, see notifyTaskAssigned's comment
+  }
 }

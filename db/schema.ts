@@ -529,6 +529,24 @@ export const pushSubscriptions = pgTable(
   (table) => [index("scout_push_subscription_user_id_idx").on(table.userId)]
 ).enableRLS();
 
+// Dedup ledger for the real-time "important alert" push notifications
+// (trap spike / scouting threshold / event threshold / escalation) --
+// these are all computed on demand from other tables (lib/trap-alerts.ts,
+// lib/scouting-alerts.ts, lib/threshold-engine.ts), not stored rows of
+// their own, so there's nothing else to check "have we already pushed
+// this" against. alertKey reuses the exact same id convention
+// lib/notifications.ts's in-app feed already uses (`trap-${trapId}`,
+// `scouting-${observationId}`, `threshold-${eventId}`,
+// `escalation-${eventId}`) -- those ids are real table primary keys, so
+// they're already globally unique with no need to also scope by org.
+export const pushAlertsSent = pgTable("scout_push_alert_sent", {
+  alertKey: text("alert_key").primaryKey(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
 // Replaces the single shared freeform `notes` field above with a real,
 // append-only thread -- a multi-person crew working the same event over
 // days previously had no way to tell who said what, when. `notes` itself
@@ -862,6 +880,13 @@ export const tasks = pgTable(
   // shared to any cross-org aggregate at this granularity (DATA_CONSENT.md).
   minutesSpent: integer("minutes_spent"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Last time the overdue-task push cron pinged an assignee about this task
+  // -- without a marker, a cron running daily would just re-derive "this is
+  // overdue" as true forever and send a fresh push every single run. Null
+  // until the first overdue push fires (at 24h late, per Simon's spec,
+  // 2026-09-03), then advances roughly once per 24h after that as long as
+  // it stays open and overdue.
+  lastOverdueNudgeAt: timestamp("last_overdue_nudge_at", { withTimezone: true }),
   },
   (table) => [
     index("scout_task_organization_id_idx").on(table.organizationId),

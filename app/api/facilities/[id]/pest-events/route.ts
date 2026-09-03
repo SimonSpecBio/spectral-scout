@@ -5,6 +5,7 @@ import { eventKindEnum, facilityAreas, facilityMapObjects, inventoryItems, pestE
 import { locationLabel } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
 import { parseMonitoringPayload } from "@/lib/monitoring";
+import { notifyTaskAssigned } from "@/lib/push";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
 import { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, sessionMetric } from "@/lib/threshold-engine";
@@ -343,6 +344,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       createdTasks.push(tomorrowTask, weekOutTask);
     }
   }
+
+  await Promise.all(createdTasks.map((t) => notifyTaskAssigned(t)));
 
   return NextResponse.json({ ...row, autoCreatedTasks: createdTasks, initialMonitoring });
 }

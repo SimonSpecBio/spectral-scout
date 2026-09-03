@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { taskStatusEnum, tasks } from "@/db/schema";
+import { notifyTaskAssigned } from "@/lib/push";
 import { getTask } from "@/lib/tasks";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -49,5 +50,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const [row] = await db.update(tasks).set(updates).where(eq(tasks.id, taskId)).returning();
+  // Only a genuine reassignment to a new/different person pings them --
+  // unassigning (null), or a PATCH that didn't touch assigneeUserId at all,
+  // has nobody new to tell.
+  if (typeof updates.assigneeUserId === "string" && updates.assigneeUserId !== existing.assigneeUserId) {
+    await notifyTaskAssigned(row);
+  }
   return NextResponse.json(row);
 }

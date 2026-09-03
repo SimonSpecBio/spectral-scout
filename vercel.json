@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/reengagement",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/overdue-tasks",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/important-alerts",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

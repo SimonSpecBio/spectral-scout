@@ -6,6 +6,7 @@ import { aggregateDiseaseGrid, severityFromDiseaseAggregate, type DiseaseLeaves 
 import { locationLabel } from "@/lib/floorplan-bays";
 import { parseMonitoringPayload } from "@/lib/monitoring";
 import { getOwnedPestEvent } from "@/lib/pest-events";
+import { notifyTaskAssigned } from "@/lib/push";
 import { requireGrowerSession } from "@/lib/session";
 import { maybeScheduleKeepAnEyeRecheck } from "@/lib/tasks";
 import { getSpeciesThresholds, maybeAutoResolve, sessionMetric } from "@/lib/threshold-engine";
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // Whitefly — Whitefly" for an unpinned event (ticket found in a
       // manager-persona walkthrough, 2026-08-27).
       const [monitorArea] = await db.select({ name: facilityAreas.name }).from(facilityAreas).where(eq(facilityAreas.id, event.facilityAreaId!));
-      await maybeScheduleKeepAnEyeRecheck({
+      const newRecheckTask = await maybeScheduleKeepAnEyeRecheck({
         organizationId: session.organizationId!,
         facilityId: id,
         facilityAreaId: event.facilityAreaId!,
@@ -143,6 +144,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         x: event.x,
         y: event.y,
       });
+      if (newRecheckTask) await notifyTaskAssigned(newRecheckTask);
     }
   }
 
