@@ -166,6 +166,15 @@ export default function PestEventDetail({
   const [commentQueued, setCommentQueued] = useState(false);
   const [statusQueued, setStatusQueued] = useState(false);
   const [escalationQueued, setEscalationQueued] = useState(false);
+  // Resolving with zero context (why -- treatment worked? about to harvest?)
+  // left the timeline unable to say anything more than "resolved" (ticket
+  // found in QA, 2026-09-03). Same "optional textarea before confirming"
+  // pattern as the escalate-to-Spectral flow above. Only resolving prompts
+  // for this -- reopening is a correction, not a decision that needs
+  // explaining.
+  const [showResolveConfirm, setShowResolveConfirm] = useState(false);
+  const [resolveNote, setResolveNote] = useState("");
+  const [resolving, setResolving] = useState(false);
 
   const [treatmentType, setTreatmentType] = useState<TreatmentType>("biological");
   const [inventoryItemId, setInventoryItemId] = useState("");
@@ -294,6 +303,26 @@ export default function PestEventDetail({
       if (result.queued) setStatusQueued(true);
       else router.refresh();
     }
+  }
+
+  async function confirmResolve() {
+    setResolving(true);
+    const note = resolveNote.trim();
+    // Comment first, status second -- if the comment post fails partway
+    // (queued offline, say) the event still shouldn't silently resolve with
+    // the note lost; posting it first means a failure here stops before
+    // anything changes.
+    if (note) {
+      const commentResult = await queuedFetch(`${base}/comments`, { body: note }, "Comment");
+      if (commentResult.ok) {
+        if (commentResult.queued) setCommentQueued(true);
+        else if (commentResult.data) setComments((prev) => [...prev, commentResult.data as Comment]);
+      }
+    }
+    await toggleStatus();
+    setShowResolveConfirm(false);
+    setResolveNote("");
+    setResolving(false);
   }
 
   function toggleShareUser(userId: string) {
@@ -537,7 +566,7 @@ export default function PestEventDetail({
             </button>
           )}
           <button
-            onClick={toggleStatus}
+            onClick={() => (status === "active" ? setShowResolveConfirm((v) => !v) : toggleStatus())}
             className={`rounded-md border px-3 py-1.5 text-sm ${
               status === "active" ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
             }`}
@@ -554,6 +583,37 @@ export default function PestEventDetail({
           )}
         </div>
       </div>
+
+      {showResolveConfirm && (
+        <div className="card flex flex-col gap-3 p-3.5">
+          <div className="text-sm">Mark this event resolved?</div>
+          <textarea
+            value={resolveNote}
+            onChange={(e) => setResolveNote(e.target.value)}
+            placeholder="Why? (optional -- e.g. treatment worked, about to harvest)"
+            rows={2}
+            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={confirmResolve}
+              disabled={resolving}
+              className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
+            >
+              {resolving ? "Resolving…" : "Mark resolved"}
+            </button>
+            <button
+              onClick={() => {
+                setShowResolveConfirm(false);
+                setResolveNote("");
+              }}
+              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {shareError && (
         <div
