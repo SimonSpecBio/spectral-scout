@@ -136,9 +136,16 @@ export default function BayBarMap({
               );
             })}
           </g>
-          <g fontFamily="ui-monospace, monospace" fontSize="8" letterSpacing="0.14em" fill="var(--map-label)">
-            <text x="50" y="12">ROW A</text>
-            <text x="174" y="12">ROW B</text>
+          {/* Centered over each column's own bars (x=50..148 for A, x=174..272
+              for B -- same column widths the bars below use) instead of
+              left-aligned from the column's edge, and moved up a few px
+              closer to the canvas top so the gap above the frame roughly
+              matches the ~14px gap the last bar row already has below it
+              (ticket found in QA, 2026-09-03: top gap read noticeably
+              tighter than the bottom one). */}
+          <g fontFamily="ui-monospace, monospace" fontSize="8" letterSpacing="0.14em" fill="var(--map-label)" textAnchor="middle">
+            <text x="99" y="9">ROW A</text>
+            <text x="223" y="9">ROW B</text>
           </g>
         </svg>
       </div>

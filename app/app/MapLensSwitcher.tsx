@@ -63,7 +63,7 @@ export default function MapLensSwitcher({
       if (!e.lastScoutedAt) continue;
       const days = Math.floor((Date.now() - new Date(e.lastScoutedAt).getTime()) / DAY_MS);
       const overdue = days >= OVERDUE_AFTER_DAYS;
-      colorByBay.set(e.key, overdue ? "var(--danger-bg)" : "var(--map-bay-selected-fill)");
+      colorByBay.set(e.key, overdue ? "var(--danger)" : "var(--map-bay-selected-fill)");
       badgeByBay.set(e.key, `${days}D`);
     }
   } else if (lens === "temp") {
