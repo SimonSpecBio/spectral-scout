@@ -6,12 +6,13 @@ import { useState } from "react";
 const SECONDARY = [
   { href: "/app/search", label: "Search" },
   { href: "/app/events", label: "Events" },
-  { href: "/app/facilities", label: "Sites" },
   { href: "/app/traps", label: "Sticky traps" },
-  { href: "/app/inventory", label: "Inventory" },
   { href: "/app/rei-phi", label: "REI & PHI" },
   { href: "/app/preventive", label: "Preventive checklist" },
+  { href: "/app/inventory", label: "Inventory" },
   { href: "/app/team", label: "Team" },
+  { href: "/app/facilities", label: "Sites" },
+  { href: "/app/settings/catalog", label: "Species & thresholds" },
   { href: "/app/settings", label: "Settings" },
 ] as const;
 

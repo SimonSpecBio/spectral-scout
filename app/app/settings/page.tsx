@@ -29,10 +29,6 @@ export default async function SettingsPage() {
       <NotificationsToggle />
 
       <div className="card flex flex-col divide-y divide-[var(--border)]">
-        <Link href="/app/settings/catalog" className="flex items-center justify-between p-4 text-sm">
-          Species &amp; thresholds
-          <span className="text-[var(--text-faint)]">&rsaquo;</span>
-        </Link>
         <Link href="/app/team" className="flex items-center justify-between p-4 text-sm">
           Team
           <span className="text-[var(--text-faint)]">&rsaquo;</span>

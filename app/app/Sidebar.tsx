@@ -15,12 +15,13 @@ const PRIMARY = [
 
 const SECONDARY = [
   { href: "/app/events", label: "Events" },
-  { href: "/app/facilities", label: "Sites" },
   { href: "/app/traps", label: "Sticky traps" },
-  { href: "/app/inventory", label: "Inventory" },
   { href: "/app/rei-phi", label: "REI & PHI" },
   { href: "/app/preventive", label: "Preventive checklist" },
+  { href: "/app/inventory", label: "Inventory" },
   { href: "/app/team", label: "Team" },
+  { href: "/app/facilities", label: "Sites" },
+  { href: "/app/settings/catalog", label: "Species & thresholds" },
   { href: "/app/settings", label: "Settings" },
 ] as const;
 
@@ -64,19 +65,26 @@ export default function Sidebar({ email, isPilot }: { email: string | null | und
       </nav>
 
       <nav className="flex flex-col gap-0.5 border-t border-[var(--border)] pt-4">
-        {SECONDARY.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="rounded-md px-2.5 py-1.5 text-sm"
-            style={{
-              color: pathname.startsWith(item.href) ? "var(--text)" : "var(--text-dim)",
-              background: pathname.startsWith(item.href) ? "var(--surface-raised)" : "transparent",
-            }}
-          >
-            {item.label}
-          </Link>
-        ))}
+        {SECONDARY.map((item) => {
+          // Settings needs an exact match, not startsWith -- otherwise
+          // visiting /app/settings/catalog would highlight both it AND
+          // Settings, since "Species & thresholds" is now a sub-path of
+          // Settings that also has its own top-level nav entry.
+          const active = item.href === "/app/settings" ? pathname === item.href : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-md px-2.5 py-1.5 text-sm"
+              style={{
+                color: active ? "var(--text)" : "var(--text-dim)",
+                background: active ? "var(--surface-raised)" : "transparent",
+              }}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="mt-auto flex flex-col gap-1 border-t border-[var(--border)] pt-4">
