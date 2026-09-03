@@ -53,6 +53,7 @@ interface Photo {
   // account -- the tap-to-reveal overlay shows "Unknown" for those rather
   // than a broken name (ticket B6/B7).
   uploadedByName: string | null;
+  uploadedByUserId: string | null;
 }
 
 interface Comment {
@@ -435,7 +436,10 @@ export default function PestEventDetail({
         // convention the Comments list already uses for own-authored rows.
         // router.refresh() reconciles with the server-joined name after.
         const raw = result.data as { id: string; blobUrl: string; caption: string | null; uploadedAt: string };
-        setPhotos((prev) => [...prev, { id: raw.id, blobUrl: raw.blobUrl, caption: raw.caption, uploadedAt: raw.uploadedAt, uploadedByName: "You" }]);
+        setPhotos((prev) => [
+          ...prev,
+          { id: raw.id, blobUrl: raw.blobUrl, caption: raw.caption, uploadedAt: raw.uploadedAt, uploadedByName: "You", uploadedByUserId: currentUserId },
+        ]);
         router.refresh();
       }
     }
@@ -1021,8 +1025,10 @@ export default function PestEventDetail({
                   <img src={p.blobUrl} alt={p.caption ?? ""} className="h-full w-full object-cover" />
                   {selectedPhotoId === p.id && (
                     <div className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-black/60 px-2 py-1.5 text-left text-white">
-                      <span className="text-xs">{p.uploadedByName ?? "Unknown"}</span>
-                      <span className="text-[10px] opacity-80">{new Date(p.uploadedAt).toLocaleString()}</span>
+                      <span className="text-xs">{p.uploadedByUserId === currentUserId ? "You" : (p.uploadedByName ?? "Unknown")}</span>
+                      <span className="text-[10px] opacity-80">
+                        <LocalDate date={p.uploadedAt} format={(d) => d.toLocaleString()} />
+                      </span>
                     </div>
                   )}
                 </button>

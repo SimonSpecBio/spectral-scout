@@ -62,6 +62,7 @@ export default async function PestEventPage({
       blobUrl: observationPhotos.blobUrl,
       caption: observationPhotos.caption,
       uploadedAt: observationPhotos.uploadedAt,
+      uploadedByUserId: observationPhotos.uploadedByUserId,
       uploaderName: authUsers.name,
       uploaderEmail: authUsers.email,
     })
@@ -175,6 +176,7 @@ export default async function PestEventPage({
           caption: p.caption,
           uploadedAt: p.uploadedAt.toISOString(),
           uploadedByName: p.uploaderName ?? p.uploaderEmail ?? null,
+          uploadedByUserId: p.uploadedByUserId,
         }))}
         initialComments={comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
         currentUserId={session.user!.id!}
