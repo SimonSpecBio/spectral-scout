@@ -76,7 +76,11 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
       .filter((e) => e.createdAt <= dayEnd && (e.resolvedAt == null || e.resolvedAt >= dayStart))
       .reduce((sum, e) => sum + SEVERITY_WEIGHT[e.severity], 0);
     days.push(pressure);
-    dayLabels.push(WEEKDAY_LETTER[dayStart.getDay()]);
+    // A single weekday letter only disambiguates within one week -- past 7
+    // days it repeats (two Tuesdays both show "T") and no longer actually
+    // identifies which calendar day it is, which is what the 30d/All ranges
+    // need it to do.
+    dayLabels.push(numDays <= 7 ? WEEKDAY_LETTER[dayStart.getDay()] : `${dayStart.getMonth() + 1}/${dayStart.getDate()}`);
   }
 
   const latest = days[days.length - 1];
@@ -85,8 +89,25 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
   const max = Math.max(...days, 1);
   // Every weekday letter at 7 days is readable; past that it's just visual
   // noise (30+ crammed single letters) -- thin to about 6 evenly-spaced
-  // labels instead once the range grows.
-  const labelStride = Math.max(1, Math.ceil(numDays / 6));
+  // labels instead once the range grows. `numDays / 6` alone hit 7 days
+  // itself (ceil(7/6) = 2), thinning out the exact range the comment above
+  // says should show every label -- gate it so nothing thins until past 7.
+  const labelStride = numDays <= 7 ? 1 : Math.ceil(numDays / 6);
+  // Always showing every `labelStride`th index *and* unconditionally forcing
+  // in the very last index produced two labels crammed right next to each
+  // other whenever the last stride-multiple landed one or two days short of
+  // the end -- the "garbled" overlapping text QA found on the All-time
+  // range. Swap the nearest stride-multiple out for the true last day
+  // instead of showing both when they'd land within half a stride of each
+  // other.
+  const labelIndices = new Set<number>();
+  for (let i = 0; i < numDays; i += labelStride) labelIndices.add(i);
+  const lastIdx = numDays - 1;
+  if (!labelIndices.has(lastIdx)) {
+    const prevIncluded = Math.max(...labelIndices);
+    if (lastIdx - prevIncluded < labelStride / 2) labelIndices.delete(prevIncluded);
+    labelIndices.add(lastIdx);
+  }
 
   // Same w/h/pad the polyline below is drawn with (sparkPoints(days, 226, 44,
   // 4)) -- replicated here (not imported from sparkPoints, which only
@@ -173,7 +194,7 @@ export default function PressureGraph({ events }: { events: EventInput[] }) {
         />
         <g fontFamily="ui-monospace, monospace" fontSize="7" fill="var(--map-label-dim)" textAnchor="middle">
           {dayLabels.map((label, i) =>
-            i % labelStride === 0 || i === dayLabels.length - 1 ? (
+            labelIndices.has(i) ? (
               <text key={i} x={22 + 4 + (i * 218) / (numDays - 1 || 1)} y="68">
                 {label}
               </text>
