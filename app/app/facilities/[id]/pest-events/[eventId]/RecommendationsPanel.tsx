@@ -23,12 +23,28 @@ function isSubstantialCulturalEntry(entry: string): boolean {
 // something most growers need open by default, and collapsing them all
 // keeps the page scannable now that they sit in one continuous scroll
 // instead of behind a "Recommended" tab.
-function CollapsibleSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+//
+// "primary" (Spectral/Beneficials/Chemicals -- the actual treatment
+// options) reads as a real heading; "secondary" (the combined Preventive &
+// cautions section below) stays at the small label-mono size it always
+// was, so the two tiers read as genuinely different weight rather than
+// five identically-styled rows (ticket found in QA, 2026-09-03).
+function CollapsibleSection({
+  title,
+  count,
+  emphasis = "primary",
+  children,
+}: {
+  title: string;
+  count: number;
+  emphasis?: "primary" | "secondary";
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div className="card overflow-hidden">
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between p-4 text-left">
-        <span className="label-mono">
+        <span className={emphasis === "primary" ? "text-base font-semibold" : "label-mono"}>
           {title} ({count})
         </span>
         <span className="text-xs text-[var(--text-dim)]">{open ? "−" : "+"}</span>
@@ -326,16 +342,6 @@ export default function RecommendationsPanel({
         </CollapsibleSection>
       )}
 
-      {program.preventive.length > 0 && (
-        <CollapsibleSection title="Preventive" count={program.preventive.length}>
-          <ul className="flex flex-col gap-1 py-3 text-sm text-[var(--text-dim)]">
-            {program.preventive.map((p, i) => (
-              <li key={i}>• {p}</li>
-            ))}
-          </ul>
-        </CollapsibleSection>
-      )}
-
       {/* Hidden for now -- every current catalog entry is a terse one-line
           reminder ("Remove alate sources"), not real actionable guidance
           (Simon, ticket A11). isSubstantial is a placeholder that currently
@@ -353,13 +359,36 @@ export default function RecommendationsPanel({
         </div>
       )}
 
-      {program.cautions.length > 0 && (
-        <CollapsibleSection title="Cautions" count={program.cautions.length}>
-          {program.cautions.map((c, i) => (
-            <div key={i} className="py-2 text-xs text-[var(--text-dim)]">
-              ⚠ {c}
+      {/* Combined into one de-emphasized section, not two separate ones --
+          neither is a treatment option to act on right now the way Spectral/
+          Beneficials/Chemicals are, so both stay small and collapsed behind
+          a single toggle (ticket found in QA, 2026-09-03). */}
+      {(program.preventive.length > 0 || program.cautions.length > 0) && (
+        <CollapsibleSection
+          title="Preventive & cautions"
+          count={program.preventive.length + program.cautions.length}
+          emphasis="secondary"
+        >
+          {program.preventive.length > 0 && (
+            <div className="flex flex-col gap-1 py-3">
+              <div className="label-mono">Preventive</div>
+              <ul className="flex flex-col gap-1 text-sm text-[var(--text-dim)]">
+                {program.preventive.map((p, i) => (
+                  <li key={i}>• {p}</li>
+                ))}
+              </ul>
             </div>
-          ))}
+          )}
+          {program.cautions.length > 0 && (
+            <div className="flex flex-col gap-1 py-3">
+              <div className="label-mono">Cautions</div>
+              {program.cautions.map((c, i) => (
+                <div key={i} className="text-xs text-[var(--text-dim)]">
+                  ⚠ {c}
+                </div>
+              ))}
+            </div>
+          )}
         </CollapsibleSection>
       )}
     </div>
