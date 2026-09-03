@@ -161,6 +161,12 @@ export default function PestEventDetail({
   const [treatmentsList, setTreatmentsList] = useState(initialTreatments);
   const [photos, setPhotos] = useState(initialPhotos);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  // Separate from selectedPhotoId (single-tap, reveals the uploader-info
+  // overlay in place) -- double-tap/double-click instead opens the photo
+  // full-size for close inspection, since the grid's small thumbnails
+  // previously had no way at all to see a photo at real size (ticket
+  // request, 2026-09-03).
+  const [enlargedPhotoId, setEnlargedPhotoId] = useState<string | null>(null);
   const [photoQueued, setPhotoQueued] = useState(false);
   const [comments, setComments] = useState(initialComments);
   const [newComment, setNewComment] = useState("");
@@ -1214,23 +1220,45 @@ export default function PestEventDetail({
             // as photos.length grows since it's just the last grid child.
             <div className="grid grid-cols-3 gap-2">
               {photos.map((p) => (
-                <button
+                <div
                   key={p.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedPhotoId((prev) => (prev === p.id ? null : p.id))}
-                  className="relative aspect-square overflow-hidden rounded-md"
+                  onDoubleClick={() => setEnlargedPhotoId(p.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") setSelectedPhotoId((prev) => (prev === p.id ? null : p.id));
+                  }}
+                  className="relative aspect-square cursor-pointer overflow-hidden rounded-md"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary Blob-hosted URLs, not a local/static asset */}
                   <img src={p.blobUrl} alt={p.caption ?? ""} className="h-full w-full object-cover" />
                   {selectedPhotoId === p.id && (
-                    <div className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-black/60 px-2 py-1.5 text-left text-white">
-                      <span className="text-xs">{p.uploadedByUserId === currentUserId ? "You" : (p.uploadedByName ?? "Unknown")}</span>
-                      <span className="text-[10px] opacity-80">
-                        <LocalDate date={p.uploadedAt} format={(d) => d.toLocaleString()} />
-                      </span>
+                    <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-black/60 px-2 py-1.5 text-left text-white">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs">{p.uploadedByUserId === currentUserId ? "You" : (p.uploadedByName ?? "Unknown")}</span>
+                        <span className="text-[10px] opacity-80">
+                          <LocalDate date={p.uploadedAt} format={(d) => d.toLocaleString()} />
+                        </span>
+                      </div>
+                      {/* Double-tap doesn't reliably fire as a real dblclick
+                          on every mobile browser's touch input, so this is
+                          the explicit fallback the ticket itself allows for
+                          -- shown once the tile is already tapped-open,
+                          rather than as permanent grid clutter. */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEnlargedPhotoId(p.id);
+                        }}
+                        className="shrink-0 rounded-md bg-white/20 px-2 py-1 text-[10px]"
+                      >
+                        Expand
+                      </button>
                     </div>
                   )}
-                </button>
+                </div>
               ))}
               <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-[var(--border)] text-center text-xs text-[var(--text-dim)]">
                 {uploading ? "Uploading…" : "+ Add photo"}
@@ -1241,6 +1269,29 @@ export default function PestEventDetail({
           {photoQueued && <div className="text-xs text-[var(--text-dim)]">Photo saved offline. Will upload once you're back online.</div>}
         </div>
       </section>
+
+      {enlargedPhotoId &&
+        (() => {
+          const enlarged = photos.find((p) => p.id === enlargedPhotoId);
+          if (!enlarged) return null;
+          return (
+            <div
+              className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/90 p-4"
+              onClick={() => setEnlargedPhotoId(null)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary Blob-hosted URLs, not a local/static asset */}
+              <img src={enlarged.blobUrl} alt={enlarged.caption ?? ""} className="max-h-full max-w-full object-contain" />
+              <button
+                type="button"
+                onClick={() => setEnlargedPhotoId(null)}
+                className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-lg text-white"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+          );
+        })()}
 
       <section id="monitoring" className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Monitor hotspot</h2>
