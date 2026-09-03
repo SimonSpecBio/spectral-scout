@@ -7,6 +7,7 @@ import { getOwnedFacility } from "@/lib/facilities";
 import { parseMonitoringPayload } from "@/lib/monitoring";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
+import { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, sessionMetric } from "@/lib/threshold-engine";
 import { findAgent, findPestProgram, findProduct, resolveCanonicalPestId } from "@/lib/treatments-catalog";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -199,17 +200,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // used "+New" instead of chasing down that specific alert's confirm
     // link left the origin observation stranded unpromoted forever -- it
     // kept re-alerting on the same already-acted-on data (manager-persona
-    // walkthrough, 2026-08-20). Best-effort only: picks the latest
-    // unpromoted session for the area regardless of species, since general
-    // scouting never captures one to match against.
+    // walkthrough, 2026-08-20).
+    //
+    // MUST verify the session is actually a live alert (over threshold),
+    // the same condition lib/scouting-alerts.ts's computeScoutingAlerts
+    // requires -- a bug here previously linked the latest unpromoted
+    // session for the area unconditionally, including a routine, clean
+    // (under-threshold) scouting round with nothing to do with the pest
+    // just reported. That phantom "monitoring session" then fed straight
+    // into maybeAutoResolve, silently auto-resolving a brand-new, genuinely
+    // active infestation (found in QA, 2026-09-03) since it read as "2
+    // consecutive under-threshold sessions." Best-effort only: still
+    // species-blind, since general scouting never captures one to match
+    // against, but never links data that isn't a real alert.
     const [latestUnpromoted] = await db
-      .select({ id: scoutingObservations.id })
+      .select()
       .from(scoutingObservations)
       .where(and(eq(scoutingObservations.facilityAreaId, facilityAreaId), isNull(scoutingObservations.promotedPestEventId)))
       .orderBy(desc(scoutingObservations.createdAt))
       .limit(1);
     if (latestUnpromoted) {
-      await db.update(scoutingObservations).set({ promotedPestEventId: row.id }).where(eq(scoutingObservations.id, latestUnpromoted.id));
+      const metric = sessionMetric(latestUnpromoted);
+      const threshold = metric?.kind === "occupancy" ? DEFAULT_INFESTED_PCT_THRESHOLD : DEFAULT_DENSITY_THRESHOLD;
+      if (metric && metric.value >= threshold) {
+        await db.update(scoutingObservations).set({ promotedPestEventId: row.id }).where(eq(scoutingObservations.id, latestUnpromoted.id));
+      }
     }
   }
 
