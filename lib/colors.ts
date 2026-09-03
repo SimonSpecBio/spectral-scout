@@ -5,6 +5,7 @@
 // a future palette tweak can't update three copies and miss the fourth.
 
 export type Severity = "low" | "moderate" | "high" | "severe";
+export const SEVERITIES: Severity[] = ["low", "moderate", "high", "severe"];
 export const SEVERITY_COLOR: Record<Severity, string> = {
   low: "#e0d24b",
   moderate: "#e0913d",

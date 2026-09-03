@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
-import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
+import { SEVERITIES, SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { queuedFetch, queuedFileFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
@@ -147,6 +147,7 @@ export default function PestEventDetail({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(event.status);
+  const [severity, setSeverity] = useState(event.severity);
   const [showSharePicker, setShowSharePicker] = useState(false);
   const [selectedShareUserIds, setSelectedShareUserIds] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
@@ -176,6 +177,16 @@ export default function PestEventDetail({
   const [showResolveConfirm, setShowResolveConfirm] = useState(false);
   const [resolveNote, setResolveNote] = useState("");
   const [resolving, setResolving] = useState(false);
+  // Lets a grower correct an over/under-called severity without going
+  // through a full resolve -- e.g. "actually this is worse than I first
+  // logged" or "the outbreak's shrinking but isn't gone yet" (ticket
+  // request, 2026-09-03). The note is required (not optional like resolve's)
+  // since a bare severity flip with no explanation is exactly the kind of
+  // silent history-rewrite this exists to prevent.
+  const [showSeverityConfirm, setShowSeverityConfirm] = useState(false);
+  const [pendingSeverity, setPendingSeverity] = useState<Severity | null>(null);
+  const [severityNote, setSeverityNote] = useState("");
+  const [changingSeverity, setChangingSeverity] = useState(false);
 
   const [treatmentType, setTreatmentType] = useState<TreatmentType>("biological");
   const [inventoryItemId, setInventoryItemId] = useState("");
@@ -324,6 +335,31 @@ export default function PestEventDetail({
     setShowResolveConfirm(false);
     setResolveNote("");
     setResolving(false);
+  }
+
+  async function confirmSeverityChange() {
+    if (!pendingSeverity) return;
+    const note = severityNote.trim();
+    if (!note) return;
+    setChangingSeverity(true);
+    // Comment first, same ordering reasoning as confirmResolve above -- a
+    // failed comment post (e.g. queued offline) should stop before the
+    // severity itself changes, not leave the change unexplained.
+    const commentResult = await queuedFetch(`${base}/comments`, { body: note }, "Comment");
+    if (commentResult.ok) {
+      if (commentResult.queued) setCommentQueued(true);
+      else if (commentResult.data) setComments((prev) => [...prev, commentResult.data as Comment]);
+    }
+    const result = await queuedFetch(base, { severity: pendingSeverity }, "Severity", "PATCH");
+    if (result.ok) {
+      setSeverity(pendingSeverity);
+      if (result.queued) setStatusQueued(true);
+      else router.refresh();
+    }
+    setShowSeverityConfirm(false);
+    setPendingSeverity(null);
+    setSeverityNote("");
+    setChangingSeverity(false);
   }
 
   function toggleShareUser(userId: string) {
@@ -534,7 +570,7 @@ export default function PestEventDetail({
               {event.kind === "pathogen" && (
                 <span className="label-mono rounded border border-[var(--border-soft)] px-1.5 py-0.5">Disease</span>
               )}
-              <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[event.severity] }} />
+              <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[severity] }} />
             </div>
             {event.scientificName && <div className="text-sm italic text-[var(--text-dim)]">{event.scientificName}</div>}
             <div className="text-sm text-[var(--text-dim)]">{locationLabel}</div>
@@ -545,16 +581,22 @@ export default function PestEventDetail({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span
+          <button
+            type="button"
+            onClick={() => {
+              setShowSeverityConfirm((v) => !v);
+              setPendingSeverity(null);
+              setSeverityNote("");
+            }}
             className="rounded-md border px-3 py-1.5 text-sm"
-            style={{ borderColor: SEVERITY_COLOR[event.severity], color: SEVERITY_COLOR[event.severity] }}
+            style={{ borderColor: SEVERITY_COLOR[severity], color: SEVERITY_COLOR[severity] }}
           >
             {/* "Severe severity" reads redundantly -- only append the word
                 "severity" for the non-severe levels (ticket feedback,
                 2026-09-03). */}
-            <span className="capitalize">{event.severity}</span>
-            {event.severity !== "severe" && " severity"}
-          </span>
+            <span className="capitalize">{severity}</span>
+            {severity !== "severe" && " severity"}
+          </button>
           {shareableMembers.length > 0 && (
             <button
               onClick={() => {
@@ -607,6 +649,54 @@ export default function PestEventDetail({
               onClick={() => {
                 setShowResolveConfirm(false);
                 setResolveNote("");
+              }}
+              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showSeverityConfirm && (
+        <div className="card flex flex-col gap-3 p-3.5">
+          <div className="text-sm">Change severity</div>
+          <div className="flex gap-2">
+            {SEVERITIES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setPendingSeverity(s)}
+                className="flex-1 rounded-md border px-3 py-1.5 text-sm capitalize"
+                style={{
+                  borderColor: pendingSeverity === s ? SEVERITY_COLOR[s] : "var(--border)",
+                  color: pendingSeverity === s ? SEVERITY_COLOR[s] : "var(--text-dim)",
+                }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={severityNote}
+            onChange={(e) => setSeverityNote(e.target.value)}
+            placeholder="Why? (required -- e.g. spread to more benches, treatment knocked it back)"
+            rows={2}
+            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={confirmSeverityChange}
+              disabled={changingSeverity || !pendingSeverity || pendingSeverity === severity || !severityNote.trim()}
+              className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)] disabled:opacity-50"
+            >
+              {changingSeverity ? "Saving…" : "Save severity"}
+            </button>
+            <button
+              onClick={() => {
+                setShowSeverityConfirm(false);
+                setPendingSeverity(null);
+                setSeverityNote("");
               }}
               className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]"
             >
