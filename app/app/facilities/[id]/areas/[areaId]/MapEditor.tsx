@@ -9,6 +9,7 @@ import { CANVAS_TEXT } from "@/lib/canvas-text-scale";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { pointInShape } from "@/lib/map-zones";
 import { queuedFetch } from "@/lib/offline-queue";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import { useTheme } from "@/app/app/ThemeProvider";
 
 // Freehand shape creation (rect/circle/polygon/label draw tools) was
@@ -76,6 +77,11 @@ function wasRecentlyTreated(lastTreatedAt: string | null): boolean {
 // direction. Ring/halo/arrow are secondary accents, only drawn when there's
 // something to say, not competing dimensions on every pin.
 const SEVERITY_RADIUS: Record<Severity, number> = { low: 7, moderate: 9.5, high: 12, severe: 15 };
+// Largest severe pin's radius (15) doubled -- comfortably covers two
+// severe pins dropped at the exact same bay coordinate (the common case:
+// both inherit the same pin from a shared location picker) without also
+// catching two genuinely different, merely nearby bays.
+const OVERLAP_PX = 30;
 
 const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 600;
@@ -142,6 +148,13 @@ export default function MapEditor({
   const [pestSpecies, setPestSpecies] = useState("");
   const [pestSeverity, setPestSeverity] = useState<Severity>("moderate");
   const [selectedEvent, setSelectedEvent] = useState<PestEvent | null>(null);
+  // Two hotspots pinned to the same row/bench render as overlapping circles
+  // -- Konva only ever delivers a click to the topmost one, so tapping the
+  // spot silently always opened whichever happened to render last, with no
+  // way to reach the other (ticket found in QA, 2026-09-03). A small picker
+  // instead of navigating straight through whenever more than one active
+  // event's pin is within OVERLAP_PX of the tapped one.
+  const [overlapPicker, setOverlapPicker] = useState<PestEvent[] | null>(null);
 
   const bgImage = useBackgroundImage(area.backgroundImageUrl);
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -563,8 +576,17 @@ export default function MapEditor({
               .flatMap((ev) => {
                 const r = SEVERITY_RADIUS[ev.severity];
                 const onActivate = () => {
-                  if (mode === "view") router.push(`/app/facilities/${facilityId}/pest-events/${ev.id}`);
-                  else if (tool === "select") setSelectedEvent(ev);
+                  if (mode === "view") {
+                    const overlapping = pestEvents.filter(
+                      (other) =>
+                        other.status === "active" &&
+                        other.x != null &&
+                        other.y != null &&
+                        Math.hypot(other.x - ev.x!, other.y - ev.y!) <= OVERLAP_PX
+                    );
+                    if (overlapping.length > 1) setOverlapPicker(overlapping);
+                    else router.push(`/app/facilities/${facilityId}/pest-events/${ev.id}`);
+                  } else if (tool === "select") setSelectedEvent(ev);
                 };
                 const nodes: React.ReactNode[] = [];
                 // Halo: a soft glow behind the pin if treated in the last
@@ -708,6 +730,36 @@ export default function MapEditor({
             </div>
             <button onClick={() => setSelectedEvent(null)} className="text-xs text-[var(--text-dim)]">
               Close
+            </button>
+          </div>
+        )}
+
+        {overlapPicker && (
+          <div
+            className="card absolute z-10 flex w-56 flex-col gap-1 p-2"
+            style={{
+              left: Math.min((overlapPicker[0].x ?? 0) * scale, CANVAS_WIDTH * scale - 232),
+              top: Math.min((overlapPicker[0].y ?? 0) * scale, CANVAS_HEIGHT * scale - 40 * overlapPicker.length - 40),
+            }}
+          >
+            <div className="px-1 text-xs text-[var(--text-dim)]">{overlapPicker.length} events here -- which one?</div>
+            {overlapPicker.map((ev) => (
+              <button
+                key={ev.id}
+                onClick={() => {
+                  setOverlapPicker(null);
+                  router.push(`/app/facilities/${facilityId}/pest-events/${ev.id}`);
+                }}
+                className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-[var(--surface-raised)]"
+              >
+                <span className="min-w-0 truncate capitalize">{displayNameForPestSpecies(ev.pestSpecies)}</span>
+                <span className="shrink-0 text-xs" style={{ color: SEVERITY_COLOR[ev.severity] }}>
+                  {ev.severity}
+                </span>
+              </button>
+            ))}
+            <button onClick={() => setOverlapPicker(null)} className="px-1 text-left text-xs text-[var(--text-dim)]">
+              Cancel
             </button>
           </div>
         )}
