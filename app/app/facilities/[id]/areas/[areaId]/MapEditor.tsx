@@ -709,7 +709,7 @@ export default function MapEditor({
               top: Math.min((selectedEvent.y ?? 0) * scale, CANVAS_HEIGHT * scale - 140),
             }}
           >
-            <div className="text-sm font-medium capitalize">{selectedEvent.pestSpecies}</div>
+            <div className="text-sm font-medium capitalize">{displayNameForPestSpecies(selectedEvent.pestSpecies)}</div>
             <div className="text-xs" style={{ color: SEVERITY_COLOR[selectedEvent.severity] }}>
               {selectedEvent.severity} severity
             </div>

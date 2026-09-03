@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { findPestProgram } from "@/lib/treatments-catalog";
+import { displayNameForPestSpecies, findPestProgram } from "@/lib/treatments-catalog";
 
 interface SpeciesRow {
   id: string;
@@ -134,7 +134,7 @@ export default function CatalogClient({
   }
 
   async function removeThreshold(row: ThresholdRow) {
-    if (!confirm(`Remove the monitoring threshold for "${row.pestSpecies}"?`)) return;
+    if (!confirm(`Remove the monitoring threshold for "${displayNameForPestSpecies(row.pestSpecies)}"?`)) return;
     const res = await fetch(`/api/thresholds/${row.id}`, { method: "DELETE" });
     if (res.ok) setThresholds((prev) => prev.filter((t) => t.id !== row.id));
   }
@@ -164,7 +164,7 @@ export default function CatalogClient({
   }
 
   async function removeTrapThreshold(row: TrapThresholdRow) {
-    if (!confirm(`Remove the trap catch/day threshold for "${row.pestSpecies}"?`)) return;
+    if (!confirm(`Remove the trap catch/day threshold for "${displayNameForPestSpecies(row.pestSpecies)}"?`)) return;
     const res = await fetch(`/api/trap-thresholds/${row.id}`, { method: "DELETE" });
     if (res.ok) setTrapThresholds((prev) => prev.filter((t) => t.id !== row.id));
   }
@@ -255,7 +255,7 @@ export default function CatalogClient({
           <div className="card flex flex-col divide-y divide-[var(--border)]">
             {thresholds.map((t) => (
               <div key={t.id} className="flex items-center justify-between gap-3 p-3.5">
-                <div className="text-sm">{t.pestSpecies}</div>
+                <div className="text-sm">{displayNameForPestSpecies(t.pestSpecies)}</div>
                 <div className="flex items-center gap-3">
                   <span className="label-mono">
                     {resolvedPresenceTriggered(t)
@@ -368,7 +368,7 @@ export default function CatalogClient({
           <div className="card flex flex-col divide-y divide-[var(--border)]">
             {trapThresholds.map((t) => (
               <div key={t.id} className="flex items-center justify-between gap-3 p-3.5">
-                <div className="text-sm">{t.pestSpecies}</div>
+                <div className="text-sm">{displayNameForPestSpecies(t.pestSpecies)}</div>
                 <div className="flex items-center gap-3">
                   <span className="label-mono">{t.catchPerDayThreshold}/day</span>
                   {isOwner && (

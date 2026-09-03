@@ -5,6 +5,7 @@ import { facilities, facilityAreas } from "@/db/schema";
 import { computeTrapAlerts, computeTrapStatuses } from "@/lib/trap-alerts";
 import { sparkPoints } from "@/lib/density";
 import { requireGrowerSession } from "@/lib/session";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -171,7 +172,7 @@ export default async function TrapsPage({
                     style={{ background: "var(--danger-bg)" }}
                   >
                     <span className="text-[var(--text)]">
-                      {alert.dedupedIntoEventId ? "Event already tracking this" : `Confirm ${alert.pestSpecies} event?`}
+                      {alert.dedupedIntoEventId ? "Event already tracking this" : `Confirm ${displayNameForPestSpecies(alert.pestSpecies)} event?`}
                     </span>
                     <span style={{ color: "var(--danger)" }}>›</span>
                   </Link>

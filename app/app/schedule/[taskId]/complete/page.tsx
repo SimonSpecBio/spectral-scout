@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { getTask } from "@/lib/tasks";
 import { requireGrowerSession } from "@/lib/session";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import CompleteTaskForm from "./CompleteTaskForm";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +46,7 @@ export default async function CompleteTaskPage({ params }: { params: Promise<{ t
       <h1 className="text-2xl font-semibold">Complete task</h1>
       <div>
         <div className="text-lg font-medium">{task.title}</div>
-        {pestSpecies && <div className="label-mono">{pestSpecies.toUpperCase()}</div>}
+        {pestSpecies && <div className="label-mono">{displayNameForPestSpecies(pestSpecies).toUpperCase()}</div>}
       </div>
       <CompleteTaskForm taskId={task.id} byName={session.user?.name ?? session.user?.email ?? ""} laborByType={laborByType} />
     </div>

@@ -3,6 +3,7 @@ import { URGENCY_COLOR } from "@/lib/colors";
 import { getTask, taskActionHref, taskUrgency } from "@/lib/tasks";
 import { getTeam } from "@/lib/team";
 import { requireGrowerSession } from "@/lib/session";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import TaskDetailClient from "./TaskDetailClient";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +62,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tas
           className="card flex items-center justify-between p-4"
         >
           <div>
-            <div className="text-sm">View {pestSpecies} event</div>
+            <div className="text-sm">View {displayNameForPestSpecies(pestSpecies)} event</div>
             <div className="label-mono">{(pestEventStatus ?? "").toUpperCase()}</div>
           </div>
           <span className="text-[var(--text-faint)]">›</span>

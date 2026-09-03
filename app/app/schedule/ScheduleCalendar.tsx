@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { initialsFor } from "@/lib/avatar";
 import { URGENCY_COLOR, type TaskUrgency } from "@/lib/colors";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 
 export interface ScheduleTaskRow {
   id: string;
@@ -197,7 +198,10 @@ export default function ScheduleCalendar({
                   <div className="flex-1">
                     <div className="text-sm">{task.title}</div>
                     <div className="label-mono">
-                      {[task.pestSpecies, task.areaName ?? task.facilityName].filter(Boolean).join(" · ").toUpperCase() || task.type.toUpperCase()}
+                      {[task.pestSpecies ? displayNameForPestSpecies(task.pestSpecies) : null, task.areaName ?? task.facilityName]
+                        .filter(Boolean)
+                        .join(" · ")
+                        .toUpperCase() || task.type.toUpperCase()}
                       {task.urgency === "overdue" && " · OVERDUE"}
                     </div>
                   </div>

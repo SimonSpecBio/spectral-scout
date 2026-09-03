@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents, tasks } from "@/db/schema";
 import { getTeam } from "@/lib/team";
 import type { MetricKind } from "@/lib/threshold-engine";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 
 export type TaskUrgency = "overdue" | "due_soon" | "scheduled" | "done" | "snoozed";
 const DUE_SOON_MS = 24 * 60 * 60 * 1000;
@@ -188,7 +189,7 @@ export async function maybeScheduleKeepAnEyeRecheck(params: {
     .insert(tasks)
     .values({
       organizationId,
-      title: `Keep an eye on ${[pestSpecies, locationLabel].filter(Boolean).join(", ") || "this area"}`,
+      title: `Keep an eye on ${[pestSpecies ? displayNameForPestSpecies(pestSpecies) : null, locationLabel].filter(Boolean).join(", ") || "this area"}`,
       type: "monitor",
       facilityId,
       facilityAreaId,

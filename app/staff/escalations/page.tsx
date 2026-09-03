@@ -86,7 +86,12 @@ export default async function StaffEscalationsPage() {
           {(photosByEvent.get(r.event.id) ?? []).length > 0 && (
             <div className="grid grid-cols-4 gap-2">
               {(photosByEvent.get(r.event.id) ?? []).map((p) => (
-                <img key={p.id} src={p.blobUrl} alt={p.caption ?? r.event.pestSpecies} className="aspect-square rounded-md object-cover" />
+                <img
+                  key={p.id}
+                  src={p.blobUrl}
+                  alt={p.caption ?? displayNameForPestSpecies(r.event.pestSpecies)}
+                  className="aspect-square rounded-md object-cover"
+                />
               ))}
             </div>
           )}

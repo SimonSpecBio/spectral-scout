@@ -9,7 +9,7 @@ import { notifyTaskAssigned } from "@/lib/push";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
 import { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, sessionMetric } from "@/lib/threshold-engine";
-import { findAgent, findPestProgram, findProduct, resolveCanonicalPestId } from "@/lib/treatments-catalog";
+import { displayNameForPestSpecies, findAgent, findPestProgram, findProduct, resolveCanonicalPestId } from "@/lib/treatments-catalog";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireGrowerSession();
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .insert(tasks)
       .values({
         organizationId: session.organizationId!,
-        title: `Recheck ${pestSpecies}${suffix}`,
+        title: `Recheck ${displayNameForPestSpecies(pestSpecies)}${suffix}`,
         type: "monitor",
         facilityId: id,
         facilityAreaId,
@@ -313,7 +313,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .values([
           {
             organizationId: session.organizationId!,
-            title: `Treat ${pestSpecies}${suffix}`,
+            title: `Treat ${displayNameForPestSpecies(pestSpecies)}${suffix}`,
             type: "treatment",
             facilityId: id,
             facilityAreaId,
@@ -327,7 +327,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           },
           {
             organizationId: session.organizationId!,
-            title: `Treat ${pestSpecies}${suffix}`,
+            title: `Treat ${displayNameForPestSpecies(pestSpecies)}${suffix}`,
             type: "treatment",
             facilityId: id,
             facilityAreaId,

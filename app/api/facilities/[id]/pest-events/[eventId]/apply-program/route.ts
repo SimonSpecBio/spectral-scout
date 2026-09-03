@@ -8,7 +8,7 @@ import { getOwnedPestEvent } from "@/lib/pest-events";
 import { notifyTaskAssigned } from "@/lib/push";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
-import { findPestProgram } from "@/lib/treatments-catalog";
+import { displayNameForPestSpecies, findPestProgram } from "@/lib/treatments-catalog";
 
 const DAY_MS = 86_400_000;
 
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .insert(tasks)
       .values({
         organizationId: session.organizationId!,
-        title: `Recheck ${event.pestSpecies}${suffix}`,
+        title: `Recheck ${displayNameForPestSpecies(event.pestSpecies)}${suffix}`,
         type: "monitor",
         facilityId: id,
         facilityAreaId: event.facilityAreaId,

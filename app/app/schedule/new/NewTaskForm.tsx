@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
 import { queuedFetch } from "@/lib/offline-queue";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import FormField from "../../FormField";
 import SubmitButton from "../../SubmitButton";
 
@@ -141,7 +142,7 @@ export default function NewTaskForm({
                 </option>
                 {eventsForFacility.map((ev) => (
                   <option key={ev.id} value={ev.id} style={{ background: "var(--surface)" }}>
-                    {ev.pestSpecies}
+                    {displayNameForPestSpecies(ev.pestSpecies)}
                   </option>
                 ))}
               </select>
