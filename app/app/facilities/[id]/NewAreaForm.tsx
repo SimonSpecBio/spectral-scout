@@ -30,14 +30,14 @@ export default function NewAreaForm({ facilityId }: { facilityId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
+    <form onSubmit={handleSubmit} className="flex flex-wrap gap-2">
       <FormField label="Area name" required layout="compact">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Area name (e.g. Flower Room 2)"
           required
-          className="flex-1 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+          className="min-w-0 flex-1 basis-40 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
         />
       </FormField>
       <FormField label="Area type" layout="compact">

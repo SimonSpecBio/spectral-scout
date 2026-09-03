@@ -16,6 +16,9 @@ export default async function StaffLayout({ children }: { children: React.ReactN
         <Link href="/staff/escalations" className="text-sm text-[var(--text-dim)]">
           Ask a person
         </Link>
+        <Link href="/api/auth/signout" className="ml-auto text-sm text-[var(--text-dim)]">
+          Sign out
+        </Link>
       </header>
       {children}
     </div>

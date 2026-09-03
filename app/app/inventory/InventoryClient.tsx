@@ -449,9 +449,9 @@ function AddFromCatalog({
         {results.length > 0 && (
           <div className="flex flex-col divide-y divide-[var(--border)]">
             {results.map((r) => (
-              <button key={r.name} onClick={() => pick(r)} className="flex items-center justify-between py-2 text-left text-sm">
-                <span>{r.name}</span>
-                <span className="label-mono">{CATEGORY_LABEL[r.category].toUpperCase()}</span>
+              <button key={r.name} onClick={() => pick(r)} className="flex items-center justify-between gap-3 py-2 text-left text-sm">
+                <span className="min-w-0 truncate">{r.name}</span>
+                <span className="label-mono shrink-0">{CATEGORY_LABEL[r.category].toUpperCase()}</span>
               </button>
             ))}
           </div>
@@ -465,15 +465,15 @@ function AddFromCatalog({
 
   return (
     <form onSubmit={submit} className="card flex flex-col gap-3 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{picked ? picked.name : "Custom item"}</span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0 truncate text-sm font-medium">{picked ? picked.name : "Custom item"}</span>
         <button
           type="button"
           onClick={() => {
             setPicked(null);
             setCustom(false);
           }}
-          className="text-xs text-[var(--text-dim)]"
+          className="shrink-0 text-xs text-[var(--text-dim)]"
         >
           Back
         </button>
@@ -514,12 +514,12 @@ function AddFromCatalog({
           Quantity
           <Stepper value={quantity} onChange={setQuantity} min={0} />
         </label>
-        <label className="flex flex-1 flex-col gap-1 text-xs text-[var(--text-dim)]">
+        <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-[var(--text-dim)]">
           Unit
           <input
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
-            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
+            className="w-full min-w-0 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
           />
         </label>
       </div>
