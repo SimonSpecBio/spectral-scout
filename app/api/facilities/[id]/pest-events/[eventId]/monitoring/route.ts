@@ -1,7 +1,7 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { facilityAreas, pestEvents, scoutingObservations } from "@/db/schema";
+import { facilityAreas, pestEvents, scoutingObservations, tasks } from "@/db/schema";
 import { aggregateDiseaseGrid, severityFromDiseaseAggregate, type DiseaseLeaves } from "@/lib/disease";
 import { locationLabel } from "@/lib/floorplan-bays";
 import { parseMonitoringPayload } from "@/lib/monitoring";
@@ -9,6 +9,8 @@ import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
 import { maybeScheduleKeepAnEyeRecheck } from "@/lib/tasks";
 import { getSpeciesThresholds, maybeAutoResolve, sessionMetric } from "@/lib/threshold-engine";
+
+const DAY_MS = 86_400_000;
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string; eventId: string }> }) {
   const session = await requireGrowerSession();
@@ -63,6 +65,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ...parsed,
     })
     .returning();
+
+  // Logging a monitoring session directly on the hotspot (rather than
+  // through the scheduled recheck task's own action link) left that task
+  // stuck open/overdue forever -- nothing else ever marked it done (ticket
+  // found in QA, 2026-09-03). This session fulfills the exact purpose of
+  // any open recheck-type (type "monitor") task tied to this same event,
+  // whether it was auto-scheduled or created by hand, so complete it here
+  // regardless of which path the grower used. Appends how many days late
+  // it was to the title so Logs/Timeline (which just render a task's
+  // title) surface that instead of it silently disappearing as on-time.
+  const openRecheckTasks = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.pestEventId, eventId), eq(tasks.type, "monitor"), eq(tasks.status, "open")));
+  for (const t of openRecheckTasks) {
+    const daysLate = Math.floor((Date.now() - t.dueAt.getTime()) / DAY_MS);
+    await db
+      .update(tasks)
+      .set({
+        status: "done",
+        completedAt: new Date(),
+        completedByUserId: session.user!.id!,
+        title: daysLate > 0 ? `${t.title} (${daysLate}d late)` : t.title,
+      })
+      .where(eq(tasks.id, t.id));
+  }
 
   // Pathogen events never had a live severity-update path at all (severity
   // was only ever set once, at creation) -- pest thresholds/auto-resolve/
