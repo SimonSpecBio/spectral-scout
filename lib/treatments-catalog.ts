@@ -141,7 +141,7 @@ export const PRODUCTS: Product[] = [
   { id: "pr_hort_oil", name: "Horticultural / neem oil", class: "oil", type: "biopesticide-minrisk", targets: ["pest_tssm", "pest_broadmite", "pest_whitefly", "pest_aphid", "path_pm"], reiHours: 4, phiDays: 0, cautions: "Do NOT combine or overlap with sulfur (~2wk). Avoid in heat/high light. Not in late flower (residue).", typicalDosage: "1-2% v/v solution" },
   { id: "pr_sulfur", name: "Sulfur (wettable / vaporizer burner)", class: "mineral", type: "biopesticide-minrisk", targets: ["path_pm", "pest_broadmite", "pest_tssm"], reiHours: 24, phiDays: 0, cautions: "NEVER with oils (2wk gap). Not in mid-late flower (taste/residue). Ventilate; respirator for burners. Phytotoxic in heat.", typicalDosage: "2-5 tbsp/gal" },
   { id: "pr_kbicarb", name: "Potassium bicarbonate", class: "bicarbonate", type: "biopesticide-minrisk", targets: ["path_pm"], reiHours: 4, phiDays: 0, cautions: "Contact/curative-eradicant on PM; rotate to avoid residue; test small area.", typicalDosage: "1-2 tbsp/gal" },
-  { id: "pr_bacillus_sub", name: "Bacillus subtilis / amyloliquefaciens", class: "microbial-fungicide", type: "biopesticide", targets: ["path_pm", "path_botrytis"], reiHours: 4, phiDays: 0, cautions: "Preventive/early; needs good coverage and repeat.", typicalDosage: "1-2.5 oz/gal" },
+  { id: "pr_bacillus_sub", name: "Bacillus subtilis / B. amyloliquefaciens", class: "microbial-fungicide", type: "biopesticide", targets: ["path_pm", "path_botrytis"], reiHours: 4, phiDays: 0, cautions: "Preventive/early; needs good coverage and repeat.", typicalDosage: "1-2.5 oz/gal" },
   { id: "pr_bti", name: "Bacillus thuringiensis israelensis (Bti)", class: "microbial-insecticide", type: "biopesticide", targets: ["pest_fungusgnat"], reiHours: 4, phiDays: 0, cautions: "Larval drench; reapply; pair with dry-back + nematodes.", typicalDosage: "1-8 tsp/gal (drench)" },
   { id: "pr_beauveria", name: "Beauveria bassiana", class: "entomopathogenic-fungus", type: "biopesticide", targets: ["pest_whitefly", "pest_thrips", "pest_aphid", "pest_tssm", "pest_mealybug"], reiHours: 4, phiDays: 0, cautions: "Needs humidity to infect; can harm some beneficials -- separate applications.", typicalDosage: "1-4 tsp/gal" },
   { id: "pr_isaria", name: "Cordyceps (Isaria) fumosorosea", class: "entomopathogenic-fungus", type: "biopesticide", targets: ["pest_whitefly", "pest_thrips", "pest_broadmite", "pest_rootaphid"], reiHours: 4, phiDays: 0, cautions: "As Beauveria; humidity-dependent. Also labeled for root aphids incl. rice root aphid on cannabis (Certis PFR-97 label / CSU Extension).", typicalDosage: "14-28 oz/100 gal" },
@@ -365,7 +365,7 @@ export const PESTS: PestProgram[] = [
   },
   {
     id: "path_pm", commonName: "Powdery mildew", latin: "Golovinomyces / Podosphaera spp.", kind: "pathogen",
-    preventive: ["Airflow + VPD/humidity control", "Resistant genetics", "Preventive Bacillus subtilis / amyloliquefaciens or sulfur (veg only)"],
+    preventive: ["Airflow + VPD/humidity control", "Resistant genetics", "Preventive Bacillus subtilis / B. amyloliquefaciens or sulfur (veg only)"],
     primaryBiocontrol: [],
     biopesticideRotation: ["pr_kbicarb", "pr_bacillus_sub", "pr_sulfur", "pr_hort_oil"],
     cultural: ["Remove/bag infected leaves", "Increase spacing/airflow", "Lower RH"],
@@ -382,7 +382,7 @@ export const PESTS: PestProgram[] = [
   },
   {
     id: "path_botrytis", commonName: "Botrytis / gray mold (bud rot)", latin: "Botrytis cinerea", kind: "pathogen",
-    preventive: ["RH <50% in flower + airflow", "Defoliate/open canopy", "Preventive Bacillus subtilis / amyloliquefaciens or Clonostachys rosea"],
+    preventive: ["RH <50% in flower + airflow", "Defoliate/open canopy", "Preventive Bacillus subtilis / B. amyloliquefaciens or Clonostachys rosea"],
     primaryBiocontrol: ["ag_clonostachys"],
     biopesticideRotation: ["pr_bacillus_sub"],
     cultural: ["Remove + bag infected buds immediately (don't shake spores)", "Drop RH", "Increase airflow", "Reduce wounding"],
