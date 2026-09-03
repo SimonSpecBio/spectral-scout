@@ -105,8 +105,8 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
             <div className="card flex flex-col divide-y divide-[var(--border)]">
               {dayEntries.map((e, i) => (
                 <div key={i} className="flex items-start gap-3 p-3.5">
-                  <span className="mt-1 w-11 shrink-0 label-mono">
-                    {e.at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
+                  <span className="mt-1 w-14 shrink-0 whitespace-nowrap label-mono">
+                    {e.at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true })}
                   </span>
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: KIND_COLOR[e.kind] }} />
                   <div className="flex-1">

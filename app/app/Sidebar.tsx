@@ -18,7 +18,7 @@ const SECONDARY = [
   { href: "/app/facilities", label: "Sites" },
   { href: "/app/traps", label: "Sticky traps" },
   { href: "/app/inventory", label: "Inventory" },
-  { href: "/app/rei-phi", label: "Re-entry & harvest" },
+  { href: "/app/rei-phi", label: "REI & PHI" },
   { href: "/app/preventive", label: "Preventive checklist" },
   { href: "/app/team", label: "Team" },
   { href: "/app/settings", label: "Settings" },

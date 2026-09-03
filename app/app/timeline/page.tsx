@@ -89,7 +89,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
                       <div>
                         <div className="text-sm">{e.label}</div>
                         <div className="label-mono">
-                          {e.at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })} · {e.sub}
+                          {e.at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true })} · {e.sub}
                         </div>
                       </div>
                       {e.eventId && <span className="label-mono text-[var(--text-faint)]">PE-{e.eventId.slice(0, 4).toUpperCase()}</span>}

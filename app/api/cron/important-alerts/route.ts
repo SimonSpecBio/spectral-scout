@@ -8,13 +8,20 @@ import { computeEscalationAlerts, computeMonitoringAlerts, metricLabel } from "@
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 
-// Real-time "important things" push (Simon's direct instruction,
-// 2026-09-03): the same trap-spike/scouting-threshold/event-threshold/
-// escalation signals the in-app Notifications feed (lib/notifications.ts)
-// already surfaces, but pushed to a phone instead of only showing up next
-// time someone opens the app. Runs frequently via vercel.json's cron entry
-// (every 15 min) rather than daily like reengagement -- these are meant to
-// feel timely, not a once-a-day digest.
+// "Important things" push (Simon's direct instruction, 2026-09-03): the
+// same trap-spike/scouting-threshold/event-threshold/escalation signals
+// the in-app Notifications feed (lib/notifications.ts) already surfaces,
+// but pushed to a phone instead of only showing up next time someone
+// opens the app. Runs daily via vercel.json's cron entry, same schedule
+// as reengagement/overdue-tasks -- NOT the sub-daily interval the ticket
+// really wants for these to feel timely; Vercel's Hobby plan hard-rejects
+// (build fails outright) any cron more frequent than once/day, which is
+// what this project is currently on. Getting real timeliness needs either
+// a Vercel Pro upgrade (unlocks minute-level cron) or a deeper change to
+// check thresholds immediately when the underlying data is created
+// (trap reading / scouting observation / monitoring session logged)
+// instead of polling on a schedule at all -- a real product/infra choice,
+// flagged back to Simon rather than picked unilaterally.
 //
 // Every one of these alerts is computed on demand from other tables, not
 // a stored row of its own, so re-running this on a short interval would

@@ -50,7 +50,7 @@ export async function computeNotifications(organizationId: string, userId: strin
     notifications.push({
       id: `threshold-${a.eventId}`,
       kind: "threshold",
-      title: `${a.pestSpecies} over threshold`,
+      title: `${displayNameForPestSpecies(a.pestSpecies)} over threshold`,
       sub: metricLabel({ kind: a.metricKind, value: a.value }),
       at: a.at,
       href: `/app/facilities/${a.facilityId}/pest-events/${a.eventId}`,
@@ -63,7 +63,7 @@ export async function computeNotifications(organizationId: string, userId: strin
       id: `trap-${a.trapId}`,
       kind: "trap",
       title: `${a.trapLabel} spike. Confirm?`,
-      sub: `${a.catchPerDay.toFixed(1)}/day ${a.pestSpecies}`,
+      sub: `${a.catchPerDay.toFixed(1)}/day ${displayNameForPestSpecies(a.pestSpecies)}`,
       at: a.readingAt,
       href: `/app/traps?facility=${a.facilityId}`,
     });
@@ -86,7 +86,7 @@ export async function computeNotifications(organizationId: string, userId: strin
     notifications.push({
       id: `escalation-${a.eventId}`,
       kind: "escalation",
-      title: `${a.pestSpecies} not improving. Try a different tier?`,
+      title: `${displayNameForPestSpecies(a.pestSpecies)} not improving. Try a different tier?`,
       sub: `${metricLabel({ kind: a.metricKind, value: a.baselineValue })} → ${metricLabel({ kind: a.metricKind, value: a.latestValue })} after ${a.daysSinceTreatment}d`,
       at: a.at,
       href: `/app/facilities/${a.facilityId}/pest-events/${a.eventId}?tab=recommended`,
@@ -131,7 +131,7 @@ export async function computeNotifications(organizationId: string, userId: strin
       notifications.push({
         id: `auto-resolved-${e.id}`,
         kind: "event_auto_resolved",
-        title: `${e.pestSpecies} auto-resolved`,
+        title: `${displayNameForPestSpecies(e.pestSpecies)} auto-resolved`,
         sub: "Under threshold for 2 consecutive sessions",
         at: e.resolvedAt!,
         href: `/app/facilities/${e.facilityId}/pest-events/${e.id}`,

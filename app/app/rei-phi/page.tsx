@@ -27,7 +27,7 @@ export default async function ReiPhiPage({ searchParams }: { searchParams: Promi
   if (orgFacilities.length === 0) {
     return (
       <div className="flex flex-col gap-6">
-        <h1 className="text-2xl font-semibold">Re-entry &amp; harvest</h1>
+        <h1 className="text-2xl font-semibold">REI &amp; PHI</h1>
         <div className="card p-6 text-[var(--text-dim)]">
           No sites yet.{" "}
           <Link href="/app/facilities" className="text-[var(--accent)]">
