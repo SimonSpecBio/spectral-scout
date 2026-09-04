@@ -2,15 +2,30 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents, trapReadings, traps, trapThresholds } from "@/db/schema";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
+import { findPestProgram } from "@/lib/treatments-catalog";
 
 // Falls back to this whenever an org hasn't configured a custom
-// catch/day threshold for a species (see scout_trap_threshold's schema
+// catch/day threshold for a species AND the catalog has no sourced
+// species-specific default either (see scout_trap_threshold's schema
 // comment for why this is per-pest rather than a single global switch).
 // 5/day is a conservative, broadly-cited sticky-card economic threshold
 // ballpark for common greenhouse pests (whitefly, thrips) -- deliberately
 // on the low/cautious side since a missed real trend costs more than an
 // extra suggestion a scout dismisses in one tap.
 export const DEFAULT_CATCH_PER_DAY_THRESHOLD = 5;
+
+// Three-tier lookup, same pattern as lib/threshold-engine.ts's density/
+// occupancy thresholds: an org's own trapThresholds row wins if set, then
+// the catalog's sourced per-species default (lib/treatments-catalog.ts's
+// defaultCatchPerDayThreshold -- thrips/whitefly as of 2026-09-04), then
+// the flat generic default above.
+function catchPerDayThresholdFor(species: string, orgThresholds: Map<string, number>): number {
+  const orgOverride = orgThresholds.get(species.toLowerCase());
+  if (orgOverride !== undefined) return orgOverride;
+  const catalogDefault = findPestProgram(species)?.defaultCatchPerDayThreshold;
+  if (catalogDefault !== undefined) return catalogDefault;
+  return DEFAULT_CATCH_PER_DAY_THRESHOLD;
+}
 
 export interface TrapAlert {
   trapId: string;
@@ -83,7 +98,7 @@ export async function computeTrapAlerts(organizationId: string): Promise<TrapAle
   for (const reading of latestByTrapSpecies.values()) {
     const trap = trapById.get(reading.trapId);
     if (!trap) continue;
-    const threshold = thresholdBySpecies.get(reading.pestSpecies.toLowerCase()) ?? DEFAULT_CATCH_PER_DAY_THRESHOLD;
+    const threshold = catchPerDayThresholdFor(reading.pestSpecies, thresholdBySpecies);
     const catchPerDay = reading.daysDeployed > 0 ? reading.count / reading.daysDeployed : reading.count;
     if (catchPerDay < threshold) continue;
 
@@ -133,7 +148,7 @@ export async function computeTrapStatuses(facilityId: string): Promise<TrapStatu
   const orgId = (await db.select().from(facilities).where(eq(facilities.id, facilityId)))[0]?.organizationId;
   const thresholdRows = orgId ? await db.select().from(trapThresholds).where(eq(trapThresholds.organizationId, orgId)) : [];
   const thresholdBySpecies = new Map(thresholdRows.map((t) => [t.pestSpecies.toLowerCase(), t.catchPerDayThreshold]));
-  const thresholdFor = (species: string) => thresholdBySpecies.get(species.toLowerCase()) ?? DEFAULT_CATCH_PER_DAY_THRESHOLD;
+  const thresholdFor = (species: string) => catchPerDayThresholdFor(species, thresholdBySpecies);
   const catchPerDay = (r: { count: number; daysDeployed: number }) => (r.daysDeployed > 0 ? r.count / r.daysDeployed : r.count);
 
   return facilityTraps.map((trap) => {

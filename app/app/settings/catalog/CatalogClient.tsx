@@ -359,8 +359,8 @@ export default function CatalogClient({
         <div>
           <div className="text-sm font-medium">Trap catch thresholds</div>
           <p className="text-xs text-[var(--text-dim)]">
-            Catches per trap per day that trigger a trap-spike suggestion for a species. Anything not listed uses the default,{" "}
-            {defaultCatchPerDayThreshold}/day.
+            Catches per trap per day that trigger a trap-spike suggestion for a species. Anything not listed here uses a
+            sourced catalog default where one exists, or {defaultCatchPerDayThreshold}/day otherwise.
           </p>
         </div>
 

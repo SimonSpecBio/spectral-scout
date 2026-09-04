@@ -104,6 +104,12 @@ export interface PestProgram {
   // one told us otherwise, these fall back to "alert on any detection"
   // because someone did (Airtable ticket recQMFkZ85yI2OE1i).
   presenceTriggered?: boolean;
+  // Per-species sticky-card catch/day default, layered under an org's own
+  // trapThresholds override (lib/trap-alerts.ts) and above the flat
+  // DEFAULT_CATCH_PER_DAY_THRESHOLD (5/day) every other species still
+  // shares -- same three-tier pattern as defaultDensityThreshold above,
+  // just for trap-catch monitoring instead of leaf/occupancy counts.
+  defaultCatchPerDayThreshold?: number;
 }
 
 export const AGENTS: Agent[] = [
@@ -311,6 +317,16 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: ["pr_abamectin", "pr_spinosad"],
     followUp: { recheckDays: 5, releaseIntervalDays: 7, escalateIfNoDeclineDays: 14 },
     cautions: ["Vectors viruses", "Spinosad: rotate, limited uses, harms beneficials when wet"],
+    // Best-covered species in the trap-threshold research (11 sourced
+    // rows, all greenhouse) -- Shipp et al. greenhouse EILs give
+    // 10 adults/trap/day (pepper, low end) to 20/trap/day (cucumber).
+    // Rutgers separately publishes a 4x crop-sensitivity ladder (<10/
+    // 18-30/40+ per week) plus a tospovirus zero-tolerance rule and a
+    // biocontrol-program rule, but those need per-crop context Scout
+    // doesn't track -- seeded the single low-end greenhouse EIL (10)
+    // instead, matching DEFAULT_CATCH_PER_DAY_THRESHOLD's own "err
+    // cautious" philosophy. No cannabis threshold exists.
+    defaultCatchPerDayThreshold: 10,
   },
   {
     id: "pest_aphid", commonName: "Aphids", latin: "Myzus persicae / Phorodon cannabis", kind: "pest",
@@ -341,16 +357,22 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: [],
     followUp: { recheckDays: 5, releaseIntervalDays: 7, escalateIfNoDeclineDays: 21 },
     cautions: ["Identify species -- parasitoid choice differs", "Remove yellow cards before big parasitoid releases"],
-    // Deliberately NO numeric threshold here (removed 2026-08-30, threshold
-    // research pass). The prior 10/leaf + 40% figures traced to UC IPM/
-    // Naranjo et al. field cotton -- but UC IPM states plainly "Thresholds
-    // have not yet been established for greenhouse whitefly," and the
-    // nearest per-leaf figures found in this pass (UC IPM field tomato: 4
-    // adults/leaf; UF/IFAS, same pest/crop: 1 adult/leaflet) disagree with
-    // each other by 4x, so a single borrowed number reads as more precise
-    // than the evidence supports. Falls back to the generic default for
-    // now, same as every other species with no defensible number.
+    // Deliberately NO per-leaf/occupancy threshold here (removed 2026-08-30,
+    // threshold research pass). The prior 10/leaf + 40% figures traced to UC
+    // IPM/Naranjo et al. field cotton -- but UC IPM states plainly
+    // "Thresholds have not yet been established for greenhouse whitefly,"
+    // and the nearest per-leaf figures found in this pass (UC IPM field
+    // tomato: 4 adults/leaf; UF/IFAS, same pest/crop: 1 adult/leaflet)
+    // disagree with each other by 4x, so a single borrowed number reads as
+    // more precise than the evidence supports. presence-triggered for
+    // Plant-sampling/Counts monitoring, same as every other species with no
+    // defensible per-leaf number.
     presenceTriggered: true,
+    // Trap-catch monitoring is a separate metric, though, and IS sourced:
+    // 2 whiteflies/card/day (Kentucky ENTFact-456) is already in the
+    // per-day unit lib/trap-alerts.ts uses. presenceTriggered above only
+    // governs the density/occupancy path -- this governs sticky-card alerts.
+    defaultCatchPerDayThreshold: 2,
   },
   {
     id: "pest_fungusgnat", commonName: "Fungus gnats", latin: "Bradysia spp.", kind: "pest",
