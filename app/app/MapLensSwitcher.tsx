@@ -33,7 +33,7 @@ export default function MapLensSwitcher({
   events,
   bayLensEntries,
 }: {
-  events: { id: string; facilityId: string; x: number; y: number; severity: Severity }[];
+  events: { id: string; facilityId: string; x: number; y: number; severity: Severity; pestSpecies: string }[];
   bayLensEntries: BayLensEntry[];
 }) {
   const [lens, setLens] = useState<Lens>("pests");

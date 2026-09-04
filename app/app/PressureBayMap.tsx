@@ -1,8 +1,13 @@
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { BAYS, nearestBay } from "@/lib/floorplan-bays";
+import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 import BayBarMap from "./BayBarMap";
 
 const SEVERITY_RANK: Record<Severity, number> = { low: 0, moderate: 1, high: 2, severe: 3 };
+// Small, subtle labels (ticket request, 2026-09-04) -- a bay's bar is only
+// 98px wide at zoom 1, so this keeps the combined label from ever visibly
+// overflowing into the next bay's row even when two events share one bay.
+const BADGE_MAX_CHARS = 22;
 
 interface EventInput {
   id: string;
@@ -10,6 +15,23 @@ interface EventInput {
   x: number;
   y: number;
   severity: Severity;
+  pestSpecies: string;
+}
+
+// Joins every distinct pest name at one bay into a single short label,
+// worst-severity name first (matches the bar's own color, which is also
+// keyed off the worst severity there) -- truncates rather than wrapping to
+// a second line, since there's no vertical room between bar rows for one.
+function combineBadgeLabels(names: string[]): string {
+  const joined = names.join(", ");
+  if (joined.length <= BADGE_MAX_CHARS) return joined;
+  let out = "";
+  for (const name of names) {
+    const next = out ? `${out}, ${name}` : name;
+    if (next.length > BADGE_MAX_CHARS - 1) return `${out}…`;
+    out = next;
+  }
+  return out;
 }
 
 // The "Pests" lens (the default/only lens before the switcher existed):
@@ -28,6 +50,10 @@ export default function PressureBayMap({ events }: { events: EventInput[] }) {
   // one there) -- if two events tie in severity at the same bay, the first
   // one seen wins; good enough since the bar can only ever point at one.
   const hrefByBay = new Map<string, string>();
+  // Every distinct pest at a bay, not just the worst-severity one -- two
+  // active events on the same bench (ticket request, 2026-09-04) both get
+  // named in the label, worst severity first.
+  const namesByBaySeverity = new Map<string, Map<string, Severity>>();
   for (const ev of events) {
     const bay = nearestBay(ev.x, ev.y);
     const key = `${bay.row}${bay.index}`;
@@ -37,6 +63,16 @@ export default function PressureBayMap({ events }: { events: EventInput[] }) {
       colorByBay.set(key, SEVERITY_COLOR[ev.severity]);
       hrefByBay.set(key, `/app/facilities/${ev.facilityId}/pest-events/${ev.id}`);
     }
+    const name = displayNameForPestSpecies(ev.pestSpecies);
+    const names = namesByBaySeverity.get(key) ?? new Map<string, Severity>();
+    const existingSevForName = names.get(name);
+    if (!existingSevForName || SEVERITY_RANK[ev.severity] > SEVERITY_RANK[existingSevForName]) names.set(name, ev.severity);
+    namesByBaySeverity.set(key, names);
+  }
+  const badgeByBay = new Map<string, string>();
+  for (const [key, names] of namesByBaySeverity) {
+    const sorted = [...names.entries()].sort((a, b) => SEVERITY_RANK[b[1]] - SEVERITY_RANK[a[1]]).map(([name]) => name);
+    badgeByBay.set(key, combineBadgeLabels(sorted));
   }
 
   // Glow centers on the worst active hotspot, if any -- follows real data
@@ -56,5 +92,5 @@ export default function PressureBayMap({ events }: { events: EventInput[] }) {
     }
   }
 
-  return <BayBarMap colorByBay={colorByBay} glowBar={glowBar} hrefByBay={hrefByBay} />;
+  return <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} glowBar={glowBar} hrefByBay={hrefByBay} />;
 }

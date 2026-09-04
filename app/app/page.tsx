@@ -291,7 +291,14 @@ export default async function HomePage({
   const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, selectedFacility.id));
 
   let desktopMapSection: React.ReactNode = null;
-  let heatmapEvents: { id: string; facilityId: string; x: number; y: number; severity: "low" | "moderate" | "high" | "severe" }[] = [];
+  let heatmapEvents: {
+    id: string;
+    facilityId: string;
+    x: number;
+    y: number;
+    severity: "low" | "moderate" | "high" | "severe";
+    pestSpecies: string;
+  }[] = [];
   let bayLensEntries: BayLensEntry[] = [];
   if (areas.length === 0) {
     desktopMapSection = (
@@ -320,7 +327,14 @@ export default async function HomePage({
 
     heatmapEvents = areaPestEvents
       .filter((ev) => ev.status === "active" && ev.x != null && ev.y != null)
-      .map((ev) => ({ id: ev.id, facilityId: selectedFacility.id, x: ev.x!, y: ev.y!, severity: ev.severity }));
+      .map((ev) => ({
+        id: ev.id,
+        facilityId: selectedFacility.id,
+        x: ev.x!,
+        y: ev.y!,
+        severity: ev.severity,
+        pestSpecies: ev.pestSpecies,
+      }));
 
     bayLensEntries = [...bayLensStats.entries()].map(([key, s]) => ({
       key,
