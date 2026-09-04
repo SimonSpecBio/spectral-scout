@@ -3,10 +3,15 @@ import { buildPickerFacilities } from "@/lib/location-picker-data";
 import { requireGrowerSession } from "@/lib/session";
 import DiseaseEventForm from "./DiseaseEventForm";
 
-export default async function NewDiseaseEventPage() {
+export default async function NewDiseaseEventPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ species?: string }>;
+}) {
   const session = await requireGrowerSession();
   if (!session) return null;
 
+  const { species: presetSpecies } = await searchParams;
   const pickerFacilities = await buildPickerFacilities(session.organizationId!);
 
   if (pickerFacilities.length === 0) {
@@ -24,5 +29,5 @@ export default async function NewDiseaseEventPage() {
     );
   }
 
-  return <DiseaseEventForm facilities={pickerFacilities} />;
+  return <DiseaseEventForm facilities={pickerFacilities} presetSpecies={presetSpecies} />;
 }

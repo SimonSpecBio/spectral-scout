@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import { findPestProgram } from "@/lib/treatments-catalog";
 import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import SpeciesPicker from "../SpeciesPicker";
@@ -54,11 +55,17 @@ export default function NewEventForm({
   facilities,
   presetFacilityId,
   presetAreaId,
+  presetSpecies,
   handoff,
 }: {
   facilities: PickerFacility[];
   presetFacilityId?: string;
   presetAreaId?: string;
+  // A catalog id handed off from the "Should I worry?" symptom-tree popup
+  // (lib/symptom-tree.ts) -- prefills both the display name and the
+  // scientific name, same pair SpeciesPicker fills in when a grower picks
+  // a suggestion themselves.
+  presetSpecies?: string;
   handoff: ScoutingHandoff | null;
 }) {
   const router = useRouter();
@@ -75,9 +82,12 @@ export default function NewEventForm({
     }
   });
 
-  const [species, setSpecies] = useState(typeof draft?.species === "string" ? draft.species : "");
+  const presetProgram = !draft?.species && presetSpecies ? findPestProgram(presetSpecies) : undefined;
+  const [species, setSpecies] = useState(
+    typeof draft?.species === "string" ? draft.species : (presetProgram?.commonName ?? "")
+  );
   const [scientificName, setScientificName] = useState<string | null>(
-    typeof draft?.scientificName === "string" ? draft.scientificName : null
+    typeof draft?.scientificName === "string" ? draft.scientificName : (presetProgram?.latin ?? null)
   );
   const [severity, setSeverity] = useState<Severity>(
     draft?.severity && SEVERITIES.includes(draft.severity) ? draft.severity : handoff ? severityFromHandoff(handoff) : "moderate"

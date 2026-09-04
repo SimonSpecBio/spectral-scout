@@ -10,12 +10,12 @@ import NewEventForm from "./NewEventForm";
 export default async function NewEventPage({
   searchParams,
 }: {
-  searchParams: Promise<{ facility?: string; area?: string; observationId?: string }>;
+  searchParams: Promise<{ facility?: string; area?: string; observationId?: string; species?: string }>;
 }) {
   const session = await requireGrowerSession();
   if (!session) return null;
 
-  const { facility: presetFacilityId, area: presetAreaId, observationId } = await searchParams;
+  const { facility: presetFacilityId, area: presetAreaId, observationId, species: presetSpecies } = await searchParams;
 
   // Client-supplied like every other cross-referenced id -- verify it
   // actually belongs to this org before trusting the handoff data (or
@@ -54,6 +54,7 @@ export default async function NewEventPage({
         facilities={pickerFacilities}
         presetFacilityId={presetFacilityId}
         presetAreaId={presetAreaId}
+        presetSpecies={presetSpecies}
         handoff={
           handoffObservation
             ? {

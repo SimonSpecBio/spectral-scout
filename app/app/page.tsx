@@ -3,6 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, facilityMapObjects, inventoryItems, pestEvents, tasks, treatments } from "@/db/schema";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
+import { isHomeGrower } from "@/lib/grower-type";
 import { computeBayLensStats } from "@/lib/map-lenses";
 import { computeEventSignals } from "@/lib/pest-event-signals";
 import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-alerts";
@@ -711,6 +712,15 @@ export default async function HomePage({
   return (
     <div className="flex flex-col gap-6">
       {headerRow}
+      {isHomeGrower(session.growerType) && (
+        <Link href="/app/symptom-check" className="card flex items-center justify-between p-4 text-sm">
+          <span>
+            <span className="font-medium">Should I worry?</span>
+            <span className="block text-xs text-[var(--text-dim)]">Answer a few quick questions about what you&rsquo;re seeing</span>
+          </span>
+          <span className="text-[var(--accent)]">&rarr;</span>
+        </Link>
+      )}
       {isScout ? (
         <>
           {tasksSection}

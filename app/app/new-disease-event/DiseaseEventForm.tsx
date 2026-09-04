@@ -12,6 +12,7 @@ import {
 } from "@/lib/disease";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import { findPestProgram } from "@/lib/treatments-catalog";
 import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import SpeciesPicker from "../SpeciesPicker";
@@ -29,7 +30,15 @@ function cycle(cell: DiseaseClass | null): DiseaseClass | null {
   return (cell + 1) as DiseaseClass;
 }
 
-export default function DiseaseEventForm({ facilities }: { facilities: PickerFacility[] }) {
+export default function DiseaseEventForm({
+  facilities,
+  presetSpecies,
+}: {
+  facilities: PickerFacility[];
+  // A catalog id handed off from the "Should I worry?" symptom-tree popup
+  // (lib/symptom-tree.ts).
+  presetSpecies?: string;
+}) {
   const router = useRouter();
 
   const [draft] = useState(() => {
@@ -41,8 +50,13 @@ export default function DiseaseEventForm({ facilities }: { facilities: PickerFac
     }
   });
 
-  const [commonName, setCommonName] = useState(typeof draft?.commonName === "string" ? draft.commonName : "");
-  const [scientificName, setScientificName] = useState(typeof draft?.scientificName === "string" ? draft.scientificName : "");
+  const presetProgram = !draft?.commonName && presetSpecies ? findPestProgram(presetSpecies) : undefined;
+  const [commonName, setCommonName] = useState(
+    typeof draft?.commonName === "string" ? draft.commonName : (presetProgram?.commonName ?? "")
+  );
+  const [scientificName, setScientificName] = useState(
+    typeof draft?.scientificName === "string" ? draft.scientificName : (presetProgram?.latin ?? "")
+  );
   const [grid, setGrid] = useState<DiseaseLeaves[]>(() =>
     Array.isArray(draft?.grid) && draft.grid.length === 10 ? draft.grid : emptyDiseaseGrid()
   );
