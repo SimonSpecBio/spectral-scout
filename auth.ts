@@ -73,17 +73,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any),
   providers: [
-    // Staff sign in with Google, gated by ALLOWED_STAFF_EMAILS below.
+    // Google sign-in is available to both staff (gated by
+    // ALLOWED_STAFF_EMAILS, see the session callback below) and growers --
+    // any Gmail/Google account can use it to join, same as the nodemailer
+    // path. Previously restricted to staffEmails only; growers asked to be
+    // able to sign up with Google instead of magic-link (2026-09-04).
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       allowDangerousEmailAccountLinking: true,
     }),
-    // Growers (both free-tier and pilot-program) sign in with email
-    // magic-link -- this is a public self-serve tool, arbitrary email
-    // domains, no Google account assumed. Sent via Resend SMTP from
-    // mail.spectralbiocontrol.com (verified domain, same Resend account as
-    // spectral-pilot).
+    // Growers (both free-tier and pilot-program) can also sign in with
+    // email magic-link -- arbitrary email domains, no Google account
+    // required. Sent via Resend SMTP from mail.spectralbiocontrol.com
+    // (verified domain, same Resend account as spectral-pilot).
     Nodemailer({
       server: process.env.EMAIL_SERVER,
       from: process.env.EMAIL_FROM,
@@ -92,26 +95,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "database" },
   callbacks: {
     async signIn({ user, account, email }) {
-      // Staff must already be on the allowlist. Everyone else (grower
-      // self-serve signup) is always allowed in -- org provisioning happens
-      // in the session callback below, on first successful sign-in.
+      // Staff are identified by the allowlist regardless of provider; org
+      // provisioning for everyone else (grower self-serve, via Google or
+      // email) happens in the session callback below, on first successful
+      // sign-in.
       const userEmail = user.email?.toLowerCase();
       if (!userEmail) return false;
-
-      // Google is the staff-only sign-in path (see providers[] comment
-      // below) -- but /api/auth/signin is one shared page for both /app
-      // and /staff (proxy.ts), so nothing upstream actually stops a grower
-      // visitor from clicking "Sign in with Google" instead of using
-      // email. Without this check, any Google account -- not just staff --
-      // would fall through to session()'s auto-provisioning and silently
-      // get a brand-new grower org, with none of the throttling the
-      // nodemailer path below has. Reject outright rather than rate-limit:
-      // per-email throttling wouldn't meaningfully help here anyway, since
-      // each abusive signup needs a distinct Google identity, not repeated
-      // attempts on one.
-      if (account?.provider === "google" && !staffEmails.has(userEmail)) {
-        return false;
-      }
 
       // email.verificationRequest is true specifically on the call that's
       // about to send a magic-link email (not the later call after the
