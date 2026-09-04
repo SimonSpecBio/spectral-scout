@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invites, membershipRoleEnum, memberships } from "@/db/schema";
+import { isDemoSession } from "@/lib/demo-account";
 import { getTeam } from "@/lib/team";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
   const session = await requireGrowerSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.membershipRole !== "owner") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (isDemoSession(session)) return NextResponse.json({ error: "Team invites are disabled on the shared demo account" }, { status: 403 });
 
   const body = await request.json();
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";

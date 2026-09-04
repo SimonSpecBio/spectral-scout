@@ -3,6 +3,7 @@ import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { observationPhotos } from "@/db/schema";
+import { isDemoSession } from "@/lib/demo-account";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
 import { safeFileName, stripImageMetadata, validateImageUpload } from "@/lib/validate-upload";
@@ -22,6 +23,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; eventId: string }> }) {
   const session = await requireGrowerSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (isDemoSession(session)) return NextResponse.json({ error: "Photo uploads are disabled on the shared demo account" }, { status: 403 });
 
   const { id, eventId } = await params;
   const event = await getOwnedPestEvent(id, eventId, session.organizationId!);
