@@ -110,6 +110,6 @@ export const CONSENT_SECTIONS: ConsentSection[] = [
   },
   {
     heading: "Questions",
-    paragraphs: ["Contact Spectral Biocontrol at [insert real support email] with any questions about this agreement or your data."],
+    paragraphs: ["Contact Spectral Biocontrol at support@spectralbiocontrol.com with any questions about this agreement or your data."],
   },
 ];
