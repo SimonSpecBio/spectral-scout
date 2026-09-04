@@ -36,6 +36,10 @@ interface PendingRequest {
   // as multipart form data under `fileFieldName` instead of a JSON body.
   isFile?: boolean;
   fileFieldName?: string;
+  // Extra plain-text fields sent alongside the file (e.g. a photo's
+  // caption) -- appended to the same multipart form as the file itself,
+  // both on the immediate-send path and on queued replay.
+  extraFields?: Record<string, string>;
   createdAt: number;
   label: string; // human-readable, shown in the pending-sync indicator
 }
@@ -59,12 +63,13 @@ async function enqueue(
   body: unknown,
   label: string,
   isFile?: boolean,
-  fileFieldName?: string
+  fileFieldName?: string,
+  extraFields?: Record<string, string>
 ): Promise<void> {
   const db = await openDB();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).add({ url, method, body, isFile, fileFieldName, createdAt: Date.now(), label });
+    tx.objectStore(STORE).add({ url, method, body, isFile, fileFieldName, extraFields, createdAt: Date.now(), label });
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -175,7 +180,8 @@ export async function queuedFileFetch(
   url: string,
   file: File,
   fieldName: string,
-  label: string
+  label: string,
+  extraFields?: Record<string, string>
 ): Promise<{ ok: boolean; queued: boolean; data?: unknown }> {
   inFlightMutations++;
   try {
@@ -185,6 +191,7 @@ export async function queuedFileFetch(
       try {
         const form = new FormData();
         form.append(fieldName, file);
+        if (extraFields) for (const [k, v] of Object.entries(extraFields)) form.append(k, v);
         const res = await fetch(url, { method: "POST", body: form, signal: controller.signal });
         if (res.ok) return { ok: true, queued: false, data: await res.json() };
         return { ok: false, queued: false };
@@ -194,7 +201,7 @@ export async function queuedFileFetch(
         clearTimeout(timeoutId);
       }
     }
-    await enqueue(url, "POST", file, label, true, fieldName);
+    await enqueue(url, "POST", file, label, true, fieldName, extraFields);
     return { ok: true, queued: true };
   } finally {
     inFlightMutations = Math.max(0, inFlightMutations - 1);
@@ -222,6 +229,7 @@ export async function flushQueue(): Promise<void> {
         if (item.isFile) {
           const form = new FormData();
           form.append(item.fileFieldName!, item.body as Blob);
+          if (item.extraFields) for (const [k, v] of Object.entries(item.extraFields)) form.append(k, v);
           res = await fetch(item.url, { method, body: form });
         } else {
           res = await fetch(item.url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(item.body) });

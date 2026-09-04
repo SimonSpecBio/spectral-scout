@@ -33,6 +33,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const uploadError = validateImageUpload(file);
   if (uploadError) return NextResponse.json({ error: uploadError }, { status: 400 });
 
+  const captionRaw = form.get("caption");
+  const caption = typeof captionRaw === "string" && captionRaw.trim() ? captionRaw.trim() : null;
+
   const stripped = await stripImageMetadata(Buffer.from(await file.arrayBuffer()), file.type);
   const blob = await put(`pest-events/${eventId}/${Date.now()}-${safeFileName(file.name)}`, stripped, {
     access: "public",
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const [row] = await db
     .insert(observationPhotos)
-    .values({ pestEventId: eventId, blobUrl: blob.url, uploadedByUserId: session.user!.id! })
+    .values({ pestEventId: eventId, blobUrl: blob.url, caption, uploadedByUserId: session.user!.id! })
     .returning();
   return NextResponse.json(row);
 }

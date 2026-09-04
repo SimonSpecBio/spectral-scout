@@ -168,6 +168,11 @@ export default function PestEventDetail({
   // request, 2026-09-03).
   const [enlargedPhotoId, setEnlargedPhotoId] = useState<string | null>(null);
   const [photoQueued, setPhotoQueued] = useState(false);
+  // observationPhotos already had a caption column with no way to set it
+  // (ticket request, 2026-09-03) -- one persistent field applying to
+  // whichever photo gets picked next, rather than a per-upload dialog,
+  // since the file input's native picker can't be interrupted to ask first.
+  const [photoCaption, setPhotoCaption] = useState("");
   const [comments, setComments] = useState(initialComments);
   const [newComment, setNewComment] = useState("");
   const [postingComment, setPostingComment] = useState(false);
@@ -520,8 +525,10 @@ export default function PestEventDetail({
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const result = await queuedFileFetch(`${base}/photos`, file, "file", "Photo");
+    const caption = photoCaption.trim();
+    const result = await queuedFileFetch(`${base}/photos`, file, "file", "Photo", caption ? { caption } : undefined);
     if (result.ok) {
+      setPhotoCaption("");
       if (result.queued) setPhotoQueued(true);
       else if (result.data) {
         // The raw insert response has no uploader-name join -- "You" is
@@ -1207,6 +1214,12 @@ export default function PestEventDetail({
       <section id="photos" className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Photos</h2>
         <div className="flex flex-col gap-4">
+          <input
+            value={photoCaption}
+            onChange={(e) => setPhotoCaption(e.target.value)}
+            placeholder="Caption for the next photo (optional)"
+            className="rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+          />
           {photos.length === 0 ? (
             // Empty state: no "No photos yet" text needed -- a big, centered
             // Add button already says everything there is to say here.
@@ -1236,6 +1249,7 @@ export default function PestEventDetail({
                   {selectedPhotoId === p.id && (
                     <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-black/60 px-2 py-1.5 text-left text-white">
                       <div className="flex flex-col gap-0.5">
+                        {p.caption && <span className="text-xs font-medium">{p.caption}</span>}
                         <span className="text-xs">{p.uploadedByUserId === currentUserId ? "You" : (p.uploadedByName ?? "Unknown")}</span>
                         <span className="text-[10px] opacity-80">
                           <LocalDate date={p.uploadedAt} format={(d) => d.toLocaleString()} />
@@ -1281,6 +1295,7 @@ export default function PestEventDetail({
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary Blob-hosted URLs, not a local/static asset */}
               <img src={enlarged.blobUrl} alt={enlarged.caption ?? ""} className="max-h-full max-w-full object-contain" />
+              {enlarged.caption && <div className="text-sm text-white">{enlarged.caption}</div>}
               <button
                 type="button"
                 onClick={() => setEnlargedPhotoId(null)}
