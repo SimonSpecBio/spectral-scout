@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BAYS } from "@/lib/floorplan-bays";
 
 const IDLE_FILL = "var(--idle-fill)";
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 2.5;
+
+function touchDistance(touches: React.TouchList): number {
+  const [a, b] = [touches[0], touches[1]];
+  return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+}
 
 // The shared bay-bar canvas underneath every dashboard map lens (Pests,
 // Last scouted, Temp, Humidity) -- same 20 shared bay slots, same layout,
@@ -26,11 +31,33 @@ export default function BayBarMap({
   // same as tapping it in the Attention Required list.
   hrefByBay?: Map<string, string>;
 }) {
-  // Explicit +/- zoom (ticket C2) replaces the native pinch-zoom this page
-  // disables app-wide -- a simple CSS scale is enough here (unlike
-  // MapEditor's Konva canvas, there's no drag/resize editing to keep
-  // working underneath it, just a fixed abstract chart).
+  // +/- buttons (ticket C2) replaced the native pinch-zoom this page
+  // disables app-wide, but Simon later asked for real two-finger pinch too
+  // (ticket found in QA, 2026-09-04) -- same touch-distance-ratio approach
+  // MapEditor.tsx's Konva Stage already uses, just against this component's
+  // plain CSS-width zoom instead of a canvas transform. Buttons stay as a
+  // secondary control (mouse/trackpad, or a device pinch doesn't register).
   const [zoom, setZoom] = useState(1);
+  const pinchState = useRef<{ distance: number; zoom: number } | null>(null);
+
+  function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    if (e.touches.length !== 2) {
+      pinchState.current = null;
+      return;
+    }
+    const distance = touchDistance(e.touches);
+    if (!pinchState.current) {
+      pinchState.current = { distance, zoom };
+      return;
+    }
+    const next = (pinchState.current.zoom * distance) / pinchState.current.distance;
+    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next)));
+  }
+
+  function handleTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
+    if (e.touches.length < 2) pinchState.current = null;
+  }
+
   const rowA = BAYS.filter((b) => b.row === "A");
   const rowB = BAYS.filter((b) => b.row === "B");
   const barYs = [32, 60, 88, 116, 144, 172, 200, 228, 256, 284];
@@ -60,7 +87,12 @@ export default function BayBarMap({
           +
         </button>
       </div>
-      <div className="overflow-auto" style={{ background: "var(--map-canvas-bg)", borderRadius: "var(--radius-md)" }}>
+      <div
+        className="overflow-auto"
+        style={{ background: "var(--map-canvas-bg)", borderRadius: "var(--radius-md)" }}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <svg
           viewBox="0 0 296 322"
           className="block"
