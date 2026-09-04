@@ -345,9 +345,7 @@ export default function MapEditor({
           on the narrow-viewport case, not a block). The abstract bay-bar
           heatmap on the dashboard covers day-to-day mobile use instead. */}
       {mode === "edit" && (
-        <div className="card p-3 text-xs text-[var(--text-dim)] lg:hidden">
-          Precise layout editing works best on a larger screen. For a quick check in the field, the bay heatmap on Home covers most day-to-day use.
-        </div>
+        <div className="card p-3 text-xs text-[var(--text-dim)] lg:hidden">Precise layout editing works best on a larger screen.</div>
       )}
 
       {mode === "edit" && (
@@ -372,7 +370,7 @@ export default function MapEditor({
             </button>
           )}
           <label className="ml-auto cursor-pointer rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
-            {uploading ? "Uploading…" : "Upload blueprint/background"}
+            {uploading ? "Uploading…" : "Upload reference image (blueprint or aerial photo)"}
             <input type="file" accept="image/*" className="hidden" onChange={handleBackgroundUpload} />
           </label>
         </div>
