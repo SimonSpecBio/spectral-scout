@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { facilities, facilityAreas, facilityMapObjects, inventoryItems, pestEvents, tasks, treatments } from "@/db/schema";
+import { facilities, facilityAreas, inventoryItems, pestEvents, tasks, treatments } from "@/db/schema";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
 import { isHomeGrower } from "@/lib/grower-type";
 import { computeBayLensStats } from "@/lib/map-lenses";
@@ -12,8 +12,6 @@ import { computeEscalationAlerts, computeMonitoringAlerts, metricLabel, type Met
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { displayNameForPestSpecies, displayNameForTreatmentType } from "@/lib/treatments-catalog";
 import { requireGrowerSession } from "@/lib/session";
-import LayoutPicker from "./facilities/[id]/areas/[areaId]/LayoutPicker";
-import MapEditor from "./facilities/[id]/areas/[areaId]/MapEditorClient";
 import MapLensSwitcher, { type BayLensEntry } from "./MapLensSwitcher";
 import OutbreaksStat from "./OutbreaksStat";
 import PressureGraph from "./PressureGraph";
@@ -290,7 +288,7 @@ export default async function HomePage({
 
   const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, selectedFacility.id));
 
-  let desktopMapSection: React.ReactNode = null;
+  let areaSwitcher: React.ReactNode = null;
   let heatmapEvents: {
     id: string;
     facilityId: string;
@@ -300,30 +298,15 @@ export default async function HomePage({
     pestSpecies: string;
   }[] = [];
   let bayLensEntries: BayLensEntry[] = [];
-  if (areas.length === 0) {
-    desktopMapSection = (
-      <div className="card p-6 text-[var(--text-dim)]">
-        {selectedFacility.name} has no areas yet.{" "}
-        <Link href={`/app/facilities/${selectedFacility.id}`} className="text-[var(--accent)]">
-          Add a room or greenhouse
-        </Link>{" "}
-        to see it on the map.
-      </div>
-    );
-  } else {
+  if (areas.length > 0) {
     const hottestAreaEvent = [...facilityActive].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])[0];
     const selectedAreaId = areaParam ?? hottestAreaEvent?.facilityAreaId ?? areas[0].id;
     const selectedArea = areas.find((a) => a.id === selectedAreaId) ?? areas[0];
 
-    // objects/areaPestEvents/bayLensStats each only need selectedArea.id --
-    // one round trip instead of three. signals depends on areaPestEvents'
-    // resolved rows, so it stays a separate await after.
-    const [objects, areaPestEvents, bayLensStats] = await Promise.all([
-      db.select().from(facilityMapObjects).where(eq(facilityMapObjects.facilityAreaId, selectedArea.id)),
+    const [areaPestEvents, bayLensStats] = await Promise.all([
       db.select().from(pestEvents).where(and(eq(pestEvents.facilityAreaId, selectedArea.id))),
       computeBayLensStats(selectedArea.id),
     ]);
-    const signals = await computeEventSignals(areaPestEvents.map((e) => e.id));
 
     heatmapEvents = areaPestEvents
       .filter((ev) => ev.status === "active" && ev.x != null && ev.y != null)
@@ -343,58 +326,23 @@ export default async function HomePage({
       avgHumidityPct: s.avgHumidityPct,
     }));
 
-    desktopMapSection = (
-      <div className="flex flex-col gap-3">
-        {areas.length > 1 && (
-          <div className="flex flex-wrap gap-2">
-            {areas.map((a) => (
-              <Link
-                key={a.id}
-                href={`/app?facility=${selectedFacility.id}&area=${a.id}`}
-                className={`rounded-full px-3 py-1.5 text-sm ${
-                  a.id === selectedArea.id ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
-                }`}
-              >
-                {a.name}
-              </Link>
-            ))}
-          </div>
-        )}
-        {objects.length === 0 && !selectedArea.backgroundImageUrl ? (
-          <LayoutPicker facilityId={selectedFacility.id} areaId={selectedArea.id} />
-        ) : (
-          <MapEditor
-            facilityId={selectedFacility.id}
-            area={{
-              id: selectedArea.id,
-              name: selectedArea.name,
-              backgroundImageUrl: selectedArea.backgroundImageUrl,
-              backgroundScale: selectedArea.backgroundScale,
-            }}
-            initialObjects={objects.map((o) => ({
-              id: o.id,
-              shapeType: o.shapeType,
-              geometry: o.geometry as never,
-              style: o.style as never,
-              label: o.label,
-              zIndex: o.zIndex,
-            }))}
-            initialPestEvents={areaPestEvents.map((ev) => ({
-              id: ev.id,
-              x: ev.x,
-              y: ev.y,
-              pestSpecies: ev.pestSpecies,
-              severity: ev.severity,
-              status: ev.status,
-              notes: ev.notes,
-              createdAt: ev.createdAt.toISOString(),
-              lastTreatedAt: signals.get(ev.id)?.lastTreatedAt ?? null,
-              trend: signals.get(ev.id)?.trend ?? null,
-            }))}
-          />
-        )}
-      </div>
-    );
+    if (areas.length > 1) {
+      areaSwitcher = (
+        <div className="flex flex-wrap gap-2">
+          {areas.map((a) => (
+            <Link
+              key={a.id}
+              href={`/app?facility=${selectedFacility.id}&area=${a.id}`}
+              className={`rounded-full px-3 py-1.5 text-sm ${
+                a.id === selectedArea.id ? "bg-[var(--accent)] text-[var(--on-accent)]" : "card text-[var(--text-dim)]"
+              }`}
+            >
+              {a.name}
+            </Link>
+          ))}
+        </div>
+      );
+    }
   }
 
   // Multi-facility roll-up ("2 houses need attention" -- ARCHITECTURE.md's
@@ -458,10 +406,8 @@ export default async function HomePage({
 
   const mapAndGraphSection = (
     <>
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-        <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
-        <div className="hidden sm:block">{desktopMapSection}</div>
-      </div>
+      {areaSwitcher}
+      <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
 
       <PressureGraph events={facilityEvents.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
 
