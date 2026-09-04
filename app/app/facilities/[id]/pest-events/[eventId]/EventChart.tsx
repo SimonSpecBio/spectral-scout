@@ -114,7 +114,7 @@ export default function EventChart({
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block w-full" onClick={handleChartClick} style={{ cursor: sessionMs.length > 0 ? "pointer" : "default" }}>
-      <g fontFamily="ui-monospace, monospace" fontSize="7" fill="var(--text-faint)">
+      <g fontFamily="ui-monospace, monospace" fontSize="8" fill="var(--text-faint)">
         <line x1={PAD} y1={refY} x2={W - PAD} y2={refY} stroke="var(--text-faint)" strokeWidth={0.75} strokeDasharray="3 3" />
         <text x={PAD} y={refY - 3}>
           {presenceTriggered ? "Alert on any detection" : metricKind === "density" ? `${threshold}/leaf threshold` : `${threshold}% threshold`}
@@ -134,7 +134,7 @@ export default function EventChart({
       ))}
 
       {chronological.length > 0 && (
-        <g fontFamily="ui-monospace, monospace" fontSize="7" fill="var(--text-faint)">
+        <g fontFamily="ui-monospace, monospace" fontSize="8" fill="var(--text-faint)">
           <text x={pointX(sessionMs[0])} y={DATE_LABEL_Y} textAnchor="start">
             <LocalDate date={chronological[0].date} format={(d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
           </text>
@@ -164,7 +164,7 @@ export default function EventChart({
               renders (that's what hasDetectionGap means), so it always
               lands exactly at the chart's left edge -- start-anchor, never
               middle, or half the label clips off the SVG's own viewport. */}
-          <text x={pointX(detectedMs)} y={DETECTED_LABEL_Y} textAnchor="start" fontFamily="ui-monospace, monospace" fontSize="6.5" fill="var(--text-faint)">
+          <text x={pointX(detectedMs)} y={DETECTED_LABEL_Y} textAnchor="start" fontFamily="ui-monospace, monospace" fontSize="7.5" fill="var(--text-faint)">
             First detected
           </text>
         </g>
@@ -180,9 +180,9 @@ export default function EventChart({
           }}
           style={{ cursor: "pointer" }}
         >
-          <circle cx={pointX(treatmentMs[i])} cy={TREATMENT_ROW_Y} r={6} fill="transparent" />
+          <circle cx={pointX(treatmentMs[i])} cy={TREATMENT_ROW_Y} r={7} fill="transparent" />
           <path
-            d={`M ${pointX(treatmentMs[i]) - 3} ${TREATMENT_ROW_Y - 3} L ${pointX(treatmentMs[i]) + 3} ${TREATMENT_ROW_Y - 3} L ${pointX(treatmentMs[i])} ${TREATMENT_ROW_Y + 3} Z`}
+            d={`M ${pointX(treatmentMs[i]) - 4} ${TREATMENT_ROW_Y - 4} L ${pointX(treatmentMs[i]) + 4} ${TREATMENT_ROW_Y - 4} L ${pointX(treatmentMs[i])} ${TREATMENT_ROW_Y + 4} Z`}
             fill={activeTreatment === t.id ? "var(--accent)" : "var(--text-dim)"}
           />
         </g>
@@ -217,10 +217,19 @@ export default function EventChart({
         (() => {
           const x = pointX(new Date(activeTreatmentData.appliedAt).getTime());
           const boxW = 96;
+          const boxH = 28;
           const boxX = Math.min(Math.max(x - boxW / 2, PAD), W - PAD - boxW);
+          // Bounds-aware, not just clamped -- the treatment row sits close
+          // to the chart's bottom edge, so a tooltip opening straight down
+          // from it clipped off the SVG's own viewport (ticket found in
+          // QA, 2026-09-04). Opens above the marker instead whenever there
+          // isn't room below, same "flip" a floating tooltip library would
+          // do, mirroring the horizontal clamp boxX already does.
+          const spaceBelow = H - PAD - (TREATMENT_ROW_Y + 6);
+          const boxY = spaceBelow >= boxH ? TREATMENT_ROW_Y + 6 : TREATMENT_ROW_Y - 4 - boxH;
           return (
-            <g transform={`translate(${boxX}, ${TREATMENT_ROW_Y + 6})`}>
-              <rect width={boxW} height={28} rx={3} fill="var(--surface-raised)" stroke="var(--border)" strokeWidth={0.5} />
+            <g transform={`translate(${boxX}, ${boxY})`}>
+              <rect width={boxW} height={boxH} rx={3} fill="var(--surface-raised)" stroke="var(--border)" strokeWidth={0.5} />
               <text x={6} y={11} fontFamily="ui-monospace, monospace" fontSize={6.5} fill="var(--text)">
                 {truncate(
                   `${displayNameForTreatmentType(activeTreatmentData.type)}${activeTreatmentData.product ? `: ${activeTreatmentData.product}` : ""}`,

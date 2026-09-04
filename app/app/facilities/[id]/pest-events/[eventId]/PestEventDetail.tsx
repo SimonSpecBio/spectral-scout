@@ -793,7 +793,7 @@ export default function PestEventDetail({
             treatments={treatmentsList.map((t) => ({ id: t.id, type: t.type, product: t.product, loggedBy: t.loggedBy, appliedAt: t.appliedAt }))}
             detectedAt={event.createdAt}
           />
-          <div className="flex flex-wrap gap-6">
+          <div className="flex flex-wrap items-center justify-around gap-6 text-center">
             <div>
               <div className="text-2xl font-semibold">
                 {chartMetricKind === "density" ? latestDensity.toFixed(1) : `${Math.round(latestDensity)}%`}
