@@ -321,6 +321,16 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: ["pr_flonicamid"],
     followUp: { recheckDays: 4, releaseIntervalDays: 7, escalateIfNoDeclineDays: 12 },
     cautions: ["Cannabis aphid can be cryptic on stems", "Preserve mummies (parasitized aphids) -- don't spray over them"],
+    // ESTIMATE, not a sourced citation like TSSM's 7/leaf or PM's 2% above --
+    // no published aphid threshold exists for any greenhouse or cannabis
+    // context (threshold research pass, 2026-08-29/09-04). Simon's call
+    // (2026-09-04): better to give aphids its own working number than share
+    // one generic default across every unscored species. Deliberately NOT
+    // 3 -- that's DEFAULT_DENSITY_THRESHOLD (lib/scout-metric.ts) and would
+    // be a silent no-op, not a real number. Picked 2, lower than TSSM's
+    // sourced 7/leaf, since aphids reproduce faster and are a stronger
+    // virus-vector risk per-individual. Revisit if real data ever turns up.
+    defaultDensityThreshold: 2,
   },
   {
     id: "pest_whitefly", commonName: "Whiteflies", latin: "Trialeurodes vaporariorum / Bemisia tabaci", kind: "pest",
@@ -351,6 +361,13 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: [],
     followUp: { recheckDays: 7, releaseIntervalDays: 7, escalateIfNoDeclineDays: 21 },
     cautions: ["Larvae damage roots + spread Pythium/Fusarium -- root-rot link"],
+    // No numeric threshold exists for fungus gnats in any published source
+    // (the real greenhouse numbers found -- 3-5 larvae/potato-disc,
+    // 15-20/wedge -- need a count type Scout doesn't have, see the Symptom
+    // Tree data-ingestion tracker). Simon's call (2026-09-04): presence-
+    // triggered rather than sharing the generic numeric default, same
+    // reasoning as whitefly/mealybug/broad mite above.
+    presenceTriggered: true,
   },
   {
     id: "pest_mealybug", commonName: "Mealybugs", latin: "Planococcus / Pseudococcus spp.", kind: "pest",
@@ -413,6 +430,11 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: [],
     followUp: { recheckDays: 5, releaseIntervalDays: 14, escalateIfNoDeclineDays: 14 },
     cautions: ["Fungus gnats spread it -- control them too", "H2O2 harms beneficial microbes -- reinoculate after"],
+    // No incidence- or zoospore-count threshold exists in any extension
+    // source -- root rot is confirmed by direct root inspection (brown/
+    // black/mushy), not a countable per-leaf/per-plant metric. Simon's call
+    // (2026-09-04): presence-triggered, same reasoning as botrytis above.
+    presenceTriggered: true,
   },
   {
     id: "path_hlvd", commonName: "Hop latent viroid (HLVd)", latin: "HLVd", kind: "pathogen",
@@ -423,15 +445,18 @@ export const PESTS: PestProgram[] = [
     chemicalLastResort: [],
     followUp: null, // no treatment program -- monitor + sanitation only, see TREATMENTS.md
     cautions: ["NO chemical/biological cure -- management is testing + sanitation + clean stock only", "Mechanically transmitted via tools/handling"],
+    // No percentage-of-stock threshold exists anywhere (extension or
+    // peer-reviewed) -- the real decision point is a lab (PCR) test result,
+    // not a scouting count; infection is frequently asymptomatic. Simon's
+    // call (2026-09-04): presence-triggered rather than a fabricated
+    // percentage, since "act on any detection" is the only honest framing
+    // for a disease that isn't reliably visible at all.
+    presenceTriggered: true,
   },
 
   // Added from the pest-research handoff (2026-08-21, catalog-expansion.ts)
   // -- these are the two real, zero-coverage gaps that pass found (no
-  // program existed for either pest before this). No defaultDensityThreshold/
-  // defaultOccupancyPctThreshold given, same as aphids/broad mite/thrips-on-
-  // leaves/root rot above -- no defensible sourced number was found, so
-  // both correctly fall back to threshold-engine.ts's generic defaults
-  // rather than a fabricated one.
+  // program existed for either pest before this).
   {
     id: "pest_caterpillar",
     commonName: "Caterpillars / loopers (budworms, armyworms)",
@@ -451,6 +476,11 @@ export const PESTS: PestProgram[] = [
       "No chemicalLastResort entry currently has confirmed cannabis legality for this pest -- Bt kurstaki/aizawai rotation is the realistic primary control, not a biopesticide-then-chemical-backup pattern like the other programs.",
       "Rotate Dipel/Xentari to manage resistance -- do not use the same Bt subspecies every application.",
     ],
+    // No numeric threshold exists in any greenhouse source -- direct bud
+    // destruction means any confirmed frass/tunneling/caterpillar sighting
+    // already warrants action, not a per-plant count. Simon's call
+    // (2026-09-04): presence-triggered rather than the generic default.
+    presenceTriggered: true,
   },
   {
     id: "pest_rootaphid",
@@ -471,6 +501,13 @@ export const PESTS: PestProgram[] = [
       "No prior catalog coverage at all for this pest despite it being a well-documented cannabis-specific issue (rice root aphid).",
       "Confirmed legality is thin across all three states for every option here -- present these as 'best available, verify current label/state list' rather than a fully cleared program.",
     ],
+    // No threshold exists in any source (PNW Handbook: "no established
+    // treatment thresholds for aphids") -- root aphids are also cryptic and
+    // slow to notice by design (root-zone dwelling, detected via winged
+    // adults on upper leaves, not a root count). Simon's call (2026-09-04):
+    // presence-triggered rather than the generic default, same reasoning
+    // as broad mite's "delayed detection" framing above.
+    presenceTriggered: true,
   },
 ];
 

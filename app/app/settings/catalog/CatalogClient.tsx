@@ -284,8 +284,8 @@ export default function CatalogClient({
             />
             <div className="flex flex-col gap-1">
               <span className="text-xs text-[var(--text-dim)]">
-                Alert mode -- some species (mealybug, broad mite, whitefly, botrytis) default to alerting on any
-                detection instead of a numeric threshold, since no defensible number exists for them.
+                Alert mode -- several species default to alerting on any detection instead of a numeric threshold,
+                since no defensible number exists for them.
               </span>
               <div className="flex gap-2">
                 {(
