@@ -6,6 +6,7 @@ import BottomNav from "./BottomNav";
 import HeaderMenu from "./HeaderMenu";
 import InstallPrompt from "./InstallPrompt";
 import NotificationBell from "./NotificationBell";
+import OfflineBanner from "./OfflineBanner";
 import OfflineQueueBadge from "./OfflineQueueBadge";
 import Sidebar from "./Sidebar";
 import ThemeProvider from "./ThemeProvider";
@@ -38,6 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {children}
         </div>
         <BottomNav />
+        <OfflineBanner />
         <OfflineQueueBadge />
         <InstallPrompt />
       </div>
