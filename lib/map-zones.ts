@@ -77,6 +77,26 @@ export function centroidOf(shapeType: ZoneShapeType, g: ZoneGeometry): { x: numb
   return null;
 }
 
+// A standalone treatment (db/schema.ts's treatments.x/y comment) has no
+// facilityAreaId -- only facility + x/y, and each of the facility's areas
+// has its own independent 900x600 canvas, so the same (x, y) is a different
+// physical point in every area. Nearest-zone guessing (nearestZoneLabel's
+// fallback half) would silently pick a real-looking label in the WRONG
+// area's geometry -- containment is the only signal trustworthy enough to
+// cross areas with. Returns a label only when exactly one area's zone
+// actually contains the point; null for zero matches (nothing drawn there)
+// or more than one (genuinely ambiguous which area this point belongs to)
+// -- both cases are the caller's cue to show an explicit "can't resolve
+// this" fallback rather than a real-looking name that might be wrong.
+export function resolveZoneAcrossAreas(x: number, y: number, areasWithZones: { areaId: string; zones: Zone[] }[]): string | null {
+  const matches: string[] = [];
+  for (const { zones } of areasWithZones) {
+    const hit = zones.find((z) => z.label && pointInShape(x, y, z.shapeType, z.geometry));
+    if (hit) matches.push(hit.label);
+  }
+  return matches.length === 1 ? matches[0] : null;
+}
+
 // The real-zone equivalent of lib/floorplan-bays.ts's bayLabel(nearestBay(...)):
 // the label of whichever zone's actual shape contains the point, or --
 // nothing contains it exactly (a pin dropped just outside a drawn zone's
