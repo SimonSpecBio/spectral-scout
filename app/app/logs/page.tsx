@@ -72,7 +72,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
               type="date"
               name="from"
               defaultValue={from}
-              className="w-28 rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm"
+              className="w-36 rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm"
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-[var(--text-dim)]">
@@ -81,7 +81,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
               type="date"
               name="to"
               defaultValue={to}
-              className="w-28 rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm"
+              className="w-36 rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm"
             />
           </label>
           <button type="submit" className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-dim)]">
