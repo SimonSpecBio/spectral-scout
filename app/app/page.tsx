@@ -12,6 +12,7 @@ import { computeEscalationAlerts, computeMonitoringAlerts, metricLabel, type Met
 import { computeTrapAlerts } from "@/lib/trap-alerts";
 import { displayNameForPestSpecies, displayNameForTreatmentType } from "@/lib/treatments-catalog";
 import { requireGrowerSession } from "@/lib/session";
+import HomeSwipeNav from "./HomeSwipeNav";
 import MapLensSwitcher, { type BayLensEntry } from "./MapLensSwitcher";
 import OutbreaksStat from "./OutbreaksStat";
 import PressureGraph from "./PressureGraph";
@@ -289,6 +290,7 @@ export default async function HomePage({
   const areas = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, selectedFacility.id));
 
   let areaSwitcher: React.ReactNode = null;
+  let currentAreaId: string | null = null;
   let heatmapEvents: {
     id: string;
     facilityId: string;
@@ -302,6 +304,7 @@ export default async function HomePage({
     const hottestAreaEvent = [...facilityActive].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])[0];
     const selectedAreaId = areaParam ?? hottestAreaEvent?.facilityAreaId ?? areas[0].id;
     const selectedArea = areas.find((a) => a.id === selectedAreaId) ?? areas[0];
+    currentAreaId = selectedArea.id;
 
     const [areaPestEvents, bayLensStats] = await Promise.all([
       db.select().from(pestEvents).where(and(eq(pestEvents.facilityAreaId, selectedArea.id))),
@@ -407,7 +410,13 @@ export default async function HomePage({
   const mapAndGraphSection = (
     <>
       {areaSwitcher}
-      <MapLensSwitcher events={heatmapEvents} bayLensEntries={bayLensEntries} />
+      <MapLensSwitcher
+        facilityId={selectedFacility.id}
+        areas={areas.map((a) => ({ id: a.id, name: a.name }))}
+        currentAreaId={currentAreaId}
+        events={heatmapEvents}
+        bayLensEntries={bayLensEntries}
+      />
 
       <PressureGraph events={facilityEvents.map((e) => ({ createdAt: e.createdAt, resolvedAt: e.resolvedAt, severity: e.severity }))} />
 
@@ -670,31 +679,33 @@ export default async function HomePage({
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      {headerRow}
-      {isHomeGrower(session.growerType) && (
-        <Link href="/app/symptom-check" className="card flex items-center justify-between p-4 text-sm">
-          <span>
-            <span className="font-medium">Should I worry?</span>
-            <span className="block text-xs text-[var(--text-dim)]">Answer a few quick questions about what you&rsquo;re seeing</span>
-          </span>
-          <span className="text-[var(--accent)]">&rarr;</span>
-        </Link>
-      )}
-      {isScout ? (
-        <>
-          {tasksSection}
-          {attentionSection}
-          {scoutMapLink}
-        </>
-      ) : (
-        <>
-          {mapAndGraphSection}
-          {attentionSection}
-          {tasksSection}
-        </>
-      )}
-      {activitySection}
-    </div>
+    <HomeSwipeNav facilities={orgFacilities.map((f) => ({ id: f.id }))} currentFacilityId={selectedFacility.id}>
+      <div className="flex flex-col gap-6">
+        {headerRow}
+        {isHomeGrower(session.growerType) && (
+          <Link href="/app/symptom-check" className="card flex items-center justify-between p-4 text-sm">
+            <span>
+              <span className="font-medium">Should I worry?</span>
+              <span className="block text-xs text-[var(--text-dim)]">Answer a few quick questions about what you&rsquo;re seeing</span>
+            </span>
+            <span className="text-[var(--accent)]">&rarr;</span>
+          </Link>
+        )}
+        {isScout ? (
+          <>
+            {tasksSection}
+            {attentionSection}
+            {scoutMapLink}
+          </>
+        ) : (
+          <>
+            {mapAndGraphSection}
+            {attentionSection}
+            {tasksSection}
+          </>
+        )}
+        {activitySection}
+      </div>
+    </HomeSwipeNav>
   );
 }
