@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { facilityAreas, facilityMapObjects } from "@/db/schema";
+import { isDemoSession } from "@/lib/demo-account";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -53,6 +54,7 @@ export async function DELETE(
 ) {
   const session = await requireGrowerSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (isDemoSession(session)) return NextResponse.json({ error: "Deleting map objects is disabled on the shared demo account" }, { status: 403 });
 
   const { id, areaId, objectId } = await params;
   const object = await ownedObject(id, areaId, objectId, session.organizationId!);

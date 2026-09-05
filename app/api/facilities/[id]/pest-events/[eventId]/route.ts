@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { pestEventStatusEnum, pestEvents, severityEnum } from "@/db/schema";
+import { isDemoSession } from "@/lib/demo-account";
 import { getOwnedPestEvent as ownedEvent, resolvePestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -52,6 +53,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string; eventId: string }> }) {
   const session = await requireGrowerSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (isDemoSession(session)) return NextResponse.json({ error: "Deleting events is disabled on the shared demo account" }, { status: 403 });
 
   const { id, eventId } = await params;
   const event = await ownedEvent(id, eventId, session.organizationId!);

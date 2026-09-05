@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/auth-schema";
 import { memberships, organizations } from "@/db/schema";
+import { isDemoSession } from "@/lib/demo-account";
 import { requireGrowerSession } from "@/lib/session";
 
 // Self-serve account deletion (CCPA/CPRA right to delete, and the GDPR
@@ -32,6 +33,7 @@ import { requireGrowerSession } from "@/lib/session";
 export async function DELETE() {
   const session = await requireGrowerSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (isDemoSession(session)) return NextResponse.json({ error: "Account deletion is disabled on the shared demo account" }, { status: 403 });
 
   const userId = session.user!.id!;
   const orgId = session.organizationId!;

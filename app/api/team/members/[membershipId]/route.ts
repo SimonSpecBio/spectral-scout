@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { memberships } from "@/db/schema";
+import { isDemoSession } from "@/lib/demo-account";
 import { requireGrowerSession } from "@/lib/session";
 
 // Removes a team member. Owner-only, and guards the last owner -- without
@@ -12,6 +13,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const session = await requireGrowerSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.membershipRole !== "owner") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (isDemoSession(session)) return NextResponse.json({ error: "Removing teammates is disabled on the shared demo account" }, { status: 403 });
 
   const { membershipId } = await params;
   const [target] = await db
