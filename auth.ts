@@ -71,6 +71,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // too, if Auth.js's Vercel auto-detection doesn't extend to a custom
   // domain layered on top the same way it does the *.vercel.app one.
   trustHost: true,
+  // A real, branded sign-in/error/check-email flow (ticket recTJ5GagPLVKY62n)
+  // replacing NextAuth's own default scaffolding, which growers were
+  // hitting for every one of these three screens. All three routes stay
+  // outside proxy.ts's auth matcher (reachable signed-out) and outside the
+  // (auth) route group's need for any special layout.
+  pages: {
+    signIn: "/sign-in",
+    error: "/sign-in",
+    verifyRequest: "/sign-in/check-email",
+  },
   // @auth/drizzle-adapter's types want the literal PgTableWithColumns shape;
   // .enableRLS() (db/auth-schema.ts) deliberately returns that type minus
   // itself, to stop it being called twice -- compile-time-only mismatch,
@@ -132,8 +142,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // grower clicks the link) -- the right checkpoint to throttle before
       // this triggers a real Resend send. Scoped to the nodemailer
       // provider only; Google (staff) sign-in is unaffected.
+      //
+      // Returning false here used to render NextAuth's generic
+      // "AccessDenied -- You do not have permission to sign in" (Task 602)
+      // -- indistinguishable from a real denial, for a grower who just
+      // asked for a second link because the first was slow to arrive.
+      // Returning a redirect string instead of false skips that generic
+      // path entirely: the signIn callback's return value becomes the
+      // actual redirect target when it's a string (not run through
+      // Auth.js's error-code allowlist at all), landing straight on
+      // /sign-in with a code this app defines and controls.
       if (account?.provider === "nodemailer" && email?.verificationRequest && !checkSignInRateLimit(userEmail)) {
-        return false;
+        return `/sign-in?error=RateLimited&email=${encodeURIComponent(userEmail)}`;
       }
 
       return true;

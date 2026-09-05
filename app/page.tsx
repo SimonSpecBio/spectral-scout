@@ -50,7 +50,7 @@ export default async function Home() {
 
       <div className="flex w-full flex-col items-center gap-4 sm:w-auto">
         <Link
-          href="/api/auth/signin"
+          href="/sign-in"
           className="w-full rounded-md bg-[var(--accent)] px-5 py-3.5 text-center font-medium text-[var(--on-accent)] sm:w-auto sm:py-2.5"
         >
           Sign in

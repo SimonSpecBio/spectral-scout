@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOutAction } from "@/lib/auth-actions";
 import NotificationBell from "./NotificationBell";
 import QuickActionsMenu from "./QuickActionsMenu";
 
@@ -89,9 +90,11 @@ export default function Sidebar({ email, isPilot }: { email: string | null | und
 
       <div className="mt-auto flex flex-col gap-1 border-t border-[var(--border)] pt-4">
         {email && <div className="truncate px-2.5 text-xs text-[var(--text-dim)]">{email}</div>}
-        <Link href="/api/auth/signout" className="rounded-md px-2.5 py-1.5 text-sm text-[var(--text-dim)]">
-          Sign out
-        </Link>
+        <form action={signOutAction}>
+          <button type="submit" className="w-full rounded-md px-2.5 py-1.5 text-left text-sm text-[var(--text-dim)]">
+            Sign out
+          </button>
+        </form>
       </div>
     </aside>
   );

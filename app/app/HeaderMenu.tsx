@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { signOutAction } from "@/lib/auth-actions";
 
 const SECONDARY = [
   { href: "/app/search", label: "Search" },
@@ -49,9 +50,11 @@ export default function HeaderMenu({ email }: { email: string | null | undefined
             ))}
             <div className="my-1 border-t border-[var(--border)]" />
             {email && <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{email}</div>}
-            <Link href="/api/auth/signout" className="rounded-md px-3 py-2 text-sm hover:bg-[var(--surface-raised)]">
-              Sign out
-            </Link>
+            <form action={signOutAction}>
+              <button type="submit" className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-[var(--surface-raised)]">
+                Sign out
+              </button>
+            </form>
           </div>
         </>
       )}
