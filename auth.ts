@@ -61,6 +61,16 @@ async function provisionMembership(userId: string, email: string, name: string |
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Vercel gives every preview deploy its own generated hostname; without
+  // this, Auth.js only trusts the host it was configured for (or none),
+  // and Google OAuth rejects any redirect URI that isn't registered in the
+  // console anyway (only production + localhost are), so sign-in on a
+  // preview deploy failed with redirect_uri_mismatch before this existed --
+  // and, per Task 603's read of the same symptom, could plausibly explain
+  // a generic "Configuration" error on the real production custom domain
+  // too, if Auth.js's Vercel auto-detection doesn't extend to a custom
+  // domain layered on top the same way it does the *.vercel.app one.
+  trustHost: true,
   // @auth/drizzle-adapter's types want the literal PgTableWithColumns shape;
   // .enableRLS() (db/auth-schema.ts) deliberately returns that type minus
   // itself, to stop it being called twice -- compile-time-only mismatch,
@@ -78,6 +88,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // any Gmail/Google account can use it to join, same as the nodemailer
     // path. Previously restricted to staffEmails only; growers asked to be
     // able to sign up with Google instead of magic-link (2026-09-04).
+    //
+    // allowDangerousEmailAccountLinking (Task 603, decision recorded
+    // 2026-09-05): kept ON, deliberately. Threat model -- this auto-links a
+    // Google sign-in to an existing user row with the same email, created
+    // by ANY method (an earlier magic-link sign-in, most likely). Since
+    // Google verifies the email address itself before ever reaching us,
+    // the only way to exploit this is to control an email address someone
+    // else already used to sign up here, which is already a full account
+    // takeover via the magic-link path regardless of this flag (whoever
+    // controls the inbox can just request a new link). Turning it off
+    // would break the exact feature just shipped -- a grower who signed up
+    // with email X via magic-link, then later clicks "Sign in with
+    // Google" using a Google account that happens to be X, would hit
+    // OAuthAccountNotLinked ("confirm your identity, sign in with the
+    // original account") instead of landing in their own existing org.
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -114,11 +139,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     // Runs on every session fetch (database strategy = no JWT to decode).
-    // First sign-in for a brand-new grower email: no scout_staff row and no
-    // scout_membership row yet, so provision a fresh organization + owner
-    // membership on the fly. This is what makes the free tier genuinely
-    // self-serve instead of staff-provisioned like spectral-pilot's
-    // pp_contacts allowlist.
+    // Reads only -- provisioning itself now happens once, in
+    // events.createUser below, not on every request that happens to read
+    // the session. The membership check+provision here stays only as a
+    // fallback for the (should be unreachable) case where createUser's own
+    // provisioning attempt failed outright, so a partial failure still
+    // self-heals on the next session read rather than leaving the grower
+    // stuck with no org and no recovery path.
     async session({ session }) {
       const email = session.user?.email?.toLowerCase();
       const userId = session.user?.id;
@@ -161,6 +188,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.organizationConsentVersion = org?.dataConsentVersion ?? null;
       session.growerType = org?.growerType ?? null;
       return session;
+    },
+  },
+  events: {
+    // Fires exactly once, when the adapter creates a brand-new user row --
+    // the right place for org provisioning (Task 603), not the session
+    // callback above, which used to run this same transactional
+    // org+membership insert on every session read that found no
+    // membership yet (redundant once it's already provisioned, and on the
+    // very first request race meant two concurrent session reads could
+    // both attempt it before either committed -- provisionMembership's own
+    // retry-on-unique-violation handles that, but there's no reason to
+    // exercise it routinely when creation is a one-time event). Staff
+    // accounts never get an org, same two checks session() makes.
+    async createUser({ user }) {
+      const email = user.email?.toLowerCase();
+      if (!email || !user.id || staffEmails.has(email)) return;
+      const [existingStaffRow] = await db.select().from(staff).where(eq(staff.userId, user.id));
+      if (existingStaffRow) return;
+      await provisionMembership(user.id, email, user.name ?? null);
     },
   },
 });
