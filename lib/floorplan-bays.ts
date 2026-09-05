@@ -36,6 +36,19 @@ export const BAYS: Bay[] = (["A", "B"] as const).flatMap((row) =>
   })
 );
 
+// A row's continuous placement extent in canvas space (LocationPicker's "tap
+// anywhere along a row" mode, replacing the old fixed-10-slot snap) -- same
+// ROW_X/BENCH_YS source data as BAYS above, just expressed as a range
+// instead of discrete points. yMin/yMax pad half a bench-height past the
+// first/last slot so the ends of the row stay tappable, not just the
+// midpoints between slots.
+export const ROWS: { row: "A" | "B"; x: number; yMin: number; yMax: number }[] = (["A", "B"] as const).map((row) => ({
+  row,
+  x: ((ROW_X[row] + BENCH_W / 2) / VIEW_W) * CANVAS_W,
+  yMin: ((BENCH_YS[0] + BENCH_H / 2) / VIEW_H) * CANVAS_H,
+  yMax: ((BENCH_YS[BENCH_YS.length - 1] + BENCH_H / 2) / VIEW_H) * CANVAS_H,
+}));
+
 export function nearestBay(x: number, y: number): Bay {
   let best = BAYS[0];
   let bestDist = Infinity;

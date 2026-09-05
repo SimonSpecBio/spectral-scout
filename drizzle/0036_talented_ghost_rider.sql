@@ -1,0 +1,1 @@
+ALTER TABLE "scout_pest_event" ADD COLUMN "span_positions" jsonb;

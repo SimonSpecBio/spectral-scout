@@ -1,6 +1,6 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { facilities, facilityAreas, facilityMapObjects } from "@/db/schema";
+import { facilities, facilityAreas, facilityMapObjects, pestEvents } from "@/db/schema";
 import type { Zone } from "@/lib/map-zones";
 import type { PickerFacility } from "@/app/app/LocationPicker";
 
@@ -25,6 +25,26 @@ export async function buildPickerFacilities(organizationId: string): Promise<Pic
 
   const mapObjects = areaIds.length > 0 ? await db.select().from(facilityMapObjects).where(inArray(facilityMapObjects.facilityAreaId, areaIds)) : [];
 
+  // Existing active hotspots, shown as context while placing a new pin
+  // (location picker ticket, 2026-09-04) -- so a grower can see "there's
+  // already an outbreak two benches over" instead of placing blind. Active
+  // only (a resolved case isn't a hotspot to avoid anymore); x/y required
+  // since a pin-less event has nothing to plot.
+  const hotspotRows =
+    areaIds.length > 0
+      ? await db
+          .select({ facilityAreaId: pestEvents.facilityAreaId, x: pestEvents.x, y: pestEvents.y, severity: pestEvents.severity })
+          .from(pestEvents)
+          .where(
+            and(
+              inArray(pestEvents.facilityAreaId, areaIds),
+              eq(pestEvents.status, "active"),
+              isNotNull(pestEvents.x),
+              isNotNull(pestEvents.y)
+            )
+          )
+      : [];
+
   return orgFacilities.map((f) => ({
     id: f.id,
     name: f.name,
@@ -36,6 +56,9 @@ export async function buildPickerFacilities(organizationId: string): Promise<Pic
         zones: mapObjects
           .filter((o) => o.facilityAreaId === a.id && o.label && (o.shapeType === "rect" || o.shapeType === "circle" || o.shapeType === "polygon"))
           .map((o) => ({ id: o.id, label: o.label!, shapeType: o.shapeType as Zone["shapeType"], geometry: o.geometry as Zone["geometry"] })),
+        hotspots: hotspotRows
+          .filter((h) => h.facilityAreaId === a.id)
+          .map((h) => ({ x: h.x!, y: h.y!, severity: h.severity })),
       })),
   }));
 }

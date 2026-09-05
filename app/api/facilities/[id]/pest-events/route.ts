@@ -49,6 +49,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const severity = severityEnum.enumValues.includes(body.severity) ? body.severity : "moderate";
   const kind = eventKindEnum.enumValues.includes(body.kind) ? body.kind : "pest";
 
+  // LocationPicker's allowPath mode (ticket recuQ3WClsMKdcDQJ) -- an
+  // outbreak spanning more than one bench/row. Server-side re-validated
+  // rather than trusted as-is: only well-formed {x,y} number pairs survive,
+  // and capped at 6 to match the picker's own MAX_POINTS rather than
+  // trusting an arbitrarily long client-supplied array.
+  const spanPositions = Array.isArray(body.spanPositions)
+    ? body.spanPositions
+        .filter((p: unknown): p is { x: number; y: number } => !!p && typeof p === "object" && typeof (p as { x: unknown }).x === "number" && typeof (p as { y: unknown }).y === "number")
+        .slice(0, 6)
+    : null;
+
   // Client-supplied and only type-checked below otherwise -- verify it
   // actually belongs to this facility before trusting it, same reasoning
   // as every other cross-referenced id fixed this pass (an unowned area id
@@ -99,6 +110,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         mapObjectId,
         x: typeof body.x === "number" ? body.x : null,
         y: typeof body.y === "number" ? body.y : null,
+        spanPositions: spanPositions?.length ? spanPositions : null,
         kind,
         pestSpecies,
         scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,
@@ -137,6 +149,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         mapObjectId,
         x: typeof body.x === "number" ? body.x : null,
         y: typeof body.y === "number" ? body.y : null,
+        spanPositions: spanPositions?.length ? spanPositions : null,
         kind,
         pestSpecies,
         scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,

@@ -113,7 +113,7 @@ export default function NewEventForm({
     }
   }, [species, scientificName, severity, notes]);
 
-  async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
+  async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number, extraPoints?: { x: number; y: number }[]) {
     setSubmitting(true);
     setError(null);
     const result = await queuedFetch(
@@ -126,6 +126,7 @@ export default function NewEventForm({
         notes,
         x,
         y,
+        spanPositions: extraPoints?.length ? extraPoints : undefined,
         sourceObservationId: handoff?.observationId ?? null,
       },
       "Pest event"
@@ -162,6 +163,7 @@ export default function NewEventForm({
         onConfirm={handleConfirmLocation}
         onCancel={() => setPlacingLocation(false)}
         step={{ current: 2, total: 2 }}
+        allowPath
       />
     );
   }

@@ -94,6 +94,10 @@ interface Event {
   // Null for events created before this was tracked, or a since-deleted
   // account -- there's no way to know who logged those after the fact.
   loggedBy: string | null;
+  // Extra benches/rows this event was tagged to at creation (location
+  // picker's allowPath mode, ticket recuQ3WClsMKdcDQJ) -- 0 for the
+  // overwhelming majority of events, a single-point pin.
+  spanCount: number;
 }
 
 export default function PestEventDetail({
@@ -599,7 +603,15 @@ export default function PestEventDetail({
               <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[severity] }} />
             </div>
             {event.scientificName && <div className="text-sm italic text-[var(--text-dim)]">{event.scientificName}</div>}
-            <div className="text-sm text-[var(--text-dim)]">{locationLabel}</div>
+            <div className="text-sm text-[var(--text-dim)]">
+              {locationLabel}
+              {event.spanCount > 0 && (
+                <span className="text-[var(--text-faint)]">
+                  {" "}
+                  &middot; +{event.spanCount} more spot{event.spanCount > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
             <div className="text-xs text-[var(--text-faint)]">
               Detected <LocalDate date={event.createdAt} format={(d) => d.toLocaleDateString()} />
               {event.loggedBy && <> by {event.loggedBy}</>}

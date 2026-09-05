@@ -335,6 +335,13 @@ export const pestEvents = pgTable(
     mapObjectId: uuid("map_object_id").references(() => facilityMapObjects.id, { onDelete: "set null" }),
     x: numeric("x", { mode: "number" }),
     y: numeric("y", { mode: "number" }),
+    // Extra canvas-space points beyond x/y, for an outbreak that spans more
+    // than one bench/row (location picker ticket, 2026-09-04) -- x/y stays
+    // the one, primary point every existing marker/heatmap/nearestBay call
+    // already keys off, this is purely additive context for "where else is
+    // this spreading." null/empty for the overwhelming majority of events
+    // (a single-point pin), same "nothing extra to say" convention as notes.
+    spanPositions: jsonb("span_positions").$type<{ x: number; y: number }[]>(),
     kind: eventKindEnum("kind").notNull().default("pest"),
     pestSpecies: text("pest_species").notNull(), // common name either way -- insect species name, or disease/pathogen name
     scientificName: text("scientific_name"), // optional Latin binomial, either kind

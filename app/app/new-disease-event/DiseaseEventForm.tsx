@@ -86,7 +86,7 @@ export default function DiseaseEventForm({
   // "Create disease event" opens the location placement screen instead of
   // submitting directly -- this is what actually finishes the submission,
   // once a real pin position exists.
-  async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
+  async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number, extraPoints?: { x: number; y: number }[]) {
     setSubmitting(true);
     setError(null);
     // The leaf-severity grid rides along in this same request (as
@@ -106,6 +106,7 @@ export default function DiseaseEventForm({
         notes: notes || null,
         x,
         y,
+        spanPositions: extraPoints?.length ? extraPoints : undefined,
         initialMonitoring:
           agg.leavesAssessed > 0
             ? { sampleSize: agg.leavesAssessed, pestCount: agg.leavesInfected, assessmentType: "disease_severity", leafGrid: grid }
@@ -143,6 +144,7 @@ export default function DiseaseEventForm({
         onConfirm={handleConfirmLocation}
         onCancel={() => setPlacingLocation(false)}
         step={{ current: 2, total: 2 }}
+        allowPath
       />
     );
   }

@@ -155,6 +155,7 @@ export default async function PestEventPage({
           resolvedAt: event.resolvedAt ? event.resolvedAt.toISOString() : null,
           autoResolved: event.autoResolved,
           loggedBy: loggedByName ? (loggedByName.name ?? loggedByName.email) : null,
+          spanCount: event.spanPositions?.length ?? 0,
         }}
         locationLabel={locationLabel}
         mapHref={area ? `/app/facilities/${id}/areas/${area.id}` : null}
