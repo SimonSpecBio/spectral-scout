@@ -8,6 +8,8 @@ import InstallPrompt from "./InstallPrompt";
 import NotificationBell from "./NotificationBell";
 import OfflineBanner from "./OfflineBanner";
 import OfflineQueueBadge from "./OfflineQueueBadge";
+import OfflineQueueFailedBadge from "./OfflineQueueFailedBadge";
+import SessionExpiredBanner from "./SessionExpiredBanner";
 import Sidebar from "./Sidebar";
 import ThemeProvider from "./ThemeProvider";
 
@@ -41,6 +43,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <BottomNav />
         <OfflineBanner />
         <OfflineQueueBadge />
+        <OfflineQueueFailedBadge />
+        <SessionExpiredBanner />
         <InstallPrompt />
       </div>
     </ThemeProvider>

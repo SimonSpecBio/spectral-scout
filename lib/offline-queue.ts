@@ -23,8 +23,13 @@
 // the network tab set to "Offline," confirm the pending badge appears,
 // go back online, confirm it syncs and the badge clears.
 const DB_NAME = "spectral-scout-offline";
-const DB_VERSION = 1;
+// v2 (ticket recAAWHkGTiiWDH5C): adds the FAILED_STORE -- a rejected item
+// used to just be deleted, indistinguishable in the UI from one that
+// synced. Bumping this runs onupgradeneeded for anyone still on v1, which
+// only ever adds the new store; existing pending items are untouched.
+const DB_VERSION = 2;
 const STORE = "pending";
+const FAILED_STORE = "failed";
 
 interface PendingRequest {
   id: number;
@@ -44,12 +49,25 @@ interface PendingRequest {
   label: string; // human-readable, shown in the pending-sync indicator
 }
 
+// A pending item the server told us, unambiguously, it will never accept
+// (validation, a since-deleted reference, a conflict) -- kept for the
+// grower to see and re-enter by hand instead of silently vanishing, which
+// is what happened before (ticket recAAWHkGTiiWDH5C: "everything synced"
+// was reported even when a whole queue was quietly discarded).
+export interface FailedRequest extends PendingRequest {
+  failedStatus: number;
+  failedAt: number;
+}
+
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains(STORE)) {
         req.result.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+      }
+      if (!req.result.objectStoreNames.contains(FAILED_STORE)) {
+        req.result.createObjectStore(FAILED_STORE, { keyPath: "id", autoIncrement: true });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -95,6 +113,48 @@ async function removePending(id: number): Promise<void> {
   });
 }
 
+export async function getFailed(): Promise<FailedRequest[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(FAILED_STORE, "readonly").objectStore(FAILED_STORE).getAll();
+    req.onsuccess = () => resolve(req.result as FailedRequest[]);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// A grower dismissing a failed item after re-entering it by hand (or just
+// deciding to drop it) -- the only way anything leaves FAILED_STORE, since
+// nothing here retries automatically (the server already told us it never
+// will).
+export async function dismissFailed(id: number): Promise<void> {
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(FAILED_STORE, "readwrite");
+    tx.objectStore(FAILED_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  notifyChanged();
+}
+
+// Moves one pending item to the failed store in a single pass (rather than
+// a separate delete-then-add) so a crash between the two can't either
+// duplicate it or drop it silently.
+async function moveToFailed(item: PendingRequest, status: number): Promise<void> {
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction([STORE, FAILED_STORE], "readwrite");
+    tx.objectStore(STORE).delete(item.id);
+    // Carries its old pending-store id over as the failed-store id too --
+    // fine to reuse: autoIncrement only fills in an id when one isn't
+    // already present, and pending ids are never reused within a store's
+    // lifetime, so this can never collide with another failed entry.
+    tx.objectStore(FAILED_STORE).add({ ...item, failedStatus: status, failedAt: Date.now() });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 const CHANGE_EVENT = "spectral-offline-queue-changed";
 function notifyChanged() {
   window.dispatchEvent(new Event(CHANGE_EVENT));
@@ -102,6 +162,22 @@ function notifyChanged() {
 export function onQueueChanged(cb: () => void): () => void {
   window.addEventListener(CHANGE_EVENT, cb);
   return () => window.removeEventListener(CHANGE_EVENT, cb);
+}
+
+// Fired when a flush hits a 401/403 -- the session itself is the problem,
+// not any individual item, so every item still in the queue is left alone
+// (not moved to failed) and this tells the UI to prompt a real sign-in
+// instead. flushQueue already re-runs on the existing online/visibility/
+// pageshow listeners, so signing back in and returning to the app is
+// enough to pick the queue back up -- nothing here needs its own retry
+// timer.
+const AUTH_REQUIRED_EVENT = "spectral-offline-queue-auth-required";
+function notifyAuthRequired() {
+  window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
+}
+export function onAuthRequired(cb: () => void): () => void {
+  window.addEventListener(AUTH_REQUIRED_EVENT, cb);
+  return () => window.removeEventListener(AUTH_REQUIRED_EVENT, cb);
 }
 
 // Lets PwaRegister's controllerchange handler defer its forced reload while
@@ -250,6 +326,19 @@ export async function queuedFileFetch(
 // fine here (this file is a singleton per page, same as `initialized` below).
 let flushing = false;
 
+// Statuses where the server itself is telling us "not now, try again" --
+// an expired/not-yet-valid session, a transient rate limit, a request that
+// timed out server-side, or the server having a bad moment. None of these
+// mean the DATA was invalid, only that this particular attempt was, so the
+// item must survive to retry (ticket recAAWHkGTiiWDH5C -- these used to be
+// deleted exactly like a genuine validation failure, and the realistic
+// trigger is a session that expired while a scout worked offline for a
+// couple hours: every queued item would 401 on reconnect and the whole
+// queue vanished with the UI reporting success).
+function isRetryableStatus(status: number): boolean {
+  return status === 401 || status === 403 || status === 408 || status === 429 || status >= 500;
+}
+
 export async function flushQueue(): Promise<void> {
   if (flushing) return;
   flushing = true;
@@ -271,13 +360,21 @@ export async function flushQueue(): Promise<void> {
           await removePending(item.id);
           continue;
         }
-        // A real HTTP error response (the server is reachable) means retrying
-        // this exact item later won't help -- same reasoning queuedFetch uses
-        // to not queue these in the first place. Drop it and keep going,
+        if (isRetryableStatus(res.status)) {
+          // Leave this item (and everything queued after it, since replay
+          // order matters and a session problem would 401 those too) for
+          // the next flush rather than burning through the rest of the
+          // queue against a session/server that just told us to back off.
+          if (res.status === 401 || res.status === 403) notifyAuthRequired();
+          break;
+        }
+        // A genuinely terminal response (400/404/409/422/...) -- retrying
+        // this exact item would never succeed, but silently deleting it
+        // hides real lost data from the person who entered it. Move it
+        // where the grower can see it and re-enter by hand, and keep going
         // rather than letting one permanently-broken item (e.g. a since-
-        // deleted area it referenced) block every item queued after it on
-        // every future flush.
-        await removePending(item.id);
+        // deleted area it referenced) block every item queued after it.
+        await moveToFailed(item, res.status);
       } catch {
         // A thrown fetch error means the network itself is the problem --
         // stop here and retry the whole remaining queue on the next flush,
