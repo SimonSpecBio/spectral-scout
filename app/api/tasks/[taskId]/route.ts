@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { taskStatusEnum, tasks } from "@/db/schema";
+import { memberships, taskStatusEnum, tasks } from "@/db/schema";
 import { notifyTaskAssigned } from "@/lib/push";
 import { getTask } from "@/lib/tasks";
 import { requireGrowerSession } from "@/lib/session";
@@ -35,6 +35,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   if (typeof body.assigneeUserId === "string" || body.assigneeUserId === null) {
     if (session.membershipRole !== "owner") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Same cross-org check the POST route already has (app/api/tasks/route.ts)
+    // -- without this, an owner could PATCH any task with an arbitrary
+    // foreign user id, and notifyTaskAssigned below would push that org's
+    // task title straight to a device in a different org.
+    if (typeof body.assigneeUserId === "string") {
+      const [member] = await db
+        .select()
+        .from(memberships)
+        .where(and(eq(memberships.userId, body.assigneeUserId), eq(memberships.organizationId, session.organizationId!)));
+      if (!member) return NextResponse.json({ error: "assigneeUserId is not a member of this organization" }, { status: 400 });
+    }
     updates.assigneeUserId = body.assigneeUserId;
   }
   if (typeof body.status === "string") {
