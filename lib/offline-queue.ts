@@ -137,6 +137,38 @@ export function onMutationSettled(cb: () => void): () => void {
 // submit button reading "Setting..." forever.
 const FETCH_TIMEOUT_MS = 20_000;
 
+// A capture's real "when" is the moment this function is first called, not
+// whenever the request finally lands server-side -- if it queues, that
+// could be hours later, potentially past midnight (ticket recd05VrZFhxePhoi:
+// a scouting session captured at 08:00 in a dead zone and synced at 17:00
+// used to get stamped 17:00, and a session captured before midnight and
+// synced after landed on the wrong day entirely). Computed once here, from
+// getFullYear/getMonth/getDate (this DEVICE's own local calendar day, not
+// UTC) rather than sliced from a UTC ISO string -- the same fix also
+// resolves the separate always-online bug where a grower scouting late in
+// the evening got tomorrow's UTC date. Only date-sensitive routes
+// (scouting, monitoring, trap readings -- the ones whose "date" column
+// feeds day-granularity trend/threshold math) read this; every other
+// route ignores the extra field.
+function capturedDateLocal(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Merges capturedDate (this device's local calendar day, for date-column
+// routes like scouting/monitoring) and capturedAt (the exact moment, ISO,
+// for a full timestamp column like trap readings' createdAt) into a JSON
+// body without disturbing a non-object body (there are none today, but
+// this stays defensive rather than assume). Both derived from the same
+// Date instance so they can never disagree with each other.
+function withCapturedDate(body: unknown): unknown {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return body;
+  const now = new Date();
+  return { ...body, capturedDate: capturedDateLocal(now), capturedAt: now.toISOString() };
+}
+
 export async function queuedFetch(
   url: string,
   body: unknown,
@@ -144,6 +176,7 @@ export async function queuedFetch(
   method: string = "POST"
 ): Promise<{ ok: boolean; queued: boolean; data?: unknown }> {
   inFlightMutations++;
+  const stampedBody = withCapturedDate(body);
   try {
     if (typeof navigator !== "undefined" && navigator.onLine) {
       const controller = new AbortController();
@@ -152,7 +185,7 @@ export async function queuedFetch(
         const res = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify(stampedBody),
           signal: controller.signal,
         });
         if (res.ok) return { ok: true, queued: false, data: await res.json() };
@@ -165,7 +198,7 @@ export async function queuedFetch(
         clearTimeout(timeoutId);
       }
     }
-    await enqueue(url, method, body, label);
+    await enqueue(url, method, stampedBody, label);
     return { ok: true, queued: true };
   } finally {
     inFlightMutations = Math.max(0, inFlightMutations - 1);

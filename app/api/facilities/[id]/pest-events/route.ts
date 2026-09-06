@@ -2,6 +2,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { eventKindEnum, facilityAreas, facilityMapObjects, inventoryItems, pestEvents, scoutingObservations, severityEnum, tasks } from "@/db/schema";
+import { capturedDateOrToday } from "@/lib/captured-date";
 import { locationLabel } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
 import { parseMonitoringPayload } from "@/lib/monitoring";
@@ -181,7 +182,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           x: row.x,
           y: row.y,
           submittedByUserId: session.user!.id!,
-          date: new Date().toISOString().slice(0, 10),
+          date: capturedDateOrToday(body),
           promotedPestEventId: row.id,
           ...parsed,
         })

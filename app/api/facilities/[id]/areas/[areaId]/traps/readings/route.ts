@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { facilityAreas, trapReadings, traps } from "@/db/schema";
+import { capturedAtOrNow } from "@/lib/captured-date";
 import { getOwnedFacility } from "@/lib/facilities";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -51,7 +52,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }));
   if (values.length === 0) return NextResponse.json({ error: "No valid readings" }, { status: 400 });
 
-  const rows = await db.insert(trapReadings).values(values).returning();
+  // Captured-at-capture, not stamped-at-insert (ticket recd05VrZFhxePhoi) --
+  // a reading queued offline and replayed hours later should keep the
+  // moment it was actually taken, which the per-trap-per-day math this
+  // feeds (dividing by daysDeployed) depends on being accurate.
+  const capturedAt = capturedAtOrNow(body);
+  const rows = await db.insert(trapReadings).values(values.map((v: (typeof values)[number]) => ({ ...v, createdAt: capturedAt }))).returning();
   return NextResponse.json(rows);
 }
 

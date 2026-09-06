@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { facilityAreas, scoutingObservations } from "@/db/schema";
+import { capturedDateOrToday } from "@/lib/captured-date";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
 import { parseMonitoringPayload } from "@/lib/monitoring";
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       x: typeof body.x === "number" ? body.x : null,
       y: typeof body.y === "number" ? body.y : null,
       submittedByUserId: session.user!.id!,
-      date: new Date().toISOString().slice(0, 10),
+      date: capturedDateOrToday(body),
       ...parsed,
     })
     .returning();

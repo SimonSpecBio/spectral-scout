@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { facilityAreas, pestEvents, scoutingObservations, tasks } from "@/db/schema";
+import { capturedDateOrToday } from "@/lib/captured-date";
 import { aggregateDiseaseGrid, severityFromDiseaseAggregate, type DiseaseLeaves } from "@/lib/disease";
 import { locationLabel } from "@/lib/floorplan-bays";
 import { parseMonitoringPayload } from "@/lib/monitoring";
@@ -48,7 +49,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Event has no facility area to monitor" }, { status: 400 });
   }
 
-  const parsed = parseMonitoringPayload(await request.json());
+  const body = await request.json();
+  const parsed = parseMonitoringPayload(body);
   if (!parsed) return NextResponse.json({ error: "sampleSize and pestCount are required" }, { status: 400 });
 
   const [row] = await db
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       x: event.x,
       y: event.y,
       submittedByUserId: session.user!.id!,
-      date: new Date().toISOString().slice(0, 10),
+      date: capturedDateOrToday(body),
       promotedPestEventId: eventId,
       ...parsed,
     })
