@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { users as authUsers } from "@/db/auth-schema";
-import { facilities, inventoryItems, inventoryOrders, pestEvents, shareNotifications, tasks, treatments } from "@/db/schema";
+import { facilities, facilityAreas, inventoryItems, inventoryOrders, pestEvents, shareNotifications, tasks, treatments } from "@/db/schema";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { computeScoutingAlerts, scoutingAlertConfirmHref } from "@/lib/scouting-alerts";
 import { computeEscalationAlerts, computeMonitoringAlerts, metricLabel } from "@/lib/threshold-engine";
@@ -146,14 +146,34 @@ export async function computeNotifications(organizationId: string, userId: strin
       .from(treatments)
       .innerJoin(inventoryItems, eq(treatments.inventoryItemId, inventoryItems.id))
       .where(and(inArray(treatments.facilityId, facilityIds), gte(treatments.appliedAt, new Date(Date.now() - 30 * DAY_MS))));
+    // Event-scoped treatments with no map pin (db/schema.ts's comment on
+    // treatments.x/y) used to be silently excluded from this notification
+    // entirely -- degrade to the event's real area name instead (ticket
+    // recVRucXHLYwnnWhq: a missing pin narrows what's known, it must never
+    // narrow what's protected/surfaced). Standalone treatments always have
+    // real coordinates (the create route requires them), so this only ever
+    // needs to resolve via a pestEventId.
+    const unpinnedEventIds = [
+      ...new Set(recentTreatments.filter((r) => r.treatment.x == null || r.treatment.y == null).map((r) => r.treatment.pestEventId).filter((id): id is string => !!id)),
+    ];
+    const unpinnedEvents = unpinnedEventIds.length > 0 ? await db.select().from(pestEvents).where(inArray(pestEvents.id, unpinnedEventIds)) : [];
+    const areaIdByEventId = new Map(unpinnedEvents.map((e) => [e.id, e.facilityAreaId]));
+    const unpinnedAreaIds = [...new Set(unpinnedEvents.map((e) => e.facilityAreaId).filter((id): id is string => !!id))];
+    const unpinnedAreas = unpinnedAreaIds.length > 0 ? await db.select().from(facilityAreas).where(inArray(facilityAreas.id, unpinnedAreaIds)) : [];
+    const areaNameById = new Map(unpinnedAreas.map((a) => [a.id, a.name]));
+
     for (const { treatment: t, item } of recentTreatments) {
-      if (t.x == null || t.y == null || item.reiHours == null) continue;
+      if (item.reiHours == null) continue;
+      const label =
+        t.x != null && t.y != null
+          ? bayLabel(nearestBay(t.x, t.y))
+          : (areaNameById.get(areaIdByEventId.get(t.pestEventId ?? "") ?? "") ?? "Unmapped bay");
       const reiEndsAt = new Date(t.appliedAt.getTime() + item.reiHours * 3_600_000);
       if (reiEndsAt.getTime() <= Date.now() && reiEndsAt.getTime() > since.getTime()) {
         notifications.push({
           id: `rei-cleared-${t.id}`,
           kind: "rei_cleared",
-          title: `${bayLabel(nearestBay(t.x, t.y))} re-entry cleared`,
+          title: `${label} re-entry cleared`,
           sub: `${item.name} REI ended`,
           at: reiEndsAt,
           href: "/app/rei-phi",

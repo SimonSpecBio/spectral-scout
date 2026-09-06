@@ -28,6 +28,20 @@ export async function POST(request: NextRequest) {
   const unit = typeof body.unit === "string" && body.unit.trim() ? body.unit.trim() : "units";
   const quantity = typeof body.quantity === "number" && body.quantity >= 0 ? body.quantity : 0;
 
+  // A negative or wildly-out-of-range value here isn't just bad data --
+  // lib/rei-phi.ts's LOOKBACK_DAYS window and reiEndsAt/phiEndsAt math both
+  // assume a sane positive interval (ticket recdC9gknN5CHcBE4: an unvalidated
+  // phiDays north of 30 used to fall out of that window entirely and read
+  // as harvest-clear while real days remained). Rejected outright rather
+  // than silently clamped -- clamping a badly-mistyped value to the
+  // boundary would still show a real-looking-but-wrong number.
+  if (typeof body.reiHours === "number" && (!Number.isFinite(body.reiHours) || body.reiHours < 0 || body.reiHours > 8760)) {
+    return NextResponse.json({ error: "reiHours must be between 0 and 8760 (one year)" }, { status: 400 });
+  }
+  if (typeof body.phiDays === "number" && (!Number.isFinite(body.phiDays) || body.phiDays < 0 || body.phiDays > 365)) {
+    return NextResponse.json({ error: "phiDays must be between 0 and 365" }, { status: 400 });
+  }
+
   const [row] = await db
     .insert(inventoryItems)
     .values({

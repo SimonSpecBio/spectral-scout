@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { facilityAreas, memberships, taskTypeEnum, tasks } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
-import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
+import { nearestBay } from "@/lib/floorplan-bays";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { notifyTaskAssigned } from "@/lib/push";
 import { computeRestrictions } from "@/lib/rei-phi";
@@ -63,14 +63,32 @@ export async function POST(request: NextRequest) {
   // restriction (see db/schema.ts's comment on scout_task.x/y).
   const x = event?.x ?? null;
   const y = event?.y ?? null;
+  // The area a task's REI check runs against -- the linked event's own
+  // area first (matches x/y's inheritance above), falling back to an
+  // explicitly-supplied facilityAreaId for a task with no linked event.
+  const taskAreaId = event?.facilityAreaId ?? facilityAreaId;
 
-  if (facilityId && x != null && y != null) {
+  // Matched by facilityAreaId + bayKey (both stable, non-display keys),
+  // never by the bay LABEL string (ticket reclLv77FtmxbLHZr) -- a real,
+  // grower-named zone label and this route's always-generic
+  // bayLabel(nearestBay(...)) never matched each other, so the interlock
+  // silently stopped blocking anything the moment an area got labeled
+  // zones. Also no longer gated on the task having a pin at all (ticket
+  // recVRucXHLYwnnWhq): a task with no pin still needs to be blocked if
+  // its whole area is under REI, not silently skipped past the check --
+  // missing location narrows what's known, it must never narrow what's
+  // protected. A null bayKey on either side is treated as "this whole
+  // area", so an unpinned task/restriction pair still collides correctly;
+  // two pinned ones must match the exact bay.
+  if (facilityId && taskAreaId) {
     const restrictions = await computeRestrictions(facilityId);
-    const bay = bayLabel(nearestBay(x, y));
-    const blocking = restrictions.find((r) => r.bay === bay && r.reiActive);
+    const taskBayKey = x != null && y != null ? `${nearestBay(x, y).row}${nearestBay(x, y).index}` : null;
+    const blocking = restrictions.find(
+      (r) => r.reiActive && r.facilityAreaId === taskAreaId && (taskBayKey == null || r.bayKey == null || r.bayKey === taskBayKey)
+    );
     if (blocking) {
       return NextResponse.json(
-        { error: `${bay} is under an active REI restriction (${blocking.product}) -- no entry until it clears.` },
+        { error: `${blocking.bay} is under an active REI restriction (${blocking.product}) -- no entry until it clears.` },
         { status: 409 }
       );
     }
