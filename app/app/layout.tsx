@@ -10,6 +10,7 @@ import OfflineBanner from "./OfflineBanner";
 import OfflineQueueBadge from "./OfflineQueueBadge";
 import OfflineQueueFailedBadge from "./OfflineQueueFailedBadge";
 import SessionExpiredBanner from "./SessionExpiredBanner";
+import StripDemoParam from "./StripDemoParam";
 import Sidebar from "./Sidebar";
 import ThemeProvider from "./ThemeProvider";
 
@@ -45,6 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <OfflineQueueBadge />
         <OfflineQueueFailedBadge />
         <SessionExpiredBanner />
+        <StripDemoParam />
         <InstallPrompt />
       </div>
     </ThemeProvider>

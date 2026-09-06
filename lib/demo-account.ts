@@ -3,7 +3,14 @@
 // why a cookie-only flow doesn't work for a stateless HTTP client).
 export const DEMO_EMAIL = "demo@spectralscout.app";
 export const DEMO_QUERY_PARAM = "demo";
-export const DEMO_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // matches NextAuth's database-session default
+// Shortened from 30 days (ticket recFlz4adX8fhWS61) -- the token this
+// bounds travels in a URL (browser history, server access logs, anywhere
+// a link gets pasted), which is a much easier place for it to leak than a
+// normal httpOnly cookie. 24 hours is still generous for "try the demo
+// right now" while meaningfully bounding how long a leaked token stays
+// exploitable. Unrelated to how long a real grower's Google/email session
+// lasts (auth.ts, NextAuth's own default) -- this constant is demo-only.
+export const DEMO_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 // Simon's call (2026-09-04, ticket reccd0tK03RESZA6f): the demo account is
 // deliberately zero-verification and publicly linked from the landing page,

@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { sessions, users } from "@/db/auth-schema";
 import { memberships, organizations } from "@/db/schema";
 import { CURRENT_CONSENT_VERSION } from "@/lib/consent";
-import { DEMO_EMAIL, DEMO_QUERY_PARAM } from "@/lib/demo-account";
+import { DEMO_EMAIL, DEMO_QUERY_PARAM, DEMO_SESSION_MAX_AGE_MS } from "@/lib/demo-account";
 import { encodeSessionHeader, SESSION_HEADER_NAME } from "@/lib/session-cache";
 
 // A stateless HTTP client (a lot of simple AI-agent web fetchers, as
@@ -107,20 +107,41 @@ export default auth(async (req) => {
   if (demoToken && !req.auth) {
     const demoSession = await resolveDemoQuerySession(demoToken);
     if (demoSession) {
+      // Mint a FRESH session token for this browser rather than writing the
+      // URL's own token straight into its cookie jar (ticket
+      // recFlz4adX8fhWS61 -- a textbook session fixation: the token in the
+      // URL is exactly as reusable as a cookie, so an attacker who kept
+      // their own /api/demo-login token and sent someone else a link like
+      // /app/new-event?demo=<attacker_token> would land that visitor on the
+      // SAME session the attacker already holds, readable at will). This
+      // way the value that ends up in the URL/browser-history/server-logs
+      // and the value that actually authenticates this browser going
+      // forward are two different tokens -- knowing one no longer means
+      // holding the other. Same demo-only/DEMO_EMAIL lock as
+      // resolveDemoQuerySession itself, so this still can never mint a
+      // session for anything but the one shared demo org.
+      const freshToken = crypto.randomUUID() + crypto.randomUUID();
+      const expires = new Date(Date.now() + DEMO_SESSION_MAX_AGE_MS);
+      await db.insert(sessions).values({ sessionToken: freshToken, userId: demoSession.user.id, expires });
+
       const forwardHeaders = new Headers(req.headers);
-      forwardHeaders.set(SESSION_HEADER_NAME, encodeSessionHeader(demoSession));
+      forwardHeaders.set(SESSION_HEADER_NAME, encodeSessionHeader({ ...demoSession, expires: expires.toISOString() }));
       const csp = applyCsp(forwardHeaders);
       const response = NextResponse.next({ request: { headers: forwardHeaders } });
       response.headers.set("Content-Security-Policy", csp);
-      // Best-effort: if this client DOES keep cookies after all, later
-      // requests stop needing ?demo= at all. If it doesn't, this line does
-      // nothing and the query param keeps carrying the session on its own.
+      // A real browser gets the fresh token as its cookie -- later requests
+      // stop needing ?demo= in the URL at all. A stateless client that
+      // never keeps cookies (the original reason for the query param) still
+      // works exactly as before: it just keeps sending its OWN original
+      // token on every request, which resolveDemoQuerySession above keeps
+      // accepting on its own terms.
       const isHttps = req.nextUrl.protocol === "https:";
-      response.cookies.set(isHttps ? "__Secure-authjs.session-token" : "authjs.session-token", demoToken, {
+      response.cookies.set(isHttps ? "__Secure-authjs.session-token" : "authjs.session-token", freshToken, {
         httpOnly: true,
         secure: isHttps,
         sameSite: "lax",
         path: "/",
+        expires,
       });
       return response;
     }
