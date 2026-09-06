@@ -49,6 +49,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const pestSpecies = resolveCanonicalPestId(rawPestSpecies);
   const severity = severityEnum.enumValues.includes(body.severity) ? body.severity : "moderate";
   const kind = eventKindEnum.enumValues.includes(body.kind) ? body.kind : "pest";
+  const clientRequestId = typeof body.clientRequestId === "string" ? body.clientRequestId : null;
+
+  // A retry replaying the same clientRequestId (ticket recRdeguTZUTY5A7B --
+  // a request that timed out client-side after actually committing, or two
+  // tabs flushing the same queued item at once) returns the row that
+  // already exists instead of creating a second one. Checked before any of
+  // the area+species dedup logic below, which exists for a different
+  // reason (one open case per pest per area) and isn't a reliable retry
+  // guard on its own -- it stops matching the moment the original event
+  // resolves. Every downstream side effect (initial monitoring, auto-
+  // created tasks) already ran on the original attempt, so this returns
+  // immediately rather than risking doing them twice too.
+  if (clientRequestId) {
+    const [existing] = await db.select().from(pestEvents).where(and(eq(pestEvents.facilityId, id), eq(pestEvents.clientRequestId, clientRequestId)));
+    if (existing) return NextResponse.json({ ...existing, autoCreatedTasks: [], initialMonitoring: null });
+  }
 
   // LocationPicker's allowPath mode (ticket recuQ3WClsMKdcDQJ) -- an
   // outbreak spanning more than one bench/row. Server-side re-validated
@@ -112,6 +128,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         x: typeof body.x === "number" ? body.x : null,
         y: typeof body.y === "number" ? body.y : null,
         spanPositions: spanPositions?.length ? spanPositions : null,
+        clientRequestId,
         kind,
         pestSpecies,
         scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,
@@ -151,6 +168,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         x: typeof body.x === "number" ? body.x : null,
         y: typeof body.y === "number" ? body.y : null,
         spanPositions: spanPositions?.length ? spanPositions : null,
+        clientRequestId,
         kind,
         pestSpecies,
         scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,

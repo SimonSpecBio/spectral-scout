@@ -333,6 +333,14 @@ export const pestEvents = pgTable(
       .references(() => facilities.id, { onDelete: "cascade" }),
     facilityAreaId: uuid("facility_area_id").references(() => facilityAreas.id, { onDelete: "set null" }),
     mapObjectId: uuid("map_object_id").references(() => facilityMapObjects.id, { onDelete: "set null" }),
+    // Set only by lib/offline-queue.ts's queuedFetch (ticket
+    // recRdeguTZUTY5A7B) -- a stable id generated once per logical capture
+    // and replayed unchanged on every retry, so a request that timed out
+    // client-side after actually committing server-side doesn't create a
+    // second event when it replays. Nullable + unique: Postgres treats
+    // every NULL as distinct from every other NULL, so this imposes no
+    // constraint at all on a row that never went through the queue.
+    clientRequestId: text("client_request_id").unique(),
     x: numeric("x", { mode: "number" }),
     y: numeric("y", { mode: "number" }),
     // Extra canvas-space points beyond x/y, for an outbreak that spans more
@@ -682,6 +690,12 @@ export const treatments = pgTable(
     .notNull()
     .references(() => facilities.id, { onDelete: "cascade" }),
   pestEventId: uuid("pest_event_id").references(() => pestEvents.id, { onDelete: "set null" }),
+  // Set only by lib/offline-queue.ts's queuedFetch (ticket
+  // recRdeguTZUTY5A7B) -- see the identical comment on pestEvents above.
+  // The costliest instance of the double-apply bug this closes: a replayed
+  // treatment decrements inventory a second time, which reads as real lost
+  // stock a grower has no way to explain.
+  clientRequestId: text("client_request_id").unique(),
   // Dropped pin, same convention as pestEvents/scoutingObservations --
   // only set for a *standalone* treatment (no pestEventId, e.g. a routine
   // biocontrol release with no infestation behind it). An event-scoped

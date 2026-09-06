@@ -27,6 +27,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const row = await insertTreatmentAndDecrementStock(session.organizationId!, {
     facilityId: id,
     pestEventId: null,
+    clientRequestId: typeof body.clientRequestId === "string" ? body.clientRequestId : null,
     x,
     y,
     type: body.type,

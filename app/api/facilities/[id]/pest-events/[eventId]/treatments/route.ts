@@ -34,6 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const row = await insertTreatmentAndDecrementStock(session.organizationId!, {
     facilityId: id,
     pestEventId: eventId,
+    clientRequestId: typeof body.clientRequestId === "string" ? body.clientRequestId : null,
     // Inherits the parent event's own pin -- see db/schema.ts's comment on
     // treatments.x/y (only standalone/Application-log treatments set these
     // directly).

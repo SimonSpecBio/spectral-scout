@@ -233,16 +233,20 @@ function capturedDateLocal(d: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// Merges capturedDate (this device's local calendar day, for date-column
-// routes like scouting/monitoring) and capturedAt (the exact moment, ISO,
-// for a full timestamp column like trap readings' createdAt) into a JSON
-// body without disturbing a non-object body (there are none today, but
-// this stays defensive rather than assume). Both derived from the same
-// Date instance so they can never disagree with each other.
+// Merges capturedDate/capturedAt (see above) and clientRequestId -- a
+// stable id generated once per logical request, here, before either the
+// immediate-send or queued-for-later branch, so a retry (the request
+// timed out client-side after actually committing server-side, or two
+// tabs/devices flushing the same queued item at once) replays with the
+// EXACT same id every time. Routes that matter most for double-applying
+// (treatments -- inventory decrements; pest events -- duplicate cases,
+// ticket recRdeguTZUTY5A7B) use it server-side to detect and no-op a
+// replay instead of creating a second row. Every other route ignores the
+// extra field, same as capturedDate/capturedAt.
 function withCapturedDate(body: unknown): unknown {
   if (typeof body !== "object" || body === null || Array.isArray(body)) return body;
   const now = new Date();
-  return { ...body, capturedDate: capturedDateLocal(now), capturedAt: now.toISOString() };
+  return { ...body, capturedDate: capturedDateLocal(now), capturedAt: now.toISOString(), clientRequestId: crypto.randomUUID() };
 }
 
 export async function queuedFetch(

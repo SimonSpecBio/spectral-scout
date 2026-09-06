@@ -53,7 +53,22 @@ export async function insertTreatmentAndDecrementStock(organizationId: string, v
     }
   }
 
-  const [row] = await db.insert(treatments).values({ ...values, inventoryItemId }).returning();
+  // A retry replaying the same clientRequestId (ticket recRdeguTZUTY5A7B --
+  // a request that timed out client-side after actually committing
+  // server-side, or two tabs/devices flushing the same queued item at
+  // once) must not decrement stock a second time. onConflictDoNothing
+  // detects it via the column's unique constraint; the plain insert path
+  // (no clientRequestId at all -- a caller not going through the offline
+  // queue) is unaffected.
+  const insertQuery = db.insert(treatments).values({ ...values, inventoryItemId });
+  const [row] = values.clientRequestId
+    ? await insertQuery.onConflictDoNothing({ target: treatments.clientRequestId }).returning()
+    : await insertQuery.returning();
+
+  if (!row) {
+    const [existing] = await db.select().from(treatments).where(eq(treatments.clientRequestId, values.clientRequestId!));
+    return existing;
+  }
 
   if (item && inventoryItemId && values.quantityUsed) {
     await db
