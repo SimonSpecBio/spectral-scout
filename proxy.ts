@@ -56,12 +56,20 @@ async function resolveDemoQuerySession(token: string) {
 // self-hosts Manrope at build time), no third-party client-side fetches
 // anywhere in the app (grep-verified) -- Google OAuth's redirect to
 // accounts.google.com is a full top-level navigation, not a fetch/frame,
-// so it isn't governed by connect-src/frame-src here. Deliberately NOT
-// applied to public pages (/, /share/[token], /api/auth/* -- excluded from
-// this middleware's matcher by design) since Next's nonce-in-<script>
-// auto-injection needs this middleware to run on that request; those pages
-// keep next.config.ts's existing, more permissive baseline instead of
-// silently breaking sign-in or the share link.
+// so it isn't governed by connect-src/frame-src here.
+//
+// Also applied to the public surface -- "/", /sign-in + /sign-in/check-email,
+// /privacy, /offline (ticket recVziWMfTj1UB3hb) -- audited individually and
+// each one only ever renders self-hosted images and same-origin server-action
+// forms, so the exact same policy holds; no widening needed for this
+// specific set of pages. The old /share/[token] public page named in that
+// ticket no longer exists (replaced by the team-only in-app share
+// notification, app/api/.../share/route.ts, which already sits behind a
+// session and this middleware's existing /api/* matcher). /api/auth/* stays
+// excluded -- those are NextAuth's internal signin/callback/session
+// endpoints, not HTML pages this app renders (pages.signIn/error/verifyRequest
+// all point at the /sign-in routes above instead), so there's no <script> for
+// a nonce to attach to there.
 function cspHeaderFor(nonce: string): string {
   const scriptSrc = process.env.NODE_ENV === "production" ? `'nonce-${nonce}' 'strict-dynamic'` : `'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`;
   return [
@@ -100,8 +108,25 @@ function applyCsp(forwardHeaders: Headers): string {
 // tradeoffs already accepted). Role/org-scoping happens inside each route
 // handler (lib/session.ts) -- path-based gating alone can't express "this
 // org's data only."
+// Exact/prefix match for the public pages the nonce CSP now also covers --
+// checked before any auth logic runs so a signed-out visit to "/" (this
+// app's actual marketing page, unlike /app and /staff which always require
+// a session) still renders instead of being caught by the sign-in redirect
+// at the bottom of this function.
+function isPublicCspPage(pathname: string): boolean {
+  return pathname === "/" || pathname === "/privacy" || pathname === "/offline" || pathname.startsWith("/sign-in");
+}
+
 export default auth(async (req) => {
   const { pathname } = req.nextUrl;
+
+  if (isPublicCspPage(pathname)) {
+    const forwardHeaders = new Headers(req.headers);
+    const csp = applyCsp(forwardHeaders);
+    const response = NextResponse.next({ request: { headers: forwardHeaders } });
+    response.headers.set("Content-Security-Policy", csp);
+    return response;
+  }
 
   const demoToken = req.nextUrl.searchParams.get(DEMO_QUERY_PARAM);
   if (demoToken && !req.auth) {
@@ -199,5 +224,5 @@ export default auth(async (req) => {
 // warning. Each excluded name must be followed by "/" or end-of-path to
 // actually match.
 export const config = {
-  matcher: ["/app/:path*", "/staff/:path*", "/api/((?!auth/|cron/|demo-login(?:/|$)|health(?:/|$)).*)"],
+  matcher: ["/", "/privacy", "/offline", "/sign-in", "/sign-in/:path*", "/app/:path*", "/staff/:path*", "/api/((?!auth/|cron/|demo-login(?:/|$)|health(?:/|$)).*)"],
 };
