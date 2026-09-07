@@ -211,9 +211,10 @@ export default function LocationPicker({
 
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-3">
         <button
+          type="button"
           onClick={() => goTo(facilityIdx - 1)}
           disabled={facilities.length < 2}
-          className="px-2 text-[var(--text-dim)] disabled:opacity-30"
+          className="min-h-11 min-w-11 text-[var(--text-dim)] disabled:opacity-30"
         >
           &#8249;
         </button>
@@ -232,9 +233,10 @@ export default function LocationPicker({
           )}
         </div>
         <button
+          type="button"
           onClick={() => goTo(facilityIdx + 1)}
           disabled={facilities.length < 2}
-          className="px-2 text-[var(--text-dim)] disabled:opacity-30"
+          className="min-h-11 min-w-11 text-[var(--text-dim)] disabled:opacity-30"
         >
           &#8250;
         </button>

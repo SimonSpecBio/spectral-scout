@@ -236,6 +236,12 @@ export default function MapEditor({
 
   async function deleteSelected() {
     if (!selectedId) return;
+    // A glove brush on this button used to delete a bench or zone outright
+    // with no way back -- CatalogClient and TeamClient already confirm
+    // before their own destructive actions, this just matches that
+    // existing house standard (Airtable ticket recfnsVgXC5RlyBiI).
+    const target = objects.find((o) => o.id === selectedId);
+    if (!confirm(`Delete ${target?.label ? `"${target.label}"` : "this map object"}? This can't be undone.`)) return;
     await fetch(`${base}/objects/${selectedId}`, { method: "DELETE" });
     setObjects((prev) => prev.filter((o) => o.id !== selectedId));
     setSelectedId(null);
@@ -279,8 +285,18 @@ export default function MapEditor({
 
   async function deleteSelectedEvent() {
     if (!selectedEvent) return;
-    await fetch(`${eventsBase}/${selectedEvent.id}`, { method: "DELETE" });
-    setPestEvents((prev) => prev.filter((ev) => ev.id !== selectedEvent.id));
+    // Same confirm-before-destructive-action standard as deleteSelected
+    // above (Airtable ticket recfnsVgXC5RlyBiI) -- a glove brush here used
+    // to delete a pest event and its whole history with zero confirmation.
+    // Also fixed the missing res.ok check flagged alongside this same line
+    // (Airtable ticket 614): the row was optimistically removed from state
+    // even on a failed request, silently un-deleting itself on the next
+    // real data refresh with no explanation.
+    if (!confirm(`Delete this ${displayNameForPestSpecies(selectedEvent.pestSpecies)} event? This can't be undone.`)) return;
+    const res = await fetch(`${eventsBase}/${selectedEvent.id}`, { method: "DELETE" });
+    if (res.ok) {
+      setPestEvents((prev) => prev.filter((ev) => ev.id !== selectedEvent.id));
+    }
     setSelectedEvent(null);
   }
 
@@ -365,7 +381,7 @@ export default function MapEditor({
             </button>
           ))}
           {selectedId && (
-            <button onClick={deleteSelected} className="rounded-md border border-[var(--danger)] px-3 py-1.5 text-sm text-[var(--danger)]">
+            <button onClick={deleteSelected} className="min-h-11 rounded-md border border-[var(--danger)] px-3 text-sm text-[var(--danger)]">
               Delete selected
             </button>
           )}
@@ -718,11 +734,11 @@ export default function MapEditor({
             <div className="flex gap-2">
               <button
                 onClick={resolveSelectedEvent}
-                className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--on-accent)]"
+                className="min-h-11 flex-1 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-[var(--on-accent)]"
               >
                 Mark resolved
               </button>
-              <button onClick={deleteSelectedEvent} className="rounded-md border border-[var(--danger)] px-3 py-1.5 text-sm text-[var(--danger)]">
+              <button onClick={deleteSelectedEvent} className="min-h-11 rounded-md border border-[var(--danger)] px-3 text-sm text-[var(--danger)]">
                 Delete
               </button>
             </div>

@@ -84,12 +84,32 @@ export default function MonitoringFlow({
 
   const agg = aggregateLeafGrid(grid);
 
+  // A mis-tap on a 28px cell used to silently advance a reading that feeds
+  // straight into agg.estDensity and the threshold engine, with no way back
+  // except tapping through the rest of the 5-state cycle (Airtable ticket
+  // recfnsVgXC5RlyBiI). One-level undo -- scoped to the single most recent
+  // tap anywhere in the grid, not a full history -- turns that into exactly
+  // one correction tap regardless of which state was mis-tapped into.
+  const [lastLeafChange, setLastLeafChange] = useState<{ p: number; l: number; prevState: LeafState } | null>(null);
+
   function cycleLeaf(p: number, l: number) {
+    setLastLeafChange({ p, l, prevState: grid[p][l] });
     setGrid((prev) => {
       const next = prev.map((row) => [...row]) as PlantLeaves[];
       next[p][l] = CYCLE[(CYCLE.indexOf(next[p][l]) + 1) % CYCLE.length];
       return next;
     });
+  }
+
+  function undoLastLeafChange() {
+    if (!lastLeafChange) return;
+    const { p, l, prevState } = lastLeafChange;
+    setGrid((prev) => {
+      const next = prev.map((row) => [...row]) as PlantLeaves[];
+      next[p][l] = prevState;
+      return next;
+    });
+    setLastLeafChange(null);
   }
 
   function toggleUnit(u: "F" | "C") {
@@ -189,7 +209,7 @@ export default function MonitoringFlow({
                     type="button"
                     key={l}
                     onClick={() => cycleLeaf(p, l)}
-                    className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs"
+                    className="flex min-h-11 items-center justify-between rounded-md px-2 text-xs"
                     style={{
                       background:
                         s === "unchecked"
@@ -212,6 +232,16 @@ export default function MonitoringFlow({
             );
           })}
         </div>
+
+        {lastLeafChange && (
+          <button
+            type="button"
+            onClick={undoLastLeafChange}
+            className="min-h-11 self-start rounded-md border border-[var(--border)] px-3 text-xs text-[var(--text-dim)]"
+          >
+            Undo last tap (Plant {lastLeafChange.p + 1}, {POSITIONS[lastLeafChange.l]})
+          </button>
+        )}
 
         <div className="flex gap-6 pt-2">
           <div>

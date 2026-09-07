@@ -63,12 +63,30 @@ export default function DiseaseEventForm({
 
   const agg = aggregateDiseaseGrid(grid);
 
+  // Same one-level undo as MonitoringFlow's pest grid, and for the same
+  // reason: a mis-tap here feeds straight into severityFromDiseaseAggregate
+  // below, and the only way back used to be tapping through the rest of
+  // the 5-class cycle (Airtable ticket recfnsVgXC5RlyBiI).
+  const [lastCellChange, setLastCellChange] = useState<{ row: number; col: number; prevCell: DiseaseClass | null } | null>(null);
+
   function toggleCell(row: number, col: number) {
+    setLastCellChange({ row, col, prevCell: grid[row][col] });
     setGrid((prev) => {
       const next = prev.map((r) => [...r]) as DiseaseLeaves[];
       next[row][col] = cycle(next[row][col]);
       return next;
     });
+  }
+
+  function undoLastCellChange() {
+    if (!lastCellChange) return;
+    const { row, col, prevCell } = lastCellChange;
+    setGrid((prev) => {
+      const next = prev.map((r) => [...r]) as DiseaseLeaves[];
+      next[row][col] = prevCell;
+      return next;
+    });
+    setLastCellChange(null);
   }
 
   // "Create disease event" opens the location placement screen instead of
@@ -198,8 +216,9 @@ export default function DiseaseEventForm({
               {row.map((cell, c) => (
                 <button
                   key={c}
+                  type="button"
                   onClick={() => toggleCell(r, c)}
-                  className="h-8 rounded-md"
+                  className="min-h-11 rounded-md"
                   style={{
                     background: cell === null ? "transparent" : CLASS_FILL[cell],
                     border: cell === null ? "0.5px dashed var(--border-soft)" : cell === 0 ? "0.5px solid var(--border-soft)" : "0.5px solid transparent",
@@ -209,6 +228,15 @@ export default function DiseaseEventForm({
             </div>
           ))}
         </div>
+        {lastCellChange && (
+          <button
+            type="button"
+            onClick={undoLastCellChange}
+            className="min-h-11 self-start rounded-md border border-[var(--border-soft)] px-3 text-xs text-[var(--text-dim)]"
+          >
+            Undo last tap (row {lastCellChange.row + 1}, {POSITIONS[lastCellChange.col]})
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">

@@ -1319,13 +1319,19 @@ export default function PestEventDetail({
                           the explicit fallback the ticket itself allows for
                           -- shown once the tile is already tapped-open,
                           rather than as permanent grid clutter. */}
+                      {/* A ~22px tap target here (previously px-2 py-1) was
+                          the one thing standing between "double-tap doesn't
+                          fire reliably" and an actually-reachable fallback
+                          on a wet or gloved thumb (Airtable ticket
+                          recfnsVgXC5RlyBiI) -- 44px minimum, same house
+                          standard as Stepper.tsx. */}
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setEnlargedPhotoId(p.id);
                         }}
-                        className="shrink-0 rounded-md bg-white/20 px-2 py-1 text-[10px]"
+                        className="min-h-11 min-w-11 shrink-0 rounded-md bg-white/20 px-3 text-xs"
                       >
                         Expand
                       </button>
