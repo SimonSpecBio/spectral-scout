@@ -1,11 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { facilityAreas, scoutingObservations } from "@/db/schema";
+import { facilityAreas } from "@/db/schema";
 import { capturedDateOrToday } from "@/lib/captured-date";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
-import { parseMonitoringPayload } from "@/lib/monitoring";
+import { insertScoutingObservation, parseMonitoringPayload } from "@/lib/monitoring";
 import { requireGrowerSession } from "@/lib/session";
 import { maybeScheduleKeepAnEyeRecheck } from "@/lib/tasks";
 import { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, sessionMetric } from "@/lib/threshold-engine";
@@ -32,25 +32,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const parsed = parseMonitoringPayload(body);
   if (!parsed) return NextResponse.json({ error: "sampleSize and pestCount are required" }, { status: 400 });
 
-  const [row] = await db
-    .insert(scoutingObservations)
-    .values({
-      organizationId: session.organizationId!,
-      facilityAreaId: areaId,
-      // Optional, same as temp/humidity -- a quick walkthrough shouldn't be
-      // blocked on placing a pin (see db/schema.ts's comment on x/y).
-      x: typeof body.x === "number" ? body.x : null,
-      y: typeof body.y === "number" ? body.y : null,
-      submittedByUserId: session.user!.id!,
-      date: capturedDateOrToday(body),
-      ...parsed,
-    })
-    .returning();
+  const { row, isNew } = await insertScoutingObservation({
+    organizationId: session.organizationId!,
+    facilityAreaId: areaId,
+    // Optional, same as temp/humidity -- a quick walkthrough shouldn't be
+    // blocked on placing a pin (see db/schema.ts's comment on x/y).
+    x: typeof body.x === "number" ? body.x : null,
+    y: typeof body.y === "number" ? body.y : null,
+    submittedByUserId: session.user!.id!,
+    date: capturedDateOrToday(body),
+    ...parsed,
+  });
 
-  // No species yet on a general session (see scout_observation's schema
-  // comment), so only the generic defaults apply here -- same reasoning
-  // computeScoutingAlerts already uses for this flow.
-  const metric = sessionMetric(row);
+  // A replayed request (same clientRequestId) already scheduled its
+  // recheck the first time -- never do it twice.
+  const metric = isNew ? sessionMetric(row) : null;
   if (metric) {
     const threshold = metric.kind === "density" ? DEFAULT_DENSITY_THRESHOLD : DEFAULT_INFESTED_PCT_THRESHOLD;
     await maybeScheduleKeepAnEyeRecheck({

@@ -5,7 +5,7 @@ import { eventKindEnum, facilityAreas, facilityMapObjects, inventoryItems, pestE
 import { capturedDateOrToday } from "@/lib/captured-date";
 import { locationLabel } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
-import { parseMonitoringPayload } from "@/lib/monitoring";
+import { insertScoutingObservation, parseMonitoringPayload } from "@/lib/monitoring";
 import { notifyTaskAssigned } from "@/lib/push";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
@@ -192,19 +192,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (facilityAreaId && body.initialMonitoring) {
     const parsed = parseMonitoringPayload(body.initialMonitoring);
     if (parsed) {
-      [initialMonitoring] = await db
-        .insert(scoutingObservations)
-        .values({
-          organizationId: session.organizationId!,
-          facilityAreaId,
-          x: row.x,
-          y: row.y,
-          submittedByUserId: session.user!.id!,
-          date: capturedDateOrToday(body),
-          promotedPestEventId: row.id,
-          ...parsed,
-        })
-        .returning();
+      ({ row: initialMonitoring } = await insertScoutingObservation({
+        organizationId: session.organizationId!,
+        facilityAreaId,
+        x: row.x,
+        y: row.y,
+        submittedByUserId: session.user!.id!,
+        date: capturedDateOrToday(body),
+        promotedPestEventId: row.id,
+        ...parsed,
+      }));
     }
   }
 

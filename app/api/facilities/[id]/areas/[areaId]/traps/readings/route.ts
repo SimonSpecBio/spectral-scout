@@ -52,12 +52,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }));
   if (values.length === 0) return NextResponse.json({ error: "No valid readings" }, { status: 400 });
 
+  // A reading session queued offline had no replay protection at all
+  // before this (product brief, 5 Sep 2026, Task 1.5) -- a request that
+  // timed out client-side after actually committing, or two devices
+  // flushing the same queued item, inserted the whole batch a second time.
+  // One reading session shares ONE clientRequestId across every row it
+  // inserts (see db/schema.ts's comment on trapReadings.clientRequestId),
+  // so this checks for existence rather than relying on a per-row unique
+  // constraint the way single-row inserts do.
+  const clientRequestId = typeof body.clientRequestId === "string" ? body.clientRequestId : null;
+  if (clientRequestId) {
+    const existingRows = await db.select().from(trapReadings).where(eq(trapReadings.clientRequestId, clientRequestId));
+    if (existingRows.length > 0) return NextResponse.json(existingRows);
+  }
+
   // Captured-at-capture, not stamped-at-insert (ticket recd05VrZFhxePhoi) --
   // a reading queued offline and replayed hours later should keep the
   // moment it was actually taken, which the per-trap-per-day math this
   // feeds (dividing by daysDeployed) depends on being accurate.
   const capturedAt = capturedAtOrNow(body);
-  const rows = await db.insert(trapReadings).values(values.map((v: (typeof values)[number]) => ({ ...v, createdAt: capturedAt }))).returning();
+  const rows = await db
+    .insert(trapReadings)
+    .values(values.map((v: (typeof values)[number]) => ({ ...v, clientRequestId, createdAt: capturedAt })))
+    .returning();
   return NextResponse.json(rows);
 }
 

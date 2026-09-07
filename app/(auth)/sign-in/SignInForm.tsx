@@ -87,6 +87,7 @@ function EmailForm({ initialEmail, callbackUrl }: { initialEmail?: string; callb
         </div>
       )}
       <EmailSubmitButton />
+      <p className="text-[11px] text-[var(--text-faint)]">Works with any email. No password.</p>
     </form>
   );
 }

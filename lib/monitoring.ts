@@ -1,4 +1,6 @@
-import { assessmentTypeEnum, deviceStatusEnum, plantHealthEnum } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { assessmentTypeEnum, deviceStatusEnum, plantHealthEnum, scoutingObservations } from "@/db/schema";
 import { aggregateDiseaseGrid, type DiseaseLeaves } from "@/lib/disease";
 
 // Shared by both monitoring POST routes (event-scoped and general/unlinked)
@@ -38,5 +40,33 @@ export function parseMonitoringPayload(body: unknown) {
       : null,
     notes: typeof b.notes === "string" && b.notes ? b.notes : null,
     satisfactionRating: typeof b.satisfactionRating === "number" ? b.satisfactionRating : null,
+    // Same clientRequestId dedup as pestEvents/treatments -- see
+    // db/schema.ts's comment on scoutingObservations.clientRequestId
+    // (product brief, 5 Sep 2026, Task 1.5).
+    clientRequestId: typeof b.clientRequestId === "string" ? b.clientRequestId : null,
   };
+}
+
+// Shared by all three scoutingObservations insert sites (the event-scoped
+// monitoring route, the general/unlinked scouting route, and pest-events'
+// own initialMonitoring insert) so the replay-dedup logic lives in one
+// place, same reasoning as lib/apply-treatment.ts's identical pattern for
+// treatments. A retry replaying the same clientRequestId (a request that
+// timed out client-side after actually committing, or two devices flushing
+// the same queued item) returns the original row instead of creating a
+// second one. isNew tells the caller whether to run this session's
+// side effects (closing recheck tasks, auto-resolve, severity updates) --
+// those must fire exactly once, on the genuinely new row, never again on a
+// replayed one.
+export async function insertScoutingObservation(
+  values: typeof scoutingObservations.$inferInsert
+): Promise<{ row: typeof scoutingObservations.$inferSelect; isNew: boolean }> {
+  const insertQuery = db.insert(scoutingObservations).values(values);
+  const [row] = values.clientRequestId
+    ? await insertQuery.onConflictDoNothing({ target: scoutingObservations.clientRequestId }).returning()
+    : await insertQuery.returning();
+  if (row) return { row, isNew: true };
+
+  const [existing] = await db.select().from(scoutingObservations).where(eq(scoutingObservations.clientRequestId, values.clientRequestId!));
+  return { row: existing, isNew: false };
 }

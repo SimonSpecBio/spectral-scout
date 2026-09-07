@@ -5,7 +5,7 @@ import { facilityAreas, pestEvents, scoutingObservations, tasks } from "@/db/sch
 import { capturedDateOrToday } from "@/lib/captured-date";
 import { aggregateDiseaseGrid, severityFromDiseaseAggregate, type DiseaseLeaves } from "@/lib/disease";
 import { locationLabel } from "@/lib/floorplan-bays";
-import { parseMonitoringPayload } from "@/lib/monitoring";
+import { insertScoutingObservation, parseMonitoringPayload } from "@/lib/monitoring";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { notifyTaskAssigned } from "@/lib/push";
 import { requireGrowerSession } from "@/lib/session";
@@ -53,21 +53,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const parsed = parseMonitoringPayload(body);
   if (!parsed) return NextResponse.json({ error: "sampleSize and pestCount are required" }, { status: 400 });
 
-  const [row] = await db
-    .insert(scoutingObservations)
-    .values({
-      organizationId: session.organizationId!,
-      facilityAreaId: event.facilityAreaId,
-      // Inherits the parent event's own pin -- the location is already
-      // known, no reason to make a scout re-place it for a follow-up.
-      x: event.x,
-      y: event.y,
-      submittedByUserId: session.user!.id!,
-      date: capturedDateOrToday(body),
-      promotedPestEventId: eventId,
-      ...parsed,
-    })
-    .returning();
+  const { row, isNew } = await insertScoutingObservation({
+    organizationId: session.organizationId!,
+    facilityAreaId: event.facilityAreaId,
+    // Inherits the parent event's own pin -- the location is already
+    // known, no reason to make a scout re-place it for a follow-up.
+    x: event.x,
+    y: event.y,
+    submittedByUserId: session.user!.id!,
+    date: capturedDateOrToday(body),
+    promotedPestEventId: eventId,
+    ...parsed,
+  });
+
+  // A replayed request (same clientRequestId) already ran every side
+  // effect below the first time -- closing recheck tasks, updating
+  // severity, auto-resolving, scheduling a new recheck. Doing any of that
+  // again on a replay could double-close a task some other action already
+  // reopened, or schedule a second recheck for the same reading. Just
+  // return the original result unchanged.
+  if (!isNew) return NextResponse.json({ ...row, autoResolvedEvent: false });
 
   // Logging a monitoring session directly on the hotspot (rather than
   // through the scheduled recheck task's own action link) left that task

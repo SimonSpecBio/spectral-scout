@@ -19,7 +19,13 @@ function errorMessageFor(code: string | undefined): string | null {
     case "AccountNotLinked":
       return "That email is already used by an account you signed up with a different way. Sign in below using the same method you used originally, and your accounts will link automatically.";
     case "AccessDenied":
-      return "That sign-in attempt wasn't allowed. If you think this is wrong, try again or use a different sign-in method below.";
+      // Google's own "not an approved tester yet" rejection and a plain
+      // cancelled-consent click both collapse into this same AuthError
+      // type by the time it reaches the browser -- Auth.js doesn't pass
+      // through which one it was. Worded to cover both rather than assert
+      // a diagnosis it can't actually confirm (product brief, 5 Sep 2026,
+      // Task 1).
+      return "Google didn't complete that sign-in. If this account isn't approved for testing yet, use email below instead -- it works with any address.";
     case undefined:
       return null;
     default:
@@ -55,9 +61,16 @@ export default async function SignInPage({
 
       <SignInForm initialEmail={email} callbackUrl={callbackUrl} />
 
-      <a href="/api/demo-login" className="text-xs text-[var(--text-dim)] underline">
-        Just want to poke around? Try the test account →
-      </a>
+      <div className="flex flex-col items-center gap-1">
+        <a href="/api/demo-login" className="text-xs text-[var(--text-dim)] underline">
+          Just want to poke around? Try the test account →
+        </a>
+        {/* Shared org, no per-visitor isolation -- explicit here rather
+            than discovered the hard way (product brief, 5 Sep 2026, Task
+            1: "graffiti is a real risk"). Photo uploads and invites are
+            already disabled on this account for the same reason. */}
+        <p className="text-[11px] text-[var(--text-faint)]">Shared sandbox. Don&rsquo;t put a real room here.</p>
+      </div>
 
       <p className="max-w-[360px] text-xs leading-relaxed text-[var(--text-faint)]">
         <Link href="/privacy" className="text-[var(--accent-text)] underline">

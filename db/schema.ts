@@ -661,6 +661,15 @@ export const scoutingObservations = pgTable(
   notes: text("notes"),
   satisfactionRating: integer("satisfaction_rating"), // 1-5, pilot-tier only
   promotedPestEventId: uuid("promoted_pest_event_id").references(() => pestEvents.id, { onDelete: "set null" }),
+  // Same clientRequestId pattern as pestEvents/treatments -- generated once
+  // per logical capture in lib/offline-queue.ts's withCapturedDate, replayed
+  // unchanged on retry. A session queued offline had no dedup at all before
+  // this: a request that timed out client-side after actually committing,
+  // or two devices flushing the same queued item, created a second row
+  // (product brief, 5 Sep 2026, Task 1.5). Nullable + unique: every NULL is
+  // distinct in Postgres, so this imposes nothing on a caller not going
+  // through the offline queue.
+  clientRequestId: text("client_request_id").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -824,13 +833,26 @@ export const trapReadings = pgTable(
     count: integer("count").notNull(),
     daysDeployed: integer("days_deployed").notNull(),
     submittedByUserId: uuid("submitted_by_user_id").notNull(),
+    // One reading *session* inserts one row per trap in the network (see
+    // this table's own comment above) -- all sharing ONE clientRequestId
+    // per submission, since they're one logical capture, not N. That rules
+    // out a per-row unique constraint the way pestEvents/treatments/
+    // scoutingObservations use it; the readings POST route instead checks
+    // "does any row with this clientRequestId already exist" before
+    // inserting and returns the existing batch if so (product brief, 5 Sep
+    // 2026, Task 1.5 -- a reading session queued offline had no dedup at
+    // all before this).
+    clientRequestId: text("client_request_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  // Composite, replacing the bare trap_id index -- every real query filters
-  // by trap_id (or an IN-list of them) and then sorts/takes-latest by
-  // createdAt (lib/trap-alerts.ts, lib/logs.ts), which the single-column
-  // version couldn't serve as directly (Airtable ticket rec5XjxiiN0UNKI65).
-  (table) => [index("scout_trap_reading_trap_id_created_at_idx").on(table.trapId, table.createdAt.desc())]
+  (table) => [
+    // Composite, replacing the bare trap_id index -- every real query filters
+    // by trap_id (or an IN-list of them) and then sorts/takes-latest by
+    // createdAt (lib/trap-alerts.ts, lib/logs.ts), which the single-column
+    // version couldn't serve as directly (Airtable ticket rec5XjxiiN0UNKI65).
+    index("scout_trap_reading_trap_id_created_at_idx").on(table.trapId, table.createdAt.desc()),
+    index("scout_trap_reading_client_request_id_idx").on(table.clientRequestId),
+  ]
 ).enableRLS();
 
 // Per-pest catch/day threshold, org-configurable -- answers "should
