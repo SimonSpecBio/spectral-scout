@@ -7,11 +7,8 @@ import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 import LocationPicker, { type PickerFacility } from "../../../../../LocationPicker";
+import { cycleLeafState, PestLeafGrid, POSITIONS } from "../../../../../PestLeafGrid";
 import { OptionalStepper } from "../../../../../Stepper";
-
-const POSITIONS = ["Top", "Middle", "Bottom"] as const;
-const CYCLE: LeafState[] = ["unchecked", "absent", "low", "medium", "high"];
-const STATE_LABEL: Record<LeafState, string> = { unchecked: "", absent: "Absent", low: "Low", medium: "Medium", high: "High" };
 
 const DEVICE_STATUS = [
   { value: "working", label: "Working" },
@@ -96,7 +93,7 @@ export default function MonitoringFlow({
     setLastLeafChange({ p, l, prevState: grid[p][l] });
     setGrid((prev) => {
       const next = prev.map((row) => [...row]) as PlantLeaves[];
-      next[p][l] = CYCLE[(CYCLE.indexOf(next[p][l]) + 1) % CYCLE.length];
+      next[p][l] = cycleLeafState(next[p][l]);
       return next;
     });
   }
@@ -196,43 +193,7 @@ export default function MonitoringFlow({
           to change it.
         </p>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {grid.map((leaves, p) => {
-            const done = leaves.every((s) => s !== "unchecked");
-            return (
-              <div key={p} className="flex flex-col gap-1 rounded-lg border border-[var(--border)] p-2">
-                <div className="flex items-center justify-between text-xs text-[var(--text-dim)]">
-                  Plant {p + 1}
-                  {done && <span className="text-[var(--accent-text)]">✓</span>}
-                </div>
-                {leaves.map((s, l) => (
-                  <button
-                    type="button"
-                    key={l}
-                    onClick={() => cycleLeaf(p, l)}
-                    className="flex min-h-11 items-center justify-between rounded-md px-2 text-xs"
-                    style={{
-                      background:
-                        s === "unchecked"
-                          ? "transparent"
-                          : s === "absent"
-                            ? "var(--idle-fill)"
-                            : s === "low"
-                              ? "#6bb77b55"
-                              : s === "medium"
-                                ? "#e8b84b66"
-                                : "#d96b6b77",
-                      border: s === "unchecked" ? "1px dashed var(--border)" : "1px solid transparent",
-                    }}
-                  >
-                    <span className="text-[var(--text-dim)]">{POSITIONS[l]}</span>
-                    <span>{STATE_LABEL[s] || "·"}</span>
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+        <PestLeafGrid grid={grid} onToggle={cycleLeaf} />
 
         {lastLeafChange && (
           <button

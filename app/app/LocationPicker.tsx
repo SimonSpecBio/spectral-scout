@@ -43,16 +43,6 @@ const ROW_BAND = {
 // known from which <g> was tapped.
 const ROW_A_CANVAS_X = BAYS.find((b) => b.row === "A")!.x;
 const ROW_B_CANVAS_X = BAYS.find((b) => b.row === "B")!.x;
-// How close (canvas-space) a new tap needs to land to an already-selected
-// point before it's treated as "remove this one" instead of "add a new
-// one" -- multi-point (allowPath) mode only. Comfortably wider than a
-// single bench (BENCH_LEN's canvas equivalent is ~14) so a slightly-off
-// second tap on the same spot still toggles it off.
-const REMOVE_TOLERANCE = 40;
-// Multi-point mode's cap -- an outbreak spanning more benches than this is
-// the exception, not the rule, and an unbounded path would clutter both the
-// picker and the confirm bar's summary.
-const MAX_POINTS = 6;
 
 function rowOfCanvasX(canvasX: number): "A" | "B" {
   return Math.abs(canvasX - ROW_A_CANVAS_X) <= Math.abs(canvasX - ROW_B_CANVAS_X) ? "A" : "B";
@@ -117,14 +107,9 @@ export default function LocationPicker({
   initialX,
   initialY,
   pinRequired = true,
-  allowPath = false,
 }: {
   facilities: PickerFacility[];
-  // extraPoints carries any points beyond the first (allowPath mode only) --
-  // every existing caller's 4-arg callback still satisfies this type (extra
-  // params are simply never passed to it), so this is additive, not a
-  // breaking change to callers that don't care about multi-point events.
-  onConfirm: (facilityId: string, areaId: string, x: number, y: number, extraPoints?: { x: number; y: number }[]) => void;
+  onConfirm: (facilityId: string, areaId: string, x: number, y: number) => void;
   onCancel: () => void;
   // Lets an entry point that already knows the site/area (a trap-spike
   // alert's "confirm this pest event?" deep link, e.g.) skip straight past
@@ -150,22 +135,19 @@ export default function LocationPicker({
   // (passed as 0) -- the signature stays the same so every pin-placing
   // caller is unaffected.
   pinRequired?: boolean;
-  // Pest/disease events only (ticket recuQ3WClsMKdcDQJ): lets a single
-  // event span more than one bench/row -- tapping adds a point instead of
-  // replacing it, up to MAX_POINTS, and tapping near an existing point
-  // removes it. Every other caller (traps, treatments, monitoring, counts)
-  // leaves this off and keeps the original single-tap-replaces behavior.
-  allowPath?: boolean;
 }) {
   const initialIdx = initialFacilityId ? facilities.findIndex((f) => f.id === initialFacilityId) : -1;
   const [facilityIdx, setFacilityIdx] = useState(initialIdx >= 0 ? initialIdx : 0);
   const [areaId, setAreaId] = useState<string | null>(
     (initialIdx >= 0 && initialAreaId) || facilities[initialIdx >= 0 ? initialIdx : 0]?.areas[0]?.id || null
   );
-  // Order = selection order = the path an expanding outbreak is being
-  // marked as following, not just a set -- points[0] is always the primary
-  // location (what x/y becomes on confirm), same meaning "the selected bay"
-  // had before allowPath existed.
+  // A single selected point -- one pin per event. A dashed multi-point path
+  // used to live here (ticket recuQ3WClsMKdcDQJ) but didn't belong in a
+  // location picker (Simon, live feedback, 2026-09-07: "that shouldnt be in
+  // the location selector, what's the point of that?"); cross-bench spread
+  // is now something the main map shows automatically from sequential
+  // same-pest events, not something a grower manually draws while placing a
+  // pin.
   const [points, setPoints] = useState<{ x: number; y: number }[]>(initialX != null && initialY != null ? [{ x: initialX, y: initialY }] : []);
   const [confirming, setConfirming] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -199,16 +181,7 @@ export default function LocationPicker({
   }
 
   function placeAt(candidate: { x: number; y: number }) {
-    if (!allowPath) {
-      setPoints([candidate]);
-      return;
-    }
-    setPoints((prev) => {
-      const closeIdx = prev.findIndex((p) => Math.hypot(p.x - candidate.x, p.y - candidate.y) < REMOVE_TOLERANCE);
-      if (closeIdx >= 0) return prev.filter((_, i) => i !== closeIdx);
-      if (prev.length >= MAX_POINTS) return prev;
-      return [...prev, candidate];
-    });
+    setPoints([candidate]);
   }
 
   function onRowClick(row: "A" | "B", e: React.MouseEvent<SVGElement>) {
@@ -224,7 +197,7 @@ export default function LocationPicker({
   function confirm() {
     if ((pinRequired && !primary) || !currentAreaId || !facility || confirming) return;
     setConfirming(true);
-    onConfirm(facility.id, currentAreaId, primary?.x ?? 0, primary?.y ?? 0, points.slice(1));
+    onConfirm(facility.id, currentAreaId, primary?.x ?? 0, primary?.y ?? 0);
   }
 
   return (
@@ -316,9 +289,7 @@ export default function LocationPicker({
         <>
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-5 py-3">
             <span className="text-[var(--text-faint)]">&#9757;</span>
-            <span className="text-xs text-[var(--text-dim)]">
-              Swipe to change site &middot; tap anywhere on a row to place{allowPath ? " · tap again to add another spot" : ""}
-            </span>
+            <span className="text-xs text-[var(--text-dim)]">Swipe to change site &middot; tap anywhere on a row to place</span>
           </div>
 
           <div
@@ -369,39 +340,17 @@ export default function LocationPicker({
                 return <circle key={i} cx={cx} cy={cy} r={5} fill={SEVERITY_COLOR[h.severity]} opacity={0.55} pointerEvents="none" />;
               })}
 
-              {/* The path connecting multiple selected points, in selection
-                  order -- only meaningful once there are 2+. */}
-              {points.length > 1 && (
-                <polyline
-                  points={points.map((p) => { const v = toView(p); return `${v.cx},${v.cy}`; }).join(" ")}
-                  fill="none"
-                  stroke="var(--accent)"
-                  strokeWidth={1.5}
-                  strokeDasharray="3 3"
-                  opacity={0.7}
-                />
-              )}
-
-              {points.map((p, i) => {
-                const v = toView(p);
-                if (i === 0) {
+              {primary &&
+                (() => {
+                  const v = toView(primary);
                   return (
-                    <g key={i}>
+                    <g>
                       <circle cx={v.cx} cy={v.cy} r={16} fill="none" stroke="var(--accent)" strokeWidth={1} opacity={0.5} />
                       <circle cx={v.cx} cy={v.cy - 18} r={7} fill="var(--accent)" />
                       <path d={`M${v.cx} ${v.cy - 11} L${v.cx - 5} ${v.cy} L${v.cx + 5} ${v.cy} Z`} fill="var(--accent)" />
                     </g>
                   );
-                }
-                return (
-                  <g key={i}>
-                    <circle cx={v.cx} cy={v.cy} r={7} fill="var(--accent)" opacity={0.85} />
-                    <text x={v.cx} y={v.cy + 2.5} fontSize="7" textAnchor="middle" fill="var(--on-accent)">
-                      {i + 1}
-                    </text>
-                  </g>
-                );
-              })}
+                })()}
             </svg>
           </div>
         </>
@@ -415,7 +364,6 @@ export default function LocationPicker({
               <>
                 <div className="text-sm">
                   {primary ? (selectedRealLabel ?? bayLabel(nearestBay(primary.x, primary.y))) : "No location selected"}
-                  {points.length > 1 && <span className="text-[var(--text-dim)]"> +{points.length - 1} more spot{points.length > 2 ? "s" : ""}</span>}
                 </div>
                 <div className="label-mono">
                   {facility?.name.toUpperCase() ?? ""}

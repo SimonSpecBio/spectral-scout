@@ -2,27 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  aggregateDiseaseGrid,
-  DISEASE_CLASS_LABELS,
-  emptyDiseaseGrid,
-  type DiseaseClass,
-  type DiseaseLeaves,
-} from "@/lib/disease";
+import { aggregateDiseaseGrid, cycleDiseaseClass, emptyDiseaseGrid, type DiseaseClass, type DiseaseLeaves } from "@/lib/disease";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
-
-const POSITIONS = ["Bot", "Mid", "Top"] as const;
-// Same fills as new-disease-event/DiseaseEventForm.tsx, which this flow is
-// the ongoing-monitoring counterpart to (ticket C1).
-const CLASS_FILL = ["var(--idle-fill)", "rgba(206,93,64,0.20)", "rgba(206,93,64,0.42)", "rgba(206,93,64,0.66)", "#CE5D40"];
-
-function cycle(cell: DiseaseClass | null): DiseaseClass | null {
-  if (cell === null) return 0;
-  if (cell === 4) return null;
-  return (cell + 1) as DiseaseClass;
-}
+import { DiseaseGrid, DiseaseGridLegend } from "../../../../../DiseaseGrid";
 
 // Pathogen-kind events skip MethodChoice entirely and land here instead of
 // MonitoringFlow's pest presence/density grid (ticket C1) -- disease
@@ -68,7 +52,7 @@ export default function DiseaseMonitoringFlow({
     setLastCellChange({ row, col, prevCell: grid[row][col] });
     setGrid((prev) => {
       const next = prev.map((r) => [...r]) as DiseaseLeaves[];
-      next[row][col] = cycle(next[row][col]);
+      next[row][col] = cycleDiseaseClass(next[row][col]);
       return next;
     });
   }
@@ -129,47 +113,15 @@ export default function DiseaseMonitoringFlow({
           leaf to cycle through severity; tap past the last class to clear it.
         </p>
 
-        <div className="flex flex-wrap gap-3">
-          <LegendSwatch fill={CLASS_FILL[0]} border label="Unassessed" />
-          {DISEASE_CLASS_LABELS.map((label, i) => (
-            <LegendSwatch key={label} fill={CLASS_FILL[i]} label={label} />
-          ))}
-        </div>
-
-        <div className="grid grid-cols-[26px_1fr_1fr_1fr] gap-1.5">
-          <span />
-          {POSITIONS.map((p) => (
-            <span key={p} className="text-center text-[8px] font-mono uppercase text-[var(--text-faint)]">
-              {p}
-            </span>
-          ))}
-        </div>
-        <div className="flex flex-col gap-1.5">
-          {grid.map((row, r) => (
-            <div key={r} className="grid grid-cols-[26px_1fr_1fr_1fr] items-center gap-1.5">
-              <span className="text-[9px] font-mono text-[var(--text-faint)]">{String(r + 1).padStart(2, "0")}</span>
-              {row.map((cell, c) => (
-                <button
-                  type="button"
-                  key={c}
-                  onClick={() => toggleCell(r, c)}
-                  className="min-h-11 rounded-md"
-                  style={{
-                    background: cell === null ? "transparent" : CLASS_FILL[cell],
-                    border: cell === null ? "0.5px dashed var(--border-soft)" : cell === 0 ? "0.5px solid var(--border-soft)" : "0.5px solid transparent",
-                  }}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
+        <DiseaseGridLegend />
+        <DiseaseGrid grid={grid} onToggle={toggleCell} />
         {lastCellChange && (
           <button
             type="button"
             onClick={undoLastCellChange}
             className="min-h-11 self-start rounded-md border border-[var(--border-soft)] px-3 text-xs text-[var(--text-dim)]"
           >
-            Undo last tap (row {lastCellChange.row + 1}, {POSITIONS[lastCellChange.col]})
+            Undo last tap
           </button>
         )}
 
@@ -222,14 +174,5 @@ export default function DiseaseMonitoringFlow({
         {agg.leavesAssessed === 0 ? "Assess at least one leaf before submitting." : "Draft saves automatically as you go."}
       </div>
     </form>
-  );
-}
-
-function LegendSwatch({ fill, label, border }: { fill: string; label: string; border?: boolean }) {
-  return (
-    <span className="flex items-center gap-1.5 text-[9px] text-[var(--text-dim)]">
-      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: fill, border: border ? "0.5px solid var(--border-soft)" : undefined }} />
-      {label}
-    </span>
   );
 }

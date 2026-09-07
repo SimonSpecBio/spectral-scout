@@ -2,18 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { aggregateLeafGrid, emptyLeafGrid, type PlantLeaves } from "@/lib/density";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import { findPestProgram } from "@/lib/treatments-catalog";
 import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
+import { cycleLeafState, PestLeafGrid } from "../PestLeafGrid";
 import SpeciesPicker from "../SpeciesPicker";
 import SubmitButton from "../SubmitButton";
+import { MethodTabs, useSwipeableMethod } from "../SwipeableMethod";
 
 type Severity = "low" | "moderate" | "high" | "severe";
 const SEVERITIES: Severity[] = ["low", "moderate", "high", "severe"];
 const DRAFT_KEY = "scout-new-event-draft";
+const METHODS = ["quick", "detailed"] as const;
+type Method = (typeof METHODS)[number];
+const METHOD_LABELS: Record<Method, string> = { quick: "Quick", detailed: "Detailed" };
 
 interface ScoutingHandoff {
   observationId: string;
@@ -103,9 +109,37 @@ export default function NewEventForm({
   const [placingLocation, setPlacingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // "Quick" (severity buttons, the existing default -- Simon, live
+  // feedback, 2026-09-07: "good as default") vs. "Detailed" (the same
+  // 10-plant leaf-check grid MonitoringFlow uses for ongoing scouting),
+  // swipeable between the two same as LocationPicker's facility swipe.
+  const { method, setMethod, onTouchStart, onTouchEnd } = useSwipeableMethod<Method>(METHODS, "quick");
+  const [grid, setGrid] = useState<PlantLeaves[]>(emptyLeafGrid());
+  const [lastLeafChange, setLastLeafChange] = useState<{ p: number; l: number; prevState: PlantLeaves[number] } | null>(null);
+  const leafAgg = aggregateLeafGrid(grid);
+
+  function toggleLeaf(p: number, l: number) {
+    setLastLeafChange({ p, l, prevState: grid[p][l] });
+    setGrid((prev) => {
+      const next = prev.map((row) => [...row]) as PlantLeaves[];
+      next[p][l] = cycleLeafState(next[p][l]);
+      return next;
+    });
+  }
+  function undoLastLeafChange() {
+    if (!lastLeafChange) return;
+    const { p, l, prevState } = lastLeafChange;
+    setGrid((prev) => {
+      const next = prev.map((row) => [...row]) as PlantLeaves[];
+      next[p][l] = prevState;
+      return next;
+    });
+    setLastLeafChange(null);
+  }
+
   const clearDraft = useDraftAutosave(DRAFT_KEY, { species, scientificName, severity, notes });
 
-  async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number, extraPoints?: { x: number; y: number }[]) {
+  async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number) {
     setSubmitting(true);
     setError(null);
     const result = await queuedFetch(
@@ -118,8 +152,14 @@ export default function NewEventForm({
         notes,
         x,
         y,
-        spanPositions: extraPoints?.length ? extraPoints : undefined,
         sourceObservationId: handoff?.observationId ?? null,
+        // Detailed method's leaf-check grid rides along as this event's
+        // first monitoring session, same pattern as the disease event
+        // form's leaf-severity grid (initialMonitoring, created atomically
+        // with the event server-side).
+        initialMonitoring: method === "detailed" && leafAgg.leavesChecked > 0
+          ? { sampleSize: leafAgg.leavesChecked, pestCount: leafAgg.leavesInfested, assessmentType: "pest_count", leafGrid: grid }
+          : undefined,
       },
       "Pest event"
     );
@@ -155,7 +195,6 @@ export default function NewEventForm({
         onConfirm={handleConfirmLocation}
         onCancel={() => setPlacingLocation(false)}
         step={{ current: 2, total: 2 }}
-        allowPath
       />
     );
   }
@@ -184,19 +223,54 @@ export default function NewEventForm({
           placeholder="Pest species (e.g. spider mites)"
           autoFocus
         />
-        <div className="flex gap-2">
-          {SEVERITIES.map((s) => (
-            <button
-              type="button"
-              key={s}
-              onClick={() => setSeverity(s)}
-              className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize ${
-                severity === s ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+        <MethodTabs methods={METHODS} labels={METHOD_LABELS} method={method} onSelect={setMethod} />
+        <div className="flex flex-col gap-3" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+          <div className="flex gap-2">
+            {SEVERITIES.map((s) => (
+              <button
+                type="button"
+                key={s}
+                onClick={() => setSeverity(s)}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize ${
+                  severity === s ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          {method === "detailed" && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-[var(--text-dim)]">
+                Pick 10 plants at random. On each, check a top, middle, and bottom leaf. Tap a leaf to record it; tap
+                again to change it.
+              </p>
+              <PestLeafGrid grid={grid} onToggle={toggleLeaf} />
+              {lastLeafChange && (
+                <button
+                  type="button"
+                  onClick={undoLastLeafChange}
+                  className="min-h-11 self-start rounded-md border border-[var(--border)] px-3 text-xs text-[var(--text-dim)]"
+                >
+                  Undo last tap
+                </button>
+              )}
+              {leafAgg.leavesChecked > 0 && (
+                <div className="flex gap-6">
+                  <div>
+                    <div className="text-lg font-semibold">{leafAgg.infestedPct}%</div>
+                    <div className="text-xs text-[var(--text-dim)]">
+                      Infested ({leafAgg.leavesInfested}/{leafAgg.leavesChecked})
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold">{leafAgg.estDensity}</div>
+                    <div className="text-xs text-[var(--text-dim)]">Estimated density</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <FormField label="Notes (optional)">
           <input
