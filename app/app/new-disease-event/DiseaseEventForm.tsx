@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   aggregateDiseaseGrid,
   DISEASE_CLASS_LABELS,
@@ -13,6 +13,7 @@ import {
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import { findPestProgram } from "@/lib/treatments-catalog";
+import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import SpeciesPicker from "../SpeciesPicker";
@@ -41,14 +42,7 @@ export default function DiseaseEventForm({
 }) {
   const router = useRouter();
 
-  const [draft] = useState(() => {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const draft = useDraftValue(DRAFT_KEY) as { commonName?: unknown; scientificName?: unknown; grid?: unknown; notes?: unknown } | null;
 
   const presetProgram = !draft?.commonName && presetSpecies ? findPestProgram(presetSpecies) : undefined;
   const [commonName, setCommonName] = useState(
@@ -65,13 +59,7 @@ export default function DiseaseEventForm({
   const [placingLocation, setPlacingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ commonName, scientificName, grid, notes }));
-    } catch {
-      /* storage full or unavailable */
-    }
-  }, [commonName, scientificName, grid, notes]);
+  const clearDraft = useDraftAutosave(DRAFT_KEY, { commonName, scientificName, grid, notes });
 
   const agg = aggregateDiseaseGrid(grid);
 
@@ -126,7 +114,7 @@ export default function DiseaseEventForm({
     // as NewEventForm.
     if (eventResult.queued) {
       markEngaged();
-      localStorage.removeItem(DRAFT_KEY);
+      clearDraft();
       router.push(`/app/facilities/${facilityId}`);
       return;
     }

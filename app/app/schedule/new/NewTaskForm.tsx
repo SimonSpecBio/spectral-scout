@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
 import { queuedFetch } from "@/lib/offline-queue";
 import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
+import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 import FormField from "../../FormField";
 import SubmitButton from "../../SubmitButton";
 
 const TYPES = ["scout", "monitor", "release", "treatment", "trap_read", "sulfur", "sanitation", "test", "other"] as const;
+const DRAFT_KEY = "scout-new-task-draft";
 
 function localDateTimeInputDefault(): string {
   const d = new Date(Date.now() + 24 * 60 * 60 * 1000); // tomorrow, a sane default due date
@@ -26,15 +28,21 @@ export default function NewTaskForm({
   events: { id: string; pestSpecies: string; facilityId: string }[];
 }) {
   const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState<(typeof TYPES)[number]>("other");
-  const [facilityId, setFacilityId] = useState(facilities[0]?.id ?? "");
-  const [pestEventId, setPestEventId] = useState("");
-  const [assigneeUserId, setAssigneeUserId] = useState("");
-  const [dueAt, setDueAt] = useState(localDateTimeInputDefault());
-  const [repeatEveryDays, setRepeatEveryDays] = useState<number | "">("");
+  const draft = useDraftValue(DRAFT_KEY) as Record<string, unknown> | null;
+
+  const [title, setTitle] = useState(typeof draft?.title === "string" ? draft.title : "");
+  const [type, setType] = useState<(typeof TYPES)[number]>(
+    typeof draft?.type === "string" && TYPES.includes(draft.type as (typeof TYPES)[number]) ? (draft.type as (typeof TYPES)[number]) : "other"
+  );
+  const [facilityId, setFacilityId] = useState(typeof draft?.facilityId === "string" ? draft.facilityId : (facilities[0]?.id ?? ""));
+  const [pestEventId, setPestEventId] = useState(typeof draft?.pestEventId === "string" ? draft.pestEventId : "");
+  const [assigneeUserId, setAssigneeUserId] = useState(typeof draft?.assigneeUserId === "string" ? draft.assigneeUserId : "");
+  const [dueAt, setDueAt] = useState(typeof draft?.dueAt === "string" ? draft.dueAt : localDateTimeInputDefault());
+  const [repeatEveryDays, setRepeatEveryDays] = useState<number | "">(typeof draft?.repeatEveryDays === "number" ? draft.repeatEveryDays : "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const clearDraft = useDraftAutosave(DRAFT_KEY, { title, type, facilityId, pestEventId, assigneeUserId, dueAt, repeatEveryDays });
 
   const eventsForFacility = events.filter((e) => e.facilityId === facilityId);
 
@@ -56,6 +64,7 @@ export default function NewTaskForm({
       "New task"
     );
     if (result.ok) {
+      clearDraft();
       router.push("/app/schedule");
     } else {
       setError("Couldn't assign task.");

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { aggregateLeafGrid, emptyLeafGrid, type LeafState, type PlantLeaves } from "@/lib/density";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 import LocationPicker, { type PickerFacility } from "../../../../../LocationPicker";
 import { OptionalStepper } from "../../../../../Stepper";
 
@@ -58,25 +59,18 @@ export default function MonitoringFlow({
   const router = useRouter();
   const draftKey = `scout-monitoring-draft:${postUrl ?? "new-observation"}`;
 
-  // Read any in-progress draft once, synchronously, as part of the initial
-  // render (a lazy useState initializer, not an effect) -- avoids both a
-  // flash of empty state before restoration and the react-hooks/set-state-
-  // in-effect lint rule, which flags setState calls inside an effect body.
-  const [draft] = useState(() => {
-    try {
-      const raw = localStorage.getItem(draftKey);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const draft = useDraftValue(draftKey) as Record<string, unknown> | null;
 
   const [grid, setGrid] = useState<PlantLeaves[]>(() =>
     Array.isArray(draft?.grid) && draft.grid.length === 10 ? draft.grid : emptyLeafGrid()
   );
-  const [deviceStatus, setDeviceStatus] = useState<(typeof DEVICE_STATUS)[number]["value"]>(draft?.deviceStatus ?? "working");
-  const [plantHealth, setPlantHealth] = useState<(typeof PLANT_HEALTH)[number]["value"]>(draft?.plantHealth ?? "normal");
-  const [tempUnit, setTempUnit] = useState<"F" | "C">(draft?.tempUnit ?? "F");
+  const [deviceStatus, setDeviceStatus] = useState<(typeof DEVICE_STATUS)[number]["value"]>(
+    (draft?.deviceStatus as (typeof DEVICE_STATUS)[number]["value"]) ?? "working"
+  );
+  const [plantHealth, setPlantHealth] = useState<(typeof PLANT_HEALTH)[number]["value"]>(
+    (draft?.plantHealth as (typeof PLANT_HEALTH)[number]["value"]) ?? "normal"
+  );
+  const [tempUnit, setTempUnit] = useState<"F" | "C">((draft?.tempUnit as "F" | "C") ?? "F");
   const [temp, setTemp] = useState<number | "">(typeof draft?.temp === "number" ? draft.temp : "");
   const [humidity, setHumidity] = useState<number | "">(typeof draft?.humidity === "number" ? draft.humidity : "");
   const [light, setLight] = useState<number | "">(typeof draft?.light === "number" ? draft.light : "");
@@ -86,16 +80,7 @@ export default function MonitoringFlow({
   const [placingLocation, setPlacingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Autosave -- this write is a side effect on an external system
-  // (localStorage), which is exactly what effects are for; no setState here.
-  useEffect(() => {
-    const nextDraft = { grid, deviceStatus, plantHealth, temp, tempUnit, humidity, light, notes, satisfaction };
-    try {
-      localStorage.setItem(draftKey, JSON.stringify(nextDraft));
-    } catch {
-      /* storage full or unavailable */
-    }
-  }, [draftKey, grid, deviceStatus, plantHealth, temp, tempUnit, humidity, light, notes, satisfaction]);
+  const clearDraft = useDraftAutosave(draftKey, { grid, deviceStatus, plantHealth, temp, tempUnit, humidity, light, notes, satisfaction });
 
   const agg = aggregateLeafGrid(grid);
 
@@ -139,7 +124,7 @@ export default function MonitoringFlow({
     );
     if (result.ok) {
       markEngaged();
-      localStorage.removeItem(draftKey);
+      clearDraft();
       if (taskId) {
         await fetch(`/api/tasks/${taskId}/complete`, {
           method: "POST",

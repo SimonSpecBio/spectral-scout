@@ -11,6 +11,7 @@ import type { FollowUpSuggestion } from "@/lib/recommendations";
 import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { thresholdSourceFor } from "@/lib/threshold-sources";
+import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 import {
   displayNameForPestSpecies,
   displayNameForTreatmentType,
@@ -159,7 +160,12 @@ export default function PestEventDetail({
   const [shareConfirmation, setShareConfirmation] = useState<string | null>(null);
   const [escalation, setEscalation] = useState<{ note: string | null; createdAt: string; resolvedAt: string | null; staffResponse: string | null } | null>(null);
   const [showEscalateConfirm, setShowEscalateConfirm] = useState(false);
-  const [escalateNote, setEscalateNote] = useState("");
+  // Same draft-recovery pattern as the capture forms -- a "why" note typed
+  // before tapping Send shouldn't be lost to an interruption (Airtable
+  // ticket recVXbUdQ2Hed8ypt).
+  const escalateDraftKey = `scout-event-escalate-draft:${event.id}`;
+  const escalateDraft = useDraftValue(escalateDraftKey) as { escalateNote?: unknown } | null;
+  const [escalateNote, setEscalateNote] = useState(typeof escalateDraft?.escalateNote === "string" ? escalateDraft.escalateNote : "");
   const [escalating, setEscalating] = useState(false);
   const [escalateError, setEscalateError] = useState<string | null>(null);
   const [treatmentsList, setTreatmentsList] = useState(initialTreatments);
@@ -178,7 +184,9 @@ export default function PestEventDetail({
   // since the file input's native picker can't be interrupted to ask first.
   const [photoCaption, setPhotoCaption] = useState("");
   const [comments, setComments] = useState(initialComments);
-  const [newComment, setNewComment] = useState("");
+  const commentDraftKey = `scout-event-comment-draft:${event.id}`;
+  const commentDraft = useDraftValue(commentDraftKey) as { newComment?: unknown } | null;
+  const [newComment, setNewComment] = useState(typeof commentDraft?.newComment === "string" ? commentDraft.newComment : "");
   const [postingComment, setPostingComment] = useState(false);
   const [commentQueued, setCommentQueued] = useState(false);
   const [statusQueued, setStatusQueued] = useState(false);
@@ -210,29 +218,47 @@ export default function PestEventDetail({
   // rather than assumed -- Botrytis DOES have one, Clonostachys rosea, so
   // it correctly keeps the tab).
   const hasBiologicalOption = (findPestProgram(event.pestSpecies)?.primaryBiocontrol ?? []).some((id) => !!findAgent(id));
-  const [treatmentType, setTreatmentType] = useState<TreatmentType>(hasBiologicalOption ? "biological" : "pesticide");
-  const [inventoryItemId, setInventoryItemId] = useState("");
-  const [product, setProduct] = useState("");
+  // Same draft-recovery pattern as the standalone NewTreatmentForm this
+  // embedded form mirrors -- an in-progress application log tied to a
+  // specific event, previously lost on any interruption (Airtable ticket
+  // recVXbUdQ2Hed8ypt).
+  const treatmentDraftKey = `scout-event-treatment-draft:${event.id}`;
+  const treatmentDraft = useDraftValue(treatmentDraftKey) as Record<string, unknown> | null;
+  const [treatmentType, setTreatmentType] = useState<TreatmentType>(
+    typeof treatmentDraft?.treatmentType === "string" && ["pesticide", "biological", "spectral_light"].includes(treatmentDraft.treatmentType)
+      ? (treatmentDraft.treatmentType as TreatmentType)
+      : hasBiologicalOption
+        ? "biological"
+        : "pesticide"
+  );
+  const [inventoryItemId, setInventoryItemId] = useState(typeof treatmentDraft?.inventoryItemId === "string" ? treatmentDraft.inventoryItemId : "");
+  const [product, setProduct] = useState(typeof treatmentDraft?.product === "string" ? treatmentDraft.product : "");
   // Auto-filled from the matched catalog product's sourced label rate,
   // but only while untouched -- same rule as NewTreatmentForm's identical
   // field (Airtable ticket B3, splitting the old "Rate, area, notes..."
   // catch-all into this field plus the Notes input below).
-  const [dosage, setDosage] = useState("");
+  const [dosage, setDosage] = useState(typeof treatmentDraft?.dosage === "string" ? treatmentDraft.dosage : "");
   const [dosageTouched, setDosageTouched] = useState(false);
-  const [quantityUsed, setQuantityUsed] = useState<number | "">("");
+  const [quantityUsed, setQuantityUsed] = useState<number | "">(typeof treatmentDraft?.quantityUsed === "number" ? treatmentDraft.quantityUsed : "");
   // Plain number, not number|"" -- TimePicker always has a real value (it
   // starts at 0, same as NewTreatmentForm's identical fields), there's no
   // "empty" state to represent once it's a wheel instead of a text input.
-  const [minutesSpent, setMinutesSpent] = useState(0);
-  const [fixtureId, setFixtureId] = useState("");
-  const [minutesAfterDark, setMinutesAfterDark] = useState(0);
-  const [durationMin, setDurationMin] = useState(0);
+  const [minutesSpent, setMinutesSpent] = useState(typeof treatmentDraft?.minutesSpent === "number" ? treatmentDraft.minutesSpent : 0);
+  const [fixtureId, setFixtureId] = useState(typeof treatmentDraft?.fixtureId === "string" ? treatmentDraft.fixtureId : "");
+  const [minutesAfterDark, setMinutesAfterDark] = useState(typeof treatmentDraft?.minutesAfterDark === "number" ? treatmentDraft.minutesAfterDark : 0);
+  const [durationMin, setDurationMin] = useState(typeof treatmentDraft?.durationMin === "number" ? treatmentDraft.durationMin : 0);
   // Replaces the old bare "pulse count" number, which had nowhere to
   // record a second pulse's OWN timing (Airtable ticket C3).
-  const [hasSecondPulse, setHasSecondPulse] = useState(false);
-  const [secondPulseOffsetMinutes, setSecondPulseOffsetMinutes] = useState(0);
-  const [secondPulseDurationMinutes, setSecondPulseDurationMinutes] = useState(0);
-  const [treatmentNotes, setTreatmentNotes] = useState("");
+  const [hasSecondPulse, setHasSecondPulse] = useState(
+    typeof treatmentDraft?.secondPulseOffsetMinutes === "number" && typeof treatmentDraft?.secondPulseDurationMinutes === "number"
+  );
+  const [secondPulseOffsetMinutes, setSecondPulseOffsetMinutes] = useState(
+    typeof treatmentDraft?.secondPulseOffsetMinutes === "number" ? treatmentDraft.secondPulseOffsetMinutes : 0
+  );
+  const [secondPulseDurationMinutes, setSecondPulseDurationMinutes] = useState(
+    typeof treatmentDraft?.secondPulseDurationMinutes === "number" ? treatmentDraft.secondPulseDurationMinutes : 0
+  );
+  const [treatmentNotes, setTreatmentNotes] = useState(typeof treatmentDraft?.treatmentNotes === "string" ? treatmentDraft.treatmentNotes : "");
   const [submittingTreatment, setSubmittingTreatment] = useState(false);
   const [treatmentQueued, setTreatmentQueued] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -241,6 +267,24 @@ export default function PestEventDetail({
   const [acceptingSuggestion, setAcceptingSuggestion] = useState<string | null>(null);
   const [acceptedSuggestions, setAcceptedSuggestions] = useState<Set<string>>(new Set());
   const selectedItem = inventoryItems.find((i) => i.id === inventoryItemId);
+
+  const clearTreatmentDraft = useDraftAutosave(treatmentDraftKey, {
+    treatmentType,
+    inventoryItemId,
+    product,
+    dosage,
+    quantityUsed,
+    minutesSpent,
+    fixtureId,
+    minutesAfterDark,
+    durationMin,
+    secondPulseOffsetMinutes: hasSecondPulse ? secondPulseOffsetMinutes : undefined,
+    secondPulseDurationMinutes: hasSecondPulse ? secondPulseDurationMinutes : undefined,
+    treatmentNotes,
+  });
+
+  const clearCommentDraft = useDraftAutosave(commentDraftKey, { newComment });
+  const clearEscalateDraft = useDraftAutosave(escalateDraftKey, { escalateNote });
 
   const base = `/api/facilities/${facilityId}/pest-events/${event.id}`;
 
@@ -452,6 +496,7 @@ export default function PestEventDetail({
     if (result.ok) {
       setShowEscalateConfirm(false);
       setEscalateNote("");
+      clearEscalateDraft();
       if (result.queued) setEscalationQueued(true);
       else if (result.data) setEscalation(result.data as typeof escalation);
     } else {
@@ -470,6 +515,7 @@ export default function PestEventDetail({
       if (result.queued) setCommentQueued(true);
       else if (result.data) setComments((prev) => [...prev, result.data as Comment]);
       setNewComment("");
+      clearCommentDraft();
     }
     setPostingComment(false);
   }
@@ -521,6 +567,7 @@ export default function PestEventDetail({
       setSecondPulseOffsetMinutes(0);
       setSecondPulseDurationMinutes(0);
       setTreatmentNotes("");
+      clearTreatmentDraft();
     }
     setSubmittingTreatment(false);
   }

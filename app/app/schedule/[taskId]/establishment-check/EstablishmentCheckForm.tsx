@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 
 export default function EstablishmentCheckForm({
   taskId,
@@ -17,10 +18,15 @@ export default function EstablishmentCheckForm({
   alreadyChecked: { established: boolean; notes: string | null } | null;
 }) {
   const router = useRouter();
+  const draftKey = `scout-establishment-check-draft:${taskId}`;
+  const draft = useDraftValue(draftKey) as { notes?: unknown } | null;
+
   const [established, setEstablished] = useState<boolean | null>(alreadyChecked?.established ?? null);
-  const [notes, setNotes] = useState(alreadyChecked?.notes ?? "");
+  const [notes, setNotes] = useState(typeof draft?.notes === "string" ? draft.notes : (alreadyChecked?.notes ?? ""));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const clearDraft = useDraftAutosave(draftKey, { notes });
 
   async function submit(value: boolean) {
     setEstablished(value);
@@ -33,6 +39,7 @@ export default function EstablishmentCheckForm({
         body: JSON.stringify({ established: value, notes: notes.trim() || null }),
       });
       if (res.ok) {
+        clearDraft();
         router.push("/app/schedule");
       } else {
         setError("Couldn't save this check. Check your connection and try again.");

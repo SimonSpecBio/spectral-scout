@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import { displayNameForTreatmentType, findProductByName } from "@/lib/treatments-catalog";
+import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import ProductPicker from "../ProductPicker";
@@ -28,17 +29,10 @@ export default function NewTreatmentForm({
   // Same draft-recovery pattern as NewEventForm/DiseaseEventForm -- an
   // interrupted application-log entry (call, phone lock, backgrounded app)
   // shouldn't lose everything typed so far.
-  const [draft] = useState(() => {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const draft = useDraftValue(DRAFT_KEY) as Record<string, unknown> | null;
 
   const [type, setType] = useState<(typeof TYPES)[number]>(
-    draft?.type && TYPES.includes(draft.type) ? draft.type : "biological"
+    typeof draft?.type === "string" && TYPES.includes(draft.type as (typeof TYPES)[number]) ? (draft.type as (typeof TYPES)[number]) : "biological"
   );
   const [inventoryItemId, setInventoryItemId] = useState(typeof draft?.inventoryItemId === "string" ? draft.inventoryItemId : "");
   // Freeform fallback for a product not yet in Inventory -- this form had
@@ -77,30 +71,7 @@ export default function NewTreatmentForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        DRAFT_KEY,
-        JSON.stringify({
-          type,
-          inventoryItemId,
-          productName,
-          dosage,
-          quantityUsed,
-          targetPest,
-          minutesSpent,
-          fixtureId,
-          minutesAfterDark,
-          durationMin,
-          secondPulseOffsetMinutes: hasSecondPulse ? secondPulseOffsetMinutes : undefined,
-          secondPulseDurationMinutes: hasSecondPulse ? secondPulseDurationMinutes : undefined,
-          notes,
-        })
-      );
-    } catch {
-      /* storage full or unavailable */
-    }
-  }, [
+  const clearDraft = useDraftAutosave(DRAFT_KEY, {
     type,
     inventoryItemId,
     productName,
@@ -111,11 +82,10 @@ export default function NewTreatmentForm({
     fixtureId,
     minutesAfterDark,
     durationMin,
-    hasSecondPulse,
-    secondPulseOffsetMinutes,
-    secondPulseDurationMinutes,
+    secondPulseOffsetMinutes: hasSecondPulse ? secondPulseOffsetMinutes : undefined,
+    secondPulseDurationMinutes: hasSecondPulse ? secondPulseDurationMinutes : undefined,
     notes,
-  ]);
+  });
 
   const selectedItem = items.find((i) => i.id === inventoryItemId);
 
@@ -145,7 +115,7 @@ export default function NewTreatmentForm({
     );
     if (result.ok) {
       markEngaged();
-      localStorage.removeItem(DRAFT_KEY);
+      clearDraft();
       router.push("/app/rei-phi");
     } else {
       setSubmitting(false);

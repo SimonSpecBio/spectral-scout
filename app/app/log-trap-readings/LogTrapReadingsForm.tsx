@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 import SpeciesPicker from "../SpeciesPicker";
 import { Stepper } from "../Stepper";
 
@@ -25,11 +26,23 @@ export default function LogTrapReadingsForm({
   traps: { id: string; label: string; bay: string }[];
 }) {
   const router = useRouter();
-  const [species, setSpecies] = useState("");
-  const [daysDeployed, setDaysDeployed] = useState(7);
-  const [counts, setCounts] = useState<Record<string, number>>(() => Object.fromEntries(traps.map((t) => [t.id, 0])));
+  // Longest single data-entry session in the app (a full round can be 15+
+  // traps) and previously the only capture form with no draft protection at
+  // all -- a screen lock or PWA eviction lost the whole round (Airtable
+  // ticket recVXbUdQ2Hed8ypt).
+  const draftKey = `scout-trap-readings-draft:${areaId}`;
+  const draft = useDraftValue(draftKey) as { species?: unknown; daysDeployed?: unknown; counts?: unknown } | null;
+
+  const [species, setSpecies] = useState(typeof draft?.species === "string" ? draft.species : "");
+  const [daysDeployed, setDaysDeployed] = useState(typeof draft?.daysDeployed === "number" ? draft.daysDeployed : 7);
+  const [counts, setCounts] = useState<Record<string, number>>(() => {
+    const restored = draft?.counts && typeof draft.counts === "object" ? (draft.counts as Record<string, number>) : null;
+    return Object.fromEntries(traps.map((t) => [t.id, typeof restored?.[t.id] === "number" ? restored[t.id] : 0]));
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const clearDraft = useDraftAutosave(draftKey, { species, daysDeployed, counts });
 
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const meanPerTrap = traps.length ? total / traps.length : 0;
@@ -50,6 +63,7 @@ export default function LogTrapReadingsForm({
     );
     if (result.ok) {
       markEngaged();
+      clearDraft();
       router.push(`/app/traps?facility=${facilityId}&area=${areaId}`);
     } else {
       setSubmitting(false);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   aggregateDiseaseGrid,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/disease";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 
 const POSITIONS = ["Bot", "Mid", "Top"] as const;
 // Same fills as new-disease-event/DiseaseEventForm.tsx, which this flow is
@@ -44,14 +45,7 @@ export default function DiseaseMonitoringFlow({
   const router = useRouter();
   const draftKey = `scout-disease-monitoring-draft:${postUrl}`;
 
-  const [draft] = useState(() => {
-    try {
-      const raw = localStorage.getItem(draftKey);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const draft = useDraftValue(draftKey) as { grid?: unknown; notes?: unknown } | null;
 
   const [grid, setGrid] = useState<DiseaseLeaves[]>(() =>
     Array.isArray(draft?.grid) && draft.grid.length === 10 ? draft.grid : emptyDiseaseGrid()
@@ -60,13 +54,7 @@ export default function DiseaseMonitoringFlow({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(draftKey, JSON.stringify({ grid, notes }));
-    } catch {
-      /* storage full or unavailable */
-    }
-  }, [draftKey, grid, notes]);
+  const clearDraft = useDraftAutosave(draftKey, { grid, notes });
 
   const agg = aggregateDiseaseGrid(grid);
 
@@ -98,7 +86,7 @@ export default function DiseaseMonitoringFlow({
     );
     if (result.ok) {
       markEngaged();
-      localStorage.removeItem(draftKey);
+      clearDraft();
       if (taskId) {
         await fetch(`/api/tasks/${taskId}/complete`, {
           method: "POST",

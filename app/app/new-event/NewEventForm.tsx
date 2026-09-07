@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import { findPestProgram } from "@/lib/treatments-catalog";
+import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 import FormField from "../FormField";
 import LocationPicker, { type PickerFacility } from "../LocationPicker";
 import SpeciesPicker from "../SpeciesPicker";
@@ -73,14 +74,7 @@ export default function NewEventForm({
   // Same draft-recovery pattern MonitoringFlow uses: a scouting handoff's
   // prefill only applies when there's no in-progress draft to restore
   // instead, so a saved draft always wins over stale handoff defaults.
-  const [draft] = useState(() => {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const draft = useDraftValue(DRAFT_KEY) as { species?: unknown; scientificName?: unknown; severity?: unknown; notes?: unknown } | null;
 
   const presetProgram = !draft?.species && presetSpecies ? findPestProgram(presetSpecies) : undefined;
   const [species, setSpecies] = useState(
@@ -90,7 +84,11 @@ export default function NewEventForm({
     typeof draft?.scientificName === "string" ? draft.scientificName : (presetProgram?.latin ?? null)
   );
   const [severity, setSeverity] = useState<Severity>(
-    draft?.severity && SEVERITIES.includes(draft.severity) ? draft.severity : handoff ? severityFromHandoff(handoff) : "moderate"
+    typeof draft?.severity === "string" && SEVERITIES.includes(draft.severity as Severity)
+      ? (draft.severity as Severity)
+      : handoff
+        ? severityFromHandoff(handoff)
+        : "moderate"
   );
   const [notes, setNotes] = useState(
     typeof draft?.notes === "string"
@@ -105,13 +103,7 @@ export default function NewEventForm({
   const [placingLocation, setPlacingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ species, scientificName, severity, notes }));
-    } catch {
-      /* storage full or unavailable */
-    }
-  }, [species, scientificName, severity, notes]);
+  const clearDraft = useDraftAutosave(DRAFT_KEY, { species, scientificName, severity, notes });
 
   async function handleConfirmLocation(facilityId: string, areaId: string, x: number, y: number, extraPoints?: { x: number; y: number }[]) {
     setSubmitting(true);
@@ -133,7 +125,7 @@ export default function NewEventForm({
     );
     if (result.ok) {
       markEngaged();
-      localStorage.removeItem(DRAFT_KEY);
+      clearDraft();
       // Queued (offline): no server-generated id exists yet to link to a
       // detail page, so land on the facility instead of the usual
       // pest-events/[id] route -- same reasoning as CountsFlow/

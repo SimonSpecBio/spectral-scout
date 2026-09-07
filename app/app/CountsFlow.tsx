@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { queuedFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
+import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 import LocationPicker, { type PickerFacility } from "./LocationPicker";
 import { Stepper } from "./Stepper";
 
@@ -43,17 +44,10 @@ export default function CountsFlow({
   const router = useRouter();
   const draftKey = `scout-counts-draft:${postUrl ?? "new-observation"}`;
 
-  // Same lazy-read-once + effect-write pattern MonitoringFlow uses, so a
-  // Counts session survives an accidental navigate-away the same way a
-  // plant-sampling one already does.
-  const [draft] = useState(() => {
-    try {
-      const raw = localStorage.getItem(draftKey);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  // Same draft-recovery pattern every capture form uses, so a Counts
+  // session survives an accidental navigate-away the same way a plant-
+  // sampling one already does.
+  const draft = useDraftValue(draftKey) as { counts?: unknown; notes?: unknown } | null;
 
   const [counts, setCounts] = useState<number[]>(() =>
     Array.isArray(draft?.counts) && draft.counts.length === 5 ? draft.counts : [0, 0, 0, 0, 0]
@@ -70,13 +64,7 @@ export default function CountsFlow({
   // can't carry over to a different (also-zero) session.
   const [confirmingZero, setConfirmingZero] = useState(false);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(draftKey, JSON.stringify({ counts, notes }));
-    } catch {
-      /* storage full or unavailable */
-    }
-  }, [draftKey, counts, notes]);
+  const clearDraft = useDraftAutosave(draftKey, { counts, notes });
 
   const total = counts.reduce((a, b) => a + b, 0);
   const mean = total / counts.length;
@@ -96,7 +84,7 @@ export default function CountsFlow({
     );
     if (result.ok) {
       markEngaged();
-      localStorage.removeItem(draftKey);
+      clearDraft();
       if (taskId) {
         await fetch(`/api/tasks/${taskId}/complete`, {
           method: "POST",
