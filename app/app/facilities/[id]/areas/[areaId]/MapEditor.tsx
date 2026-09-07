@@ -297,8 +297,17 @@ export default function MapEditor({
     // rec7LEsgfHWQ8glss) -- the DELETE route ignores its body, {} is just a
     // placeholder. A queued delete is confirmed intent, so this stays
     // optimistic either way rather than leaving a "deleted" pin still
-    // showing on the map while it waits to sync.
-    if (!confirm(`Delete this ${displayNameForPestSpecies(selectedEvent.pestSpecies)} event? This can't be undone.`)) return;
+    // showing on the map while it waits to sync. The comment thread and any
+    // photos are named explicitly here (Airtable ticket recyEgh3n4vqZTqmw)
+    // -- the DELETE route cleans up photos/blobs and records the deletion,
+    // but the comment thread genuinely, permanently goes with it, and this
+    // is the one place that says so before it happens.
+    if (
+      !confirm(
+        `Delete this ${displayNameForPestSpecies(selectedEvent.pestSpecies)} event? This also permanently deletes its comment thread and any photos. This can't be undone.`
+      )
+    )
+      return;
     const result = await queuedFetch(`${eventsBase}/${selectedEvent.id}`, {}, "Delete pest event", "DELETE");
     if (result.ok) {
       setPestEvents((prev) => prev.filter((ev) => ev.id !== selectedEvent.id));

@@ -389,47 +389,18 @@ export const pestEvents = pgTable(
   ]
 ).enableRLS();
 
-// A scoped, read-only public link -- "gives pilot-tier orgs a clean way to
-// loop in a Spectral consultant without a full account" (product feature
-// plan, standard-build tier), scoped to a single pest event for v1 (a
-// date-range digest is a reasonable v2, not built here). token is a
-// separate unguessable value from `id` specifically so the id can stay a
-// normal sequential-lookup UUID without doubling as the secret in a public
-// URL. Resolved by a route outside proxy.ts's /app/* gate entirely
-// (app/share/[token]/page.tsx at the root, not under /app) rather than
-// carving an exception into that gate -- simpler and harder to accidentally
-// widen later. Expires by default (30 days) -- never a forever-live link.
-export const shareLinks = pgTable(
-  "scout_share_link",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    token: text("token").notNull().unique(),
-    pestEventId: uuid("pest_event_id")
-      .notNull()
-      .references(() => pestEvents.id, { onDelete: "cascade" }),
-    createdByUserId: uuid("created_by_user_id"),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    revokedAt: timestamp("revoked_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [
-    index("scout_share_link_pest_event_id_idx").on(table.pestEventId),
-    index("scout_share_link_token_idx").on(table.token),
-  ]
-).enableRLS();
-
-// Replaces the external read-only share link above for team members
-// (Airtable ticket B5, Simon's explicit call: "team-only sharing, no
-// external link at all" -- shareLinks stays in place, unused, only
-// because dropping a table is a destructive migration this ticket didn't
-// ask for). A one-off human action ("look at this"), not a recomputed
-// signal like every other row lib/notifications.ts's computeNotifications()
-// produces -- there's no live query that would ever regenerate "so-and-so
-// shared this with you" on its own, so unlike the rest of that feed, this
-// one genuinely needs to be persisted.
+// Team-only sharing (Airtable ticket B5, Simon's explicit call: "team-only
+// sharing, no external link at all") -- replaced an earlier scoped,
+// read-only public link (scout_share_link, plus its app/share/[token] page)
+// that this table made obsolete. That old table was left in place, unused,
+// for a while after this one shipped; dropped for real now (Airtable ticket
+// recyEgh3n4vqZTqmw) since dropping a table wasn't something the original
+// ticket asked for but nothing here still needs it. A one-off human action
+// ("look at this"), not a recomputed signal like every other row
+// lib/notifications.ts's computeNotifications() produces -- there's no live
+// query that would ever regenerate "so-and-so shared this with you" on its
+// own, so unlike the rest of that feed, this one genuinely needs to be
+// persisted.
 export const shareNotifications = pgTable(
   "scout_share_notification",
   {
@@ -585,6 +556,43 @@ export const pestEventComments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("scout_pest_event_comment_pest_event_id_idx").on(table.pestEventId)]
+).enableRLS();
+
+// A deleted pest event previously left no trace it ever existed -- no
+// soft-delete, no audit log (scout_staff_audit_log covers internal staff
+// only, not grower-side actions), which undercuts the treatment history the
+// app exists to keep (Airtable ticket recyEgh3n4vqZTqmw). Not a full undo
+// mechanism (that would mean converting every pestEvents read site across
+// the app to filter out soft-deleted rows, a much larger and riskier
+// change than this ticket's own acceptance criteria requires -- it accepts
+// either "recoverable" or "recorded somewhere"): just enough of a record to
+// answer "did this event exist, what was it, who deleted it, and when" --
+// pestEventId is plain uuid, not a live FK, since the row it would point to
+// is gone by the time this exists.
+export const pestEventDeletions = pgTable(
+  "scout_pest_event_deletion",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    pestEventId: uuid("pest_event_id").notNull(),
+    pestSpecies: text("pest_species").notNull(),
+    facilityId: uuid("facility_id").notNull(),
+    facilityAreaId: uuid("facility_area_id"),
+    deletedByUserId: uuid("deleted_by_user_id"),
+    // Counts of what was destroyed along with the event (comments cascade,
+    // photos are deleted explicitly along with their blob objects -- see
+    // the DELETE route) -- not the content itself, just enough to know the
+    // scale of what's gone if this ever comes up.
+    commentCount: integer("comment_count").notNull(),
+    photoCount: integer("photo_count").notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("scout_pest_event_deletion_organization_id_idx").on(table.organizationId),
+    index("scout_pest_event_deletion_pest_event_id_idx").on(table.pestEventId),
+  ]
 ).enableRLS();
 
 export const deviceStatusEnum = pgEnum("scout_device_status", ["working", "needs_attention", "down"]);

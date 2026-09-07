@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
+import { del } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { pestEventStatusEnum, pestEvents, severityEnum } from "@/db/schema";
+import { observationPhotos, pestEventComments, pestEventDeletions, pestEventStatusEnum, pestEvents, severityEnum } from "@/db/schema";
 import { isDemoSession } from "@/lib/demo-account";
 import { getOwnedPestEvent as ownedEvent, resolvePestEvent } from "@/lib/pest-events";
 import { requireGrowerSession } from "@/lib/session";
@@ -50,6 +51,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   return NextResponse.json(row);
 }
 
+// Deleting a pest event used to just remove the row and let foreign keys
+// take their default course: pestEventComments cascades (a whole discussion
+// thread about how an outbreak was handled disappears), and
+// observationPhotos.pestEventId sets to null instead of cascading, leaving
+// rows with both foreign keys null -- invisible in every UI, unreachable,
+// and their underlying Vercel Blob objects never deleted, so storage grows
+// permanently with files nobody can see or bill against. There was also no
+// record anywhere that a grower-side delete ever happened at all (Airtable
+// ticket recyEgh3n4vqZTqmw).
+//
+// Kept as a real hard delete rather than converting to soft-delete: the
+// acceptance criteria this ticket set for itself accepts either recoverable
+// OR recorded, and a genuine soft-delete would mean auditing and filtering
+// every one of the ~20 places that read from pestEvents across the app
+// (dashboard, map, logs, threshold engine, timeline, search, exports...) --
+// a much larger, higher-regression-risk change than this ticket asked for.
+// Instead: the actual harm (orphaned, unbillable, permanently-invisible
+// blob storage) is fixed for real by deleting photo rows and their blob
+// objects explicitly before the event goes, and a deletion audit row
+// records that this happened, satisfying "recorded somewhere." The comment
+// thread still cascades away for real -- the client-side confirm() warns
+// about that up front instead, per the ticket's own "or the delete
+// confirmation says exactly what will be lost."
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string; eventId: string }> }) {
   const session = await requireGrowerSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -59,6 +83,32 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const event = await ownedEvent(id, eventId, session.organizationId!);
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const [photos, comments] = await Promise.all([
+    db.select().from(observationPhotos).where(eq(observationPhotos.pestEventId, eventId)),
+    db.select({ id: pestEventComments.id }).from(pestEventComments).where(eq(pestEventComments.pestEventId, eventId)),
+  ]);
+
+  // Best-effort against the external blob store: a blob that fails to
+  // delete just becomes a small amount of unreferenced storage, not a
+  // reason to abort the whole delete and leave the event stuck. The row
+  // itself is deleted regardless either way.
+  if (photos.length > 0) {
+    await del(photos.map((p) => p.blobUrl)).catch(() => {});
+    await db.delete(observationPhotos).where(eq(observationPhotos.pestEventId, eventId));
+  }
+
+  await db.insert(pestEventDeletions).values({
+    organizationId: session.organizationId!,
+    pestEventId: event.id,
+    pestSpecies: event.pestSpecies,
+    facilityId: event.facilityId,
+    facilityAreaId: event.facilityAreaId,
+    deletedByUserId: session.user!.id!,
+    commentCount: comments.length,
+    photoCount: photos.length,
+  });
+
+  // pestEventComments cascades from here automatically.
   await db.delete(pestEvents).where(eq(pestEvents.id, eventId));
   return NextResponse.json({ ok: true });
 }

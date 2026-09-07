@@ -281,6 +281,20 @@
       "when": 1788754026503,
       "tag": "0039_minor_songbird",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1788755829320,
+      "tag": "0040_sour_medusa",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1788755853725,
+      "tag": "0041_salty_gladiator",
+      "breakpoints": true
     }
   ]
 }

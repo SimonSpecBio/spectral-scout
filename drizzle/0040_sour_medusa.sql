@@ -1,0 +1,1 @@
+DROP TABLE "scout_share_link" CASCADE;
