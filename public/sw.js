@@ -13,9 +13,44 @@
 // the offline capture queue (lib/offline-queue.ts, app-layer IndexedDB,
 // not this file) is what actually guarantees "nothing is lost in a dead
 // zone" for scouting/trap/treatment submissions.
-const VERSION = "v4";
+const VERSION = "v5";
 const CACHE_NAME = `spectral-scout-${VERSION}`;
 const APP_SHELL = ["/offline", "/manifest.webmanifest", "/favicon.png", "/icons/icon-192.png", "/icons/icon-512.png"];
+
+// How long a cached API response is treated as "fresh enough to show
+// instantly" before a read has to wait on the network first (ticket
+// recmnUcdRHPF6nrPz) -- previously an entry only ever left the cache on a
+// VERSION bump, which meant a grower could be looking at pest-count data
+// from days ago and have no way to know it wasn't live. 5 minutes matches
+// the kind of staleness a dashboard reload already tolerates; a fetch
+// failure still falls back to this same stale copy regardless of age,
+// since stale-but-real beats the static offline page.
+const API_CACHE_MAX_AGE_MS = 5 * 60_000;
+// Own header name (not a real HTTP response header) stamped onto every API
+// response this SW caches, read back to decide freshness -- Cache Storage
+// itself has no built-in per-entry expiry.
+const CACHED_AT_HEADER = "x-sw-cached-at";
+
+function isPrivateResponse(response) {
+  const cacheControl = response.headers.get("Cache-Control") || "";
+  return cacheControl.toLowerCase().includes("private");
+}
+
+// Wraps a response with a cached-at timestamp header before storing it --
+// cache.put() stores whatever Response is given it verbatim, so stamping
+// has to happen on a clone before the put, not after.
+async function putWithTimestamp(cache, request, response) {
+  const body = await response.clone().blob();
+  const headers = new Headers(response.headers);
+  headers.set(CACHED_AT_HEADER, String(Date.now()));
+  await cache.put(request, new Response(body, { status: response.status, statusText: response.statusText, headers }));
+}
+
+function isFresh(cachedResponse) {
+  const stamp = cachedResponse.headers.get(CACHED_AT_HEADER);
+  if (!stamp) return false; // no timestamp (a pre-v5 cache entry, or the app-shell/static branches which don't stamp) -- treat as stale rather than trusting it indefinitely
+  return Date.now() - Number(stamp) < API_CACHE_MAX_AGE_MS;
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -89,8 +124,15 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          // A page that opts into Cache-Control: private (none do today,
+          // but this is the same defensive check the API branch below
+          // uses) is explicitly saying "this response is for one specific
+          // user" -- never let it become the next signed-out/different
+          // visitor's cached fallback (ticket recmnUcdRHPF6nrPz).
+          if (!isPrivateResponse(response)) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
           return response;
         })
         .catch(() => caches.match(request).then((cached) => cached || caches.match("/offline")))
@@ -117,21 +159,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Read-only API data (map/events/tasks/etc GETs): stale-while-revalidate
-  // -- serve the cached copy instantly if there is one (so a previously
-  // loaded screen still renders offline), and refresh the cache in the
-  // background whenever the network is actually available.
+  // Read-only API data (map/events/tasks/etc GETs): stale-while-revalidate,
+  // but only while the cached copy is still within API_CACHE_MAX_AGE_MS
+  // (ticket recmnUcdRHPF6nrPz) -- past that it's not instantly trustworthy
+  // enough to show as if live, so this waits on the network first and only
+  // falls back to the stale copy if that fetch actually fails. Never
+  // caches a Cache-Control: private response, for the same reason as the
+  // navigation branch above.
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(request);
         const network = fetch(request)
           .then((response) => {
-            if (response.ok) cache.put(request, response.clone());
+            if (response.ok && !isPrivateResponse(response)) putWithTimestamp(cache, request, response.clone());
             return response;
           })
           .catch(() => cached);
-        return cached || network;
+        if (cached && isFresh(cached)) return cached;
+        return network;
       })
     );
   }

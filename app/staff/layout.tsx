@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { signOutAction } from "@/lib/auth-actions";
+import SignOutButton from "@/app/SignOutButton";
 import { requireStaffSession } from "@/lib/session";
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
@@ -17,11 +17,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
         <Link href="/staff/escalations" className="text-sm text-[var(--text-dim)]">
           Ask a person
         </Link>
-        <form action={signOutAction} className="ml-auto">
-          <button type="submit" className="text-sm text-[var(--text-dim)]">
-            Sign out
-          </button>
-        </form>
+        <SignOutButton className="ml-auto text-sm text-[var(--text-dim)]">Sign out</SignOutButton>
       </header>
       {children}
     </div>
