@@ -7,7 +7,7 @@ import { getOwnedFacility } from "@/lib/facilities";
 import { computeEventSignals } from "@/lib/pest-event-signals";
 import { requireGrowerSession } from "@/lib/session";
 import LayoutPicker from "./LayoutPicker";
-import MapEditor from "./MapEditorClient";
+import MapEditor from "./MapEditor";
 
 // Same "list didn't refresh after create" gap as the facility detail page
 // -- LayoutPicker's router.refresh() after generating a layout could leave
