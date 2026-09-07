@@ -1,0 +1,1 @@
+ALTER TABLE "scout_observation" ADD COLUMN "mean_severity_pct" integer;

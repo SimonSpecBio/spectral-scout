@@ -1,4 +1,5 @@
 import { assessmentTypeEnum, deviceStatusEnum, plantHealthEnum } from "@/db/schema";
+import { aggregateDiseaseGrid, type DiseaseLeaves } from "@/lib/disease";
 
 // Shared by both monitoring POST routes (event-scoped and general/unlinked)
 // so the field extraction/validation isn't duplicated. Server-authoritative:
@@ -11,13 +12,21 @@ export function parseMonitoringPayload(body: unknown) {
   const pestCount = typeof b.pestCount === "number" ? b.pestCount : null;
   if (sampleSize == null || pestCount == null) return null;
 
+  const assessmentType = assessmentTypeEnum.enumValues.includes(b.assessmentType as never)
+    ? (b.assessmentType as (typeof assessmentTypeEnum.enumValues)[number])
+    : "pest_count";
+  const leafGrid = Array.isArray(b.leafGrid) ? b.leafGrid : null;
+  // Re-derived server-side from the grid rather than trusting a client-sent
+  // number, same rule the disease-severity update in the event-scoped
+  // monitoring route already follows for the event's own severity field.
+  const meanSeverityPct = assessmentType === "disease_severity" && leafGrid ? aggregateDiseaseGrid(leafGrid as DiseaseLeaves[]).meanSeverityPct : null;
+
   return {
     sampleSize,
     pestCount,
-    assessmentType: assessmentTypeEnum.enumValues.includes(b.assessmentType as never)
-      ? (b.assessmentType as (typeof assessmentTypeEnum.enumValues)[number])
-      : "pest_count",
-    leafGrid: Array.isArray(b.leafGrid) ? b.leafGrid : null,
+    assessmentType,
+    leafGrid,
+    meanSeverityPct,
     avgTempF: typeof b.avgTempF === "number" ? b.avgTempF : null,
     avgHumidityPct: typeof b.avgHumidityPct === "number" ? b.avgHumidityPct : null,
     avgLightHrs: typeof b.avgLightHrs === "number" ? b.avgLightHrs : null,

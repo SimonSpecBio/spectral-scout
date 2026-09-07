@@ -634,6 +634,15 @@ export const scoutingObservations = pgTable(
   sampleSize: integer("sample_size"),
   pestCount: integer("pest_count"),
   leafGrid: jsonb("leaf_grid"), // shape depends on assessmentType -- see enum comment above
+  // Persisted alongside incidence (pestCount/sampleSize) for a
+  // disease_severity session only -- previously computed on the fly
+  // (aggregateDiseaseGrid over leafGrid) and shown in the UI but never
+  // stored, so nothing reading past sessions (trend/history) could see it
+  // without re-deriving from the raw grid (ticket recD5eaXUCEjT06ZD). Set
+  // server-side from leafGrid in lib/monitoring.ts's parseMonitoringPayload,
+  // never trusted from the client. Null for pest_count sessions, where
+  // severity has no meaning.
+  meanSeverityPct: integer("mean_severity_pct"),
   avgTempF: integer("avg_temp_f"),
   avgHumidityPct: integer("avg_humidity_pct"),
   avgLightHrs: integer("avg_light_hrs"),
