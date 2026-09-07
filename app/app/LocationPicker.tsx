@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
-import { BAYS, bayLabel, CANVAS_H, CANVAS_W, nearestBay } from "@/lib/floorplan-bays";
+import { BAYS, bayLabel, CANVAS_H, nearestBay } from "@/lib/floorplan-bays";
 import { nearestZoneLabel, type Zone } from "@/lib/map-zones";
 
 // The single location-picking component every creation flow uses now
@@ -16,19 +16,37 @@ import { nearestZoneLabel, type Zone } from "@/lib/map-zones";
 // exist.
 const VIEW_W = 296;
 const VIEW_H = 400;
-const BENCH_W = 86;
-const BENCH_H = 9;
-// The drawn bench stays thin (9 units, matching the physical layout), but a
-// 9-unit-tall tap target is well under a real touch target on most phones
-// once the SVG's viewBox is scaled up to the actual screen. A separate
-// invisible rect handles the tap instead, sized to nearly the full 32-unit
-// row pitch (lib/floorplan-bays.ts's BENCH_YS spacing) so it's as large as
-// it can be without overlapping the next bay's own hit area.
-const HIT_H = 30;
+// A bench's own length ("index," lib/floorplan-bays.ts's BENCH_YS) used to
+// be drawn running top-to-bottom on screen, with the two rows side by side
+// -- backwards from how a grower actually walks a bench (Simon, live
+// feedback, 2026-09-07: "vertical along the tiny bench, not horizontally").
+// This is a pure render-time transpose confined to this file: bench length
+// now maps to screen-X (left to right), which row maps to screen-Y (top
+// row above bottom row). The canonical canvas (x, y) that placeAt/onConfirm
+// compute and store is untouched -- built from the exact same
+// lib/floorplan-bays.ts BAYS/nearestBay geometry as before, so every
+// existing event keeps resolving to the same bay/label it always did.
+const BAY_LEN = 14; // along the bench's length (screen-x)
+const BAY_THICK = 9; // across the bench (screen-y) -- same as the old BENCH_H
+const BENCH_X_MIN = 40;
+const BENCH_X_MAX = 256;
+const ROW_CENTER_Y = { A: 137, B: 272 } as const;
+const ROW_BAND = {
+  A: { yMin: 70, yMax: 205 },
+  B: { yMin: 205, yMax: 340 },
+} as const;
+// This picker's continuous "tap anywhere along the row" placement already
+// clamps the along-bench coordinate to the row's real extent (onRowClick
+// below); ROW_A_CANVAS_X/ROW_B_CANVAS_X are just which of the two fixed
+// canvas-x values (lib/floorplan-bays.ts's ROW_X) a given point belongs to,
+// needed for hotspot/hotspot-adjacent points where the row isn't already
+// known from which <g> was tapped.
+const ROW_A_CANVAS_X = BAYS.find((b) => b.row === "A")!.x;
+const ROW_B_CANVAS_X = BAYS.find((b) => b.row === "B")!.x;
 // How close (canvas-space) a new tap needs to land to an already-selected
 // point before it's treated as "remove this one" instead of "add a new
 // one" -- multi-point (allowPath) mode only. Comfortably wider than a
-// single bench (BENCH_H's canvas equivalent is ~14) so a slightly-off
+// single bench (BENCH_LEN's canvas equivalent is ~14) so a slightly-off
 // second tap on the same spot still toggles it off.
 const REMOVE_TOLERANCE = 40;
 // Multi-point mode's cap -- an outbreak spanning more benches than this is
@@ -36,25 +54,36 @@ const REMOVE_TOLERANCE = 40;
 // picker and the confirm bar's summary.
 const MAX_POINTS = 6;
 
-function toView(pt: { x: number; y: number }) {
-  return { cx: (pt.x / CANVAS_W) * VIEW_W, cy: (pt.y / CANVAS_H) * VIEW_H };
+function rowOfCanvasX(canvasX: number): "A" | "B" {
+  return Math.abs(canvasX - ROW_A_CANVAS_X) <= Math.abs(canvasX - ROW_B_CANVAS_X) ? "A" : "B";
+}
+function benchCanvasYToScreenX(canvasY: number): number {
+  return BENCH_X_MIN + (canvasY / CANVAS_H) * (BENCH_X_MAX - BENCH_X_MIN);
+}
+function screenXToBenchCanvasY(screenX: number): number {
+  return ((screenX - BENCH_X_MIN) / (BENCH_X_MAX - BENCH_X_MIN)) * CANVAS_H;
 }
 
-// Inverse of toView, for turning a tap's screen position into a canvas-space
-// point -- getScreenCTM/matrixTransform accounts for however the SVG is
-// actually scaled on screen (viewBox meet-scaling, device pixel ratio),
-// rather than assuming a fixed pixel size the way reading offsetX/offsetY
-// against hardcoded dimensions would.
-function svgPointFromEvent(e: React.MouseEvent<SVGElement>): { x: number; y: number } {
+function toView(pt: { x: number; y: number }) {
+  return { cx: benchCanvasYToScreenX(pt.y), cy: ROW_CENTER_Y[rowOfCanvasX(pt.x)] };
+}
+
+// getScreenCTM/matrixTransform accounts for however the SVG is actually
+// scaled on screen (viewBox meet-scaling, device pixel ratio), rather than
+// assuming a fixed pixel size the way reading offsetX/offsetY against
+// hardcoded dimensions would. Returns raw view-space coordinates -- callers
+// convert to canvas space themselves, since only they know which row (and
+// therefore which fixed canvas-x) a tap belongs to.
+function svgPointFromEvent(e: React.MouseEvent<SVGElement>): { screenX: number; screenY: number } {
   const svg = e.currentTarget.ownerSVGElement;
-  if (!svg) return { x: 0, y: 0 };
+  if (!svg) return { screenX: 0, screenY: 0 };
   const pt = svg.createSVGPoint();
   pt.x = e.clientX;
   pt.y = e.clientY;
   const ctm = svg.getScreenCTM();
-  if (!ctm) return { x: 0, y: 0 };
+  if (!ctm) return { screenX: 0, screenY: 0 };
   const p = pt.matrixTransform(ctm.inverse());
-  return { x: (p.x / VIEW_W) * CANVAS_W, y: (p.y / VIEW_H) * CANVAS_H };
+  return { screenX: p.x, screenY: p.y };
 }
 
 export interface PickerArea {
@@ -183,11 +212,12 @@ export default function LocationPicker({
   }
 
   function onRowClick(row: "A" | "B", e: React.MouseEvent<SVGElement>) {
-    const tapped = svgPointFromEvent(e);
+    const { screenX } = svgPointFromEvent(e);
+    const tappedCanvasY = screenXToBenchCanvasY(screenX);
     const rowBays = BAYS.filter((b) => b.row === row);
     const yMin = rowBays[0].y;
     const yMax = rowBays[rowBays.length - 1].y;
-    const clampedY = Math.min(Math.max(tapped.y, yMin), yMax);
+    const clampedY = Math.min(Math.max(tappedCanvasY, yMin), yMax);
     placeAt({ x: rowBays[0].x, y: clampedY });
   }
 
@@ -262,8 +292,17 @@ export default function LocationPicker({
       )}
 
       {areas.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center px-8 text-center text-sm text-[var(--text-dim)]">
-          {facility ? `${facility.name} has no areas yet.` : "You have no sites yet."}
+        // Missing the swipe handlers every other branch here has -- a
+        // facility with zero areas configured yet (a stray test facility,
+        // or one mid-setup) was a dead end with no way off it except the
+        // tiny ‹ › arrows above, easy to miss (Simon, live feedback,
+        // 2026-09-07: got stuck here after a fast swipe landed on one).
+        <div
+          className="flex flex-1 items-center justify-center px-8 text-center text-sm text-[var(--text-dim)]"
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          {facility ? `${facility.name} has no areas yet. Swipe to another site.` : "You have no sites yet."}
         </div>
       ) : !pinRequired ? (
         <div
@@ -289,32 +328,25 @@ export default function LocationPicker({
             onTouchEnd={onTouchEnd}
           >
             <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMid meet" className="block h-full w-full">
-              <rect x="38" y="20" width="220" height="360" rx="3" fill="none" stroke="var(--map-frame-stroke)" strokeWidth="1" />
-              <line x1="148" y1="24" x2="148" y2="376" stroke="var(--map-grid-stroke)" strokeWidth="0.75" strokeDasharray="1 5" />
+              <rect x="20" y="70" width="256" height="270" rx="3" fill="none" stroke="var(--map-frame-stroke)" strokeWidth="1" />
+              <line x1="20" y1="205" x2="276" y2="205" stroke="var(--map-grid-stroke)" strokeWidth="0.75" strokeDasharray="1 5" />
 
               {(["A", "B"] as const).map((row) => {
                 const rowBays = BAYS.filter((b) => b.row === row);
-                const first = toView(rowBays[0]);
-                const last = toView(rowBays[rowBays.length - 1]);
+                const band = ROW_BAND[row];
                 return (
                   <g key={row} onClick={(e) => onRowClick(row, e)} style={{ cursor: "pointer" }}>
-                    <rect
-                      x={first.cx - BENCH_W / 2}
-                      y={first.cy - HIT_H / 2}
-                      width={BENCH_W}
-                      height={last.cy - first.cy + HIT_H}
-                      fill="transparent"
-                    />
+                    <rect x={20} y={band.yMin} width={256} height={band.yMax - band.yMin} fill="transparent" />
                     {rowBays.map((b) => {
                       const { cx, cy } = toView(b);
                       return (
                         <rect
                           key={`${b.row}${b.index}`}
-                          x={cx - BENCH_W / 2}
-                          y={cy - BENCH_H / 2}
-                          width={BENCH_W}
-                          height={BENCH_H}
-                          rx={4.5}
+                          x={cx - BAY_LEN / 2}
+                          y={cy - BAY_THICK / 2}
+                          width={BAY_LEN}
+                          height={BAY_THICK}
+                          rx={3}
                           fill="var(--map-bay-fill)"
                         />
                       );
@@ -324,8 +356,8 @@ export default function LocationPicker({
               })}
 
               <g fontFamily="ui-monospace, monospace" fontSize="8" letterSpacing="0.14em" fill="var(--map-label)">
-                <text x="50" y="15">ROW A</text>
-                <text x="160" y="15">ROW B</text>
+                <text x="24" y="64">ROW A</text>
+                <text x="24" y="221">ROW B</text>
               </g>
 
               {/* Existing hotspots -- visual context only. Drawn on top of

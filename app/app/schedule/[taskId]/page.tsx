@@ -78,6 +78,10 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ tas
           <span className="label-mono">Source</span>
           <span className="capitalize text-[var(--text-dim)]">{task.source.replace("_", " ")}</span>
         </div>
+        <div className="flex items-center justify-between p-3.5 text-sm">
+          <span className="label-mono">Created</span>
+          <span className="text-[var(--text-dim)]">{task.createdAt.toLocaleString()}</span>
+        </div>
         {task.repeatEveryDays && (
           <div className="flex items-center justify-between p-3.5 text-sm">
             <span className="label-mono">Repeats</span>
