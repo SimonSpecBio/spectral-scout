@@ -37,13 +37,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const orgs = await db.select().from(organizations);
-  let pushed = 0;
-
-  for (const org of orgs) {
+  // Fully sequential across every org, with 4 more sequential alert
+  // computations inside each one, made this O(orgs x 4-ish round-trip
+  // chains) and fully serial -- at a few hundred orgs this risks exceeding
+  // the Vercel function timeout and failing the whole run silently
+  // (Airtable ticket rec5XjxiiN0UNKI65). Two independent fixes below: the 4
+  // alert computations per org don't depend on each other, so they run in
+  // parallel; and orgs are processed in small concurrent batches rather
+  // than one-at-a-time or all-at-once (hundreds of orgs firing every query
+  // at once would just move the bottleneck to the DB connection pool).
+  async function processOrgAlerts(organizationId: string): Promise<number> {
     const candidates: { alertKey: string; title: string; body: string; url: string }[] = [];
 
-    const trapAlerts = (await computeTrapAlerts(org.id)).filter((a) => !a.dedupedIntoEventId);
+    const [trapAlertsRaw, scoutingAlerts, monitoringAlerts, escalationAlerts] = await Promise.all([
+      computeTrapAlerts(organizationId),
+      computeScoutingAlerts(organizationId),
+      computeMonitoringAlerts(organizationId),
+      computeEscalationAlerts(organizationId),
+    ]);
+
+    const trapAlerts = trapAlertsRaw.filter((a) => !a.dedupedIntoEventId);
     for (const a of trapAlerts) {
       candidates.push({
         alertKey: `trap-${a.trapId}`,
@@ -52,8 +65,6 @@ export async function GET(request: NextRequest) {
         url: `/app/traps?facility=${a.facilityId}`,
       });
     }
-
-    const scoutingAlerts = await computeScoutingAlerts(org.id);
     for (const a of scoutingAlerts) {
       candidates.push({
         alertKey: `scouting-${a.observationId}`,
@@ -62,8 +73,6 @@ export async function GET(request: NextRequest) {
         url: scoutingAlertConfirmHref(a),
       });
     }
-
-    const monitoringAlerts = await computeMonitoringAlerts(org.id);
     for (const a of monitoringAlerts) {
       candidates.push({
         alertKey: `threshold-${a.eventId}`,
@@ -72,8 +81,6 @@ export async function GET(request: NextRequest) {
         url: `/app/facilities/${a.facilityId}/pest-events/${a.eventId}`,
       });
     }
-
-    const escalationAlerts = await computeEscalationAlerts(org.id);
     for (const a of escalationAlerts) {
       candidates.push({
         alertKey: `escalation-${a.eventId}`,
@@ -83,7 +90,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (candidates.length === 0) continue;
+    if (candidates.length === 0) return 0;
 
     const alreadySent = await db
       .select({ alertKey: pushAlertsSent.alertKey })
@@ -96,14 +103,25 @@ export async function GET(request: NextRequest) {
       );
     const sentKeys = new Set(alreadySent.map((r) => r.alertKey));
     const fresh = candidates.filter((c) => !sentKeys.has(c.alertKey));
-    if (fresh.length === 0) continue;
+    if (fresh.length === 0) return 0;
 
-    const members = await db.select().from(memberships).where(eq(memberships.organizationId, org.id));
+    const members = await db.select().from(memberships).where(eq(memberships.organizationId, organizationId));
+    let orgPushed = 0;
     for (const alert of fresh) {
       await Promise.all(members.map((m) => sendPushToUser(m.userId, { title: alert.title, body: alert.body, url: alert.url })));
-      await db.insert(pushAlertsSent).values({ alertKey: alert.alertKey, organizationId: org.id });
-      pushed++;
+      await db.insert(pushAlertsSent).values({ alertKey: alert.alertKey, organizationId });
+      orgPushed++;
     }
+    return orgPushed;
+  }
+
+  const orgs = await db.select().from(organizations);
+  let pushed = 0;
+  const ORG_BATCH_SIZE = 10;
+  for (let i = 0; i < orgs.length; i += ORG_BATCH_SIZE) {
+    const batch = orgs.slice(i, i + ORG_BATCH_SIZE);
+    const batchPushCounts = await Promise.all(batch.map((org) => processOrgAlerts(org.id)));
+    pushed += batchPushCounts.reduce((sum, n) => sum + n, 0);
   }
 
   // scout_push_alert_sent only ever grows -- an alert's underlying row

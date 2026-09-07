@@ -274,6 +274,13 @@
       "when": 1788750511128,
       "tag": "0038_natural_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1788754026503,
+      "tag": "0039_minor_songbird",
+      "breakpoints": true
     }
   ]
 }

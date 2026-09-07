@@ -37,21 +37,31 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
   if (facilityIds.length === 0) return [];
   const facilityNameById = new Map(orgFacilities.map((f) => [f.id, f.name]));
 
-  const areas = await db.select().from(facilityAreas).where(inArray(facilityAreas.facilityId, facilityIds));
+  const [areas, events, sessions, appliedTreatments, orgTraps, doneTasks] = await Promise.all([
+    db.select().from(facilityAreas).where(inArray(facilityAreas.facilityId, facilityIds)),
+    db.select().from(pestEvents).where(inArray(pestEvents.facilityId, facilityIds)),
+    db.select().from(scoutingObservations).where(eq(scoutingObservations.organizationId, organizationId)),
+    db.select().from(treatments).where(inArray(treatments.facilityId, facilityIds)),
+    db.select().from(traps).where(inArray(traps.facilityId, facilityIds)),
+    db.select().from(tasks).where(eq(tasks.organizationId, organizationId)),
+  ]);
   const areaNameById = new Map(areas.map((a) => [a.id, a.name]));
   // Threads a monitoring session's own area back to its parent facility --
   // scoutingObservations only ever stores facilityAreaId, not facilityId
   // directly, which is why these entries never got a link before (ticket B8).
   const facilityIdByAreaId = new Map(areas.map((a) => [a.id, a.facilityId]));
 
-  const [events, sessions, appliedTreatments, readings, orgTraps, doneTasks] = await Promise.all([
-    db.select().from(pestEvents).where(inArray(pestEvents.facilityId, facilityIds)),
-    db.select().from(scoutingObservations).where(eq(scoutingObservations.organizationId, organizationId)),
-    db.select().from(treatments).where(inArray(treatments.facilityId, facilityIds)),
-    db.select().from(trapReadings),
-    db.select().from(traps).where(inArray(traps.facilityId, facilityIds)),
-    db.select().from(tasks).where(eq(tasks.organizationId, organizationId)),
-  ]);
+  // trapReadings has no organizationId column of its own, only trapId --
+  // scoping it means knowing this org's trap ids first, which is exactly
+  // orgTraps' own result, so this can't join the batch above. Previously
+  // fetched with no WHERE at all (every organization's trap readings, into
+  // Node, on every Logs/Timeline load and CSV export), discarding
+  // non-owned rows below only after the fact (Airtable ticket
+  // rec5XjxiiN0UNKI65) -- not a data leak today since that JS filter was
+  // correct, but exactly the pattern DB-level tenant isolation (RLS) would
+  // otherwise catch, and this app connects with BYPASSRLS.
+  const trapIds = orgTraps.map((t) => t.id);
+  const readings = trapIds.length > 0 ? await db.select().from(trapReadings).where(inArray(trapReadings.trapId, trapIds)) : [];
 
   const trapById = new Map(orgTraps.map((t) => [t.id, t]));
   const eventById = new Map(events.map((e) => [e.id, e]));

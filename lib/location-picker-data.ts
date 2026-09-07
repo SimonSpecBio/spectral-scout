@@ -19,8 +19,13 @@ import type { PickerFacility } from "@/app/app/LocationPicker";
 // meaningful to return for a line anyway.
 export async function buildPickerFacilities(organizationId: string): Promise<PickerFacility[]> {
   const orgFacilities = await db.select().from(facilities).where(eq(facilities.organizationId, organizationId));
-  const allAreas = await db.select().from(facilityAreas);
-  const orgAreas = allAreas.filter((a) => orgFacilities.some((f) => f.id === a.facilityId));
+  const facilityIds = orgFacilities.map((f) => f.id);
+  // Scoped to this org's own facilities, not every organization's areas
+  // fetched-then-filtered in JS (Airtable ticket rec5XjxiiN0UNKI65) -- not
+  // a data leak today since the JS filter below was correct, but exactly
+  // the pattern DB-level tenant isolation (RLS) would otherwise catch, and
+  // this app connects with BYPASSRLS.
+  const orgAreas = facilityIds.length > 0 ? await db.select().from(facilityAreas).where(inArray(facilityAreas.facilityId, facilityIds)) : [];
   const areaIds = orgAreas.map((a) => a.id);
 
   const mapObjects = areaIds.length > 0 ? await db.select().from(facilityMapObjects).where(inArray(facilityMapObjects.facilityAreaId, areaIds)) : [];

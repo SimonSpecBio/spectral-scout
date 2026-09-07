@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, monitoringThresholds, pestEvents, scoutingObservations, treatments } from "@/db/schema";
 import { resolvePestEvent } from "@/lib/pest-events";
@@ -98,8 +98,14 @@ export async function computeMonitoringAlerts(organizationId: string): Promise<M
   const facilityIds = orgFacilities.map((f) => f.id);
   if (facilityIds.length === 0) return [];
 
-  const events = await db.select().from(pestEvents).where(inArray(pestEvents.facilityId, facilityIds));
-  const activeEvents = events.filter((e) => e.status === "active");
+  // Filtered in SQL, not fetched-then-filtered in JS -- an index already
+  // exists on status, and every dashboard load pulled every resolved event
+  // for the org just to immediately discard it (Airtable ticket
+  // rec5XjxiiN0UNKI65).
+  const activeEvents = await db
+    .select()
+    .from(pestEvents)
+    .where(and(inArray(pestEvents.facilityId, facilityIds), eq(pestEvents.status, "active")));
   if (activeEvents.length === 0) return [];
 
   // Latest session per event, in one query rather than N -- pull every
@@ -211,8 +217,12 @@ export async function computeEscalationAlerts(organizationId: string): Promise<E
   const facilityIds = orgFacilities.map((f) => f.id);
   if (facilityIds.length === 0) return [];
 
-  const events = await db.select().from(pestEvents).where(inArray(pestEvents.facilityId, facilityIds));
-  const activeEvents = events.filter((e) => e.status === "active");
+  // Filtered in SQL, not fetched-then-filtered in JS (same fix as
+  // computeMonitoringAlerts above, Airtable ticket rec5XjxiiN0UNKI65).
+  const activeEvents = await db
+    .select()
+    .from(pestEvents)
+    .where(and(inArray(pestEvents.facilityId, facilityIds), eq(pestEvents.status, "active")));
   if (activeEvents.length === 0) return [];
   const eventIds = activeEvents.map((e) => e.id);
 

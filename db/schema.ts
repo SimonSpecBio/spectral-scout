@@ -657,8 +657,13 @@ export const scoutingObservations = pgTable(
   },
   (table) => [
     index("scout_observation_organization_id_idx").on(table.organizationId),
-    index("scout_observation_facility_area_id_idx").on(table.facilityAreaId),
-    index("scout_observation_promoted_pest_event_id_idx").on(table.promotedPestEventId),
+    // Composite, replacing the old single-column versions of each --
+    // both real access patterns (Logs/lib/logs.ts, the alert computations
+    // in lib/threshold-engine.ts) filter by one of these columns and then
+    // sort/take-latest by createdAt, which a bare single-column index
+    // can't serve as directly (Airtable ticket rec5XjxiiN0UNKI65).
+    index("scout_observation_facility_area_id_created_at_idx").on(table.facilityAreaId, table.createdAt.desc()),
+    index("scout_observation_promoted_pest_event_id_created_at_idx").on(table.promotedPestEventId, table.createdAt.desc()),
   ]
 ).enableRLS();
 
@@ -813,7 +818,11 @@ export const trapReadings = pgTable(
     submittedByUserId: uuid("submitted_by_user_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("scout_trap_reading_trap_id_idx").on(table.trapId)]
+  // Composite, replacing the bare trap_id index -- every real query filters
+  // by trap_id (or an IN-list of them) and then sorts/takes-latest by
+  // createdAt (lib/trap-alerts.ts, lib/logs.ts), which the single-column
+  // version couldn't serve as directly (Airtable ticket rec5XjxiiN0UNKI65).
+  (table) => [index("scout_trap_reading_trap_id_created_at_idx").on(table.trapId, table.createdAt.desc())]
 ).enableRLS();
 
 // Per-pest catch/day threshold, org-configurable -- answers "should
@@ -925,6 +934,10 @@ export const tasks = pgTable(
     index("scout_task_pest_event_id_idx").on(table.pestEventId),
     index("scout_task_assignee_user_id_idx").on(table.assigneeUserId),
     index("scout_task_status_idx").on(table.status),
+    // No index existed on due_at at all -- the overdue-tasks cron scans
+    // every open task org-wide by due date on every run (Airtable ticket
+    // rec5XjxiiN0UNKI65).
+    index("scout_task_due_at_idx").on(table.dueAt),
   ]
 ).enableRLS();
 
