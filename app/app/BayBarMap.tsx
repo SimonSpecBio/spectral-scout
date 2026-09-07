@@ -22,6 +22,7 @@ export default function BayBarMap({
   badgeByBay,
   glowBar,
   hrefByBay,
+  spreadEdges,
 }: {
   colorByBay: Map<string, string>;
   badgeByBay?: Map<string, string>;
@@ -30,6 +31,9 @@ export default function BayBarMap({
   // to that event's detail page, so tapping the outbreak on the map is the
   // same as tapping it in the Attention Required list.
   hrefByBay?: Map<string, string>;
+  // Pests lens only -- one dotted, arrowed line per consecutive same-pest
+  // bay-to-bay step over time (PressureBayMap's own computation).
+  spreadEdges?: { x1: number; y1: number; x2: number; y2: number }[];
 }) {
   // +/- buttons (ticket C2) replaced the native pinch-zoom this page
   // disables app-wide, but Simon later asked for real two-finger pinch too
@@ -104,6 +108,9 @@ export default function BayBarMap({
               <stop offset="55%" stopColor="var(--danger)" stopOpacity="0.08" />
               <stop offset="100%" stopColor="var(--danger)" stopOpacity="0" />
             </radialGradient>
+            <marker id="spreadArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)" />
+            </marker>
           </defs>
           <g fontFamily="ui-monospace, monospace" fontSize="7.5" fill="var(--map-label)">
             <text x="16" y="54">01</text>
@@ -168,6 +175,22 @@ export default function BayBarMap({
               );
             })}
           </g>
+          {/* Cross-bench spread arrows, drawn over the bars so they stay
+              visible -- see PressureBayMap's spreadEdges computation. */}
+          {spreadEdges?.map((e, i) => (
+            <line
+              key={i}
+              x1={e.x1}
+              y1={e.y1}
+              x2={e.x2}
+              y2={e.y2}
+              stroke="var(--accent)"
+              strokeWidth={1.25}
+              strokeDasharray="3 3"
+              opacity={0.85}
+              markerEnd="url(#spreadArrow)"
+            />
+          ))}
           {/* Centered over each column's own bars (x=50..148 for A, x=174..272
               for B -- same column widths the bars below use) instead of
               left-aligned from the column's edge, and moved up a few px

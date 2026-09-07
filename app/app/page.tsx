@@ -304,7 +304,14 @@ export default async function HomePage({
     y: number;
     severity: "low" | "moderate" | "high" | "severe";
     pestSpecies: string;
+    createdAt: string; // ISO -- Dates aren't a valid RSC prop, see bayLensEntries above
   }[] = [];
+  // Includes resolved cases too, unlike heatmapEvents -- an earlier case has
+  // almost always already resolved (one open case per pest per area is
+  // enforced) by the time the pest resurfaces at a different bay, so the
+  // spread-arrow chain needs the full history to find that earlier point,
+  // not just what's currently active.
+  let spreadHistoryEvents: { x: number; y: number; pestSpecies: string; createdAt: string }[] = [];
   let bayLensEntries: BayLensEntry[] = [];
   if (areas.length > 0) {
     const hottestAreaEvent = [...facilityActive].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])[0];
@@ -326,7 +333,12 @@ export default async function HomePage({
         y: ev.y!,
         severity: ev.severity,
         pestSpecies: ev.pestSpecies,
+        createdAt: ev.createdAt.toISOString(),
       }));
+
+    spreadHistoryEvents = areaPestEvents
+      .filter((ev) => ev.x != null && ev.y != null)
+      .map((ev) => ({ x: ev.x!, y: ev.y!, pestSpecies: ev.pestSpecies, createdAt: ev.createdAt.toISOString() }));
 
     bayLensEntries = [...bayLensStats.entries()].map(([key, s]) => ({
       key,
@@ -421,6 +433,7 @@ export default async function HomePage({
         areas={areas.map((a) => ({ id: a.id, name: a.name }))}
         currentAreaId={currentAreaId}
         events={heatmapEvents}
+        spreadHistoryEvents={spreadHistoryEvents}
         bayLensEntries={bayLensEntries}
       />
 

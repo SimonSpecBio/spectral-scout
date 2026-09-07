@@ -42,12 +42,16 @@ export default function MapLensSwitcher({
   areas,
   currentAreaId,
   events,
+  spreadHistoryEvents,
   bayLensEntries,
 }: {
   facilityId: string;
   areas: { id: string; name: string }[];
   currentAreaId: string | null;
-  events: { id: string; facilityId: string; x: number; y: number; severity: Severity; pestSpecies: string }[];
+  events: { id: string; facilityId: string; x: number; y: number; severity: Severity; pestSpecies: string; createdAt: string }[];
+  // Includes resolved cases too -- see PressureBayMap's spread-arrow comment
+  // for why the active-only `events` above isn't enough on its own.
+  spreadHistoryEvents: { x: number; y: number; pestSpecies: string; createdAt: string }[];
   bayLensEntries: BayLensEntry[];
 }) {
   const router = useRouter();
@@ -113,7 +117,11 @@ export default function MapLensSwitcher({
   return (
     <div className="flex flex-col gap-2">
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        {lens === "pests" ? <PressureBayMap events={events} /> : <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} />}
+        {lens === "pests" ? (
+          <PressureBayMap events={events} spreadHistoryEvents={spreadHistoryEvents} />
+        ) : (
+          <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} />
+        )}
       </div>
       <div className="flex items-center justify-between px-1">
         <div className="relative inline-flex items-center gap-1">

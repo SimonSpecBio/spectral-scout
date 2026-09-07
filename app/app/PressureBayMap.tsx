@@ -16,6 +16,7 @@ interface EventInput {
   y: number;
   severity: Severity;
   pestSpecies: string;
+  createdAt: string; // ISO
 }
 
 // Joins every distinct pest name at one bay into a single short label,
@@ -43,7 +44,25 @@ function combineBadgeLabels(names: string[]): string {
 // facility's actual floor plan, so MapLensSwitcher labels it as such.
 // Rendering itself now lives in BayBarMap, shared with the other map
 // lenses (see MapLensSwitcher).
-export default function PressureBayMap({ events }: { events: EventInput[] }) {
+interface SpreadHistoryEvent {
+  x: number;
+  y: number;
+  pestSpecies: string;
+  createdAt: string; // ISO
+}
+
+export default function PressureBayMap({
+  events,
+  spreadHistoryEvents,
+}: {
+  events: EventInput[];
+  // Includes resolved cases -- one open case per pest per area is enforced
+  // (db/schema.ts's scout_pest_event_open_case_idx), so by the time the
+  // same pest resurfaces at a different bay, the earlier case has almost
+  // always already resolved. The active-only `events` above can't show
+  // that chain on its own.
+  spreadHistoryEvents: SpreadHistoryEvent[];
+}) {
   const colorByBay = new Map<string, string>();
   const severityByBay = new Map<string, Severity>();
   // A bay's bar links to whichever event set its color (the worst-severity
@@ -82,15 +101,52 @@ export default function PressureBayMap({ events }: { events: EventInput[] }) {
   const rowA = BAYS.filter((b) => b.row === "A");
   const rowB = BAYS.filter((b) => b.row === "B");
   const barYs = [32, 60, 88, 116, 144, 172, 200, 228, 256, 284];
+  const centerOf = (bay: { row: "A" | "B"; index: number }): { x: number; y: number } => {
+    const idx = (bay.row === "A" ? rowA : rowB).findIndex((b) => b.index === bay.index);
+    return { x: bay.row === "A" ? 99 : 223, y: barYs[idx] + 4 }; // row bar horizontal centers (x=50/174, width=98)
+  };
   for (const bay of [...rowA, ...rowB]) {
     const sev = severityByBay.get(`${bay.row}${bay.index}`);
     if (sev && (!worst || SEVERITY_RANK[sev] > SEVERITY_RANK[worst])) {
       worst = sev;
-      const isRowA = bay.row === "A";
-      const idx = (isRowA ? rowA : rowB).indexOf(bay);
-      glowBar = { x: isRowA ? 99 : 223, y: barYs[idx] + 4 }; // row bar horizontal centers (x=50/174, width=98)
+      glowBar = centerOf(bay);
     }
   }
 
-  return <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} glowBar={glowBar} hrefByBay={hrefByBay} />;
+  // Cross-bench spread arrows (Simon, live feedback, 2026-09-07: "if a pest
+  // event happened on Monday on a bench, then another one happens at a
+  // later time on the next bench over and it's the same pest or pathogen,
+  // on the main map there should automatically be a little dotted line and
+  // arrow showing how the pest is spreading"). Grouped by species, sorted
+  // chronologically, one arrow per consecutive step to a DIFFERENT bay --
+  // traces the path an outbreak actually walked over time, not every pair.
+  // Capped to the most recent MAX_CHAIN events per species so a pest with
+  // a long history in this area doesn't clutter the map with its entire
+  // past instead of its recent movement.
+  const MAX_CHAIN = 8;
+  const bySpecies = new Map<string, SpreadHistoryEvent[]>();
+  for (const ev of spreadHistoryEvents) {
+    const list = bySpecies.get(ev.pestSpecies) ?? [];
+    list.push(ev);
+    bySpecies.set(ev.pestSpecies, list);
+  }
+  const spreadEdges: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  for (const evs of bySpecies.values()) {
+    if (evs.length < 2) continue;
+    const sorted = [...evs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).slice(-MAX_CHAIN);
+    let prevKey: string | null = null;
+    let prevCenter: { x: number; y: number } | null = null;
+    for (const ev of sorted) {
+      const bay = nearestBay(ev.x, ev.y);
+      const key = `${bay.row}${bay.index}`;
+      const center = centerOf(bay);
+      if (prevKey && prevKey !== key && prevCenter) {
+        spreadEdges.push({ x1: prevCenter.x, y1: prevCenter.y, x2: center.x, y2: center.y });
+      }
+      prevKey = key;
+      prevCenter = center;
+    }
+  }
+
+  return <BayBarMap colorByBay={colorByBay} badgeByBay={badgeByBay} glowBar={glowBar} hrefByBay={hrefByBay} spreadEdges={spreadEdges} />;
 }
