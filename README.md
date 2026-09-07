@@ -113,6 +113,31 @@ plus `AUTH_SECRET`, `ALLOWED_STAFF_EMAILS`, and `BLOB_READ_WRITE_TOKEN`
 (Vercel dashboard -> Storage -> Blob -> Create, for facility map
 background images and scouting/pest-event photos).
 
+## Upgrading next-auth
+
+`next-auth` is pinned to an exact version (no `^`) -- it's a beta series
+(`5.0.0-beta.x`), and individual beta releases have carried breaking
+changes to the adapter shape. `auth.ts`'s Drizzle adapter config is the
+one `as any` cast in this whole repo, specifically because of that
+instability: a shape change there compiles cleanly and only fails at
+runtime, and for an auth library the failure mode is every grower locked
+out or logged out, discovered in production.
+
+Treat any next-auth version bump as a deliberate change, never a routine
+`npm update`:
+
+1. Read the release's actual changelog for the adapter/callback surface
+   this app uses (`auth.ts`'s `signIn`/`session` callbacks, `events.createUser`,
+   the Drizzle adapter cast).
+2. Bump the exact pinned version in `package.json` (still no `^`).
+3. `rm -rf node_modules && npm install` (a clean install, not incremental)
+   and confirm `npx tsc --noEmit` is clean.
+4. Manually smoke-test all three sign-in paths before pushing: Google
+   OAuth, email magic-link (through to actually clicking the emailed
+   link), and `/api/demo-login`. `npm run build`/typecheck passing does
+   not prove sign-in still works -- this adapter cast is exactly the kind
+   of break that only shows up at runtime.
+
 ## Running it
 
 ```bash
