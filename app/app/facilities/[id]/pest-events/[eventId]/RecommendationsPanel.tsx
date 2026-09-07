@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import type { ProductBenchmark } from "@/lib/benchmarks";
+import { queuedFetch } from "@/lib/offline-queue";
 import { costPerUnit, matchInventoryStock, type StockStatus } from "@/lib/recommendations";
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { AGENTS, findPestProgram, legalityFor, PRODUCTS } from "@/lib/treatments-catalog";
@@ -168,28 +169,31 @@ export default function RecommendationsPanel({
     );
   }
 
+  // A bare fetch here used to hard-fail outright when offline -- applying a
+  // recommended program is the decision action the whole recommendation
+  // engine exists to produce, and a grower standing in a dead zone deciding
+  // what to do about an outbreak is exactly when this needs to still work
+  // (Airtable ticket rec7LEsgfHWQ8glss).
   async function apply(kind: "biocontrol" | "biopesticide" | "chemical" | "spectral", name: string) {
     setApplying(name);
     setError(null);
-    try {
-      const res = await fetch(`/api/facilities/${facilityId}/pest-events/${eventId}/apply-program`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, name }),
-      });
-      if (res.ok) {
-        const { tasks } = await res.json();
-        const recheck = tasks.find((t: { type: string }) => t.type === "monitor");
-        const release = tasks.find((t: { type: string }) => t.type === "release");
+    const result = await queuedFetch(`/api/facilities/${facilityId}/pest-events/${eventId}/apply-program`, { kind, name }, "Applied program");
+    if (result.ok) {
+      if (result.queued) {
+        // No server-generated tasks to describe yet -- those only exist
+        // once this actually lands, which happens later for a queued item.
+        setApplied((prev) => ({ ...prev, [name]: `${name} queued offline, will apply once you're back online` }));
+      } else {
+        const { tasks } = result.data as { tasks: { type: string; dueAt: string }[] };
+        const recheck = tasks.find((t) => t.type === "monitor");
+        const release = tasks.find((t) => t.type === "release");
         const appliedAtTime = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
         const parts = [`${name} logged at ${appliedAtTime}`];
         if (recheck) parts.push(`recheck scheduled ${new Date(recheck.dueAt).toLocaleDateString()}`);
         if (release) parts.push(`recurring release scheduled`);
         setApplied((prev) => ({ ...prev, [name]: parts.join(" · ") }));
-      } else {
-        setError(`Couldn't log ${name}. Check your connection and try again.`);
       }
-    } catch {
+    } else {
       setError(`Couldn't log ${name}. Check your connection and try again.`);
     }
     setApplying(null);

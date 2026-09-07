@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
+import { queuedFetch } from "@/lib/offline-queue";
 
 interface Member {
   userId: string;
@@ -30,27 +31,26 @@ export default function TaskDetailClient({
 
   const current = members.find((m) => m.userId === assignee);
 
+  // All three mutations below used to be a bare fetch, two of which
+  // silently no-op'd on any failure (reassign/unsnooze had no res.ok check
+  // at all, so the UI kept showing the old state as though it worked) and
+  // none of which survived being offline (Airtable ticket rec7LEsgfHWQ8glss).
+  // router.refresh() is skipped when queued -- there's nothing new server-
+  // side to refresh yet, and re-fetching now would just overwrite the
+  // optimistic update below with the stale pre-mutation state.
   async function reassign(userId: string | null) {
     setPicking(false);
-    const res = await fetch(`/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assigneeUserId: userId }),
-    });
-    if (res.ok) {
+    const result = await queuedFetch(`/api/tasks/${taskId}`, { assigneeUserId: userId }, "Reassign task", "PATCH");
+    if (result.ok) {
       setAssignee(userId);
-      router.refresh();
+      if (!result.queued) router.refresh();
     }
   }
 
   async function snooze() {
     setSnoozing(true);
-    const res = await fetch(`/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "snoozed" }),
-    });
-    if (res.ok) router.refresh();
+    const result = await queuedFetch(`/api/tasks/${taskId}`, { status: "snoozed" }, "Snooze task", "PATCH");
+    if (result.ok && !result.queued) router.refresh();
     setSnoozing(false);
   }
 
@@ -114,13 +114,10 @@ export default function TaskDetailClient({
       )}
       {status === "snoozed" && (
         <button
-          onClick={() =>
-            fetch(`/api/tasks/${taskId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "open" }),
-            }).then(() => router.refresh())
-          }
+          onClick={async () => {
+            const result = await queuedFetch(`/api/tasks/${taskId}`, { status: "open" }, "Unsnooze task", "PATCH");
+            if (result.ok && !result.queued) router.refresh();
+          }}
           className="rounded-md border border-[var(--border)] px-4 py-3 text-sm text-[var(--text-dim)]"
         >
           Unsnooze

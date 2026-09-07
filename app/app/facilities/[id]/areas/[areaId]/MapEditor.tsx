@@ -242,27 +242,31 @@ export default function MapEditor({
     // existing house standard (Airtable ticket recfnsVgXC5RlyBiI).
     const target = objects.find((o) => o.id === selectedId);
     if (!confirm(`Delete ${target?.label ? `"${target.label}"` : "this map object"}? This can't be undone.`)) return;
-    await fetch(`${base}/objects/${selectedId}`, { method: "DELETE" });
-    setObjects((prev) => prev.filter((o) => o.id !== selectedId));
+    // Queued rather than a bare fetch (Airtable ticket rec7LEsgfHWQ8glss) --
+    // the DELETE route ignores its body entirely, so {} is just a
+    // placeholder queuedFetch's signature requires. Removed from local
+    // state either way: a queued delete is confirmed intent, not something
+    // to leave half-applied in the UI while it waits to sync.
+    const result = await queuedFetch(`${base}/objects/${selectedId}`, {}, "Delete map object", "DELETE");
+    if (result.ok) setObjects((prev) => prev.filter((o) => o.id !== selectedId));
     setSelectedId(null);
   }
 
   async function submitPestEvent() {
     if (!pestFormPos || !pestSpecies.trim()) return;
-    const res = await fetch(eventsBase, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        facilityAreaId: area.id,
-        x: pestFormPos.x,
-        y: pestFormPos.y,
-        pestSpecies: pestSpecies.trim(),
-        severity: pestSeverity,
-      }),
-    });
-    if (res.ok) {
-      const row = await res.json();
-      setPestEvents((prev) => [...prev, row]);
+    // Queued rather than a bare fetch (Airtable ticket rec7LEsgfHWQ8glss) --
+    // a pest event pinned on the map while offline used to be lost outright
+    // with no error shown. Queued: no server-generated id exists yet to add
+    // a real pin for, so the form just closes the same way it does on
+    // success rather than inventing a fake row -- the pin appears once the
+    // queue syncs and this page is next loaded.
+    const result = await queuedFetch(
+      eventsBase,
+      { facilityAreaId: area.id, x: pestFormPos.x, y: pestFormPos.y, pestSpecies: pestSpecies.trim(), severity: pestSeverity },
+      "Pest event"
+    );
+    if (result.ok && !result.queued) {
+      setPestEvents((prev) => [...prev, result.data as (typeof prev)[number]]);
     }
     setPestFormPos(null);
     setPestSpecies("");
@@ -272,12 +276,12 @@ export default function MapEditor({
 
   async function resolveSelectedEvent() {
     if (!selectedEvent) return;
-    const res = await fetch(`${eventsBase}/${selectedEvent.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "resolved" }),
-    });
-    if (res.ok) {
+    // Queued rather than a bare fetch (Airtable ticket rec7LEsgfHWQ8glss).
+    // Optimistic either way (same as the online branch already was) -- a
+    // queued resolve is confirmed intent, not something to leave the map
+    // showing as still-active while it waits to sync.
+    const result = await queuedFetch(`${eventsBase}/${selectedEvent.id}`, { status: "resolved" }, "Resolve pest event", "PATCH");
+    if (result.ok) {
       setPestEvents((prev) => prev.map((ev) => (ev.id === selectedEvent.id ? { ...ev, status: "resolved" } : ev)));
     }
     setSelectedEvent(null);
@@ -289,12 +293,14 @@ export default function MapEditor({
     // above (Airtable ticket recfnsVgXC5RlyBiI) -- a glove brush here used
     // to delete a pest event and its whole history with zero confirmation.
     // Also fixed the missing res.ok check flagged alongside this same line
-    // (Airtable ticket 614): the row was optimistically removed from state
-    // even on a failed request, silently un-deleting itself on the next
-    // real data refresh with no explanation.
+    // (Airtable ticket 614) and queued rather than a bare fetch (ticket
+    // rec7LEsgfHWQ8glss) -- the DELETE route ignores its body, {} is just a
+    // placeholder. A queued delete is confirmed intent, so this stays
+    // optimistic either way rather than leaving a "deleted" pin still
+    // showing on the map while it waits to sync.
     if (!confirm(`Delete this ${displayNameForPestSpecies(selectedEvent.pestSpecies)} event? This can't be undone.`)) return;
-    const res = await fetch(`${eventsBase}/${selectedEvent.id}`, { method: "DELETE" });
-    if (res.ok) {
+    const result = await queuedFetch(`${eventsBase}/${selectedEvent.id}`, {}, "Delete pest event", "DELETE");
+    if (result.ok) {
       setPestEvents((prev) => prev.filter((ev) => ev.id !== selectedEvent.id));
     }
     setSelectedEvent(null);

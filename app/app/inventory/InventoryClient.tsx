@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { INVENTORY_CATALOG, type CatalogEntry, type InventoryCategory } from "@/lib/inventory-catalog";
+import { queuedFetch } from "@/lib/offline-queue";
 import { OptionalStepper, Stepper } from "../Stepper";
 
 interface Item {
@@ -60,56 +61,60 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
           .filter(([, list]) => list.length > 0)
       : [[tab, visible]];
 
+  // Stock counts happen in the storage room, often the worst signal in the
+  // building -- all three below used to be a bare fetch, hard-failing
+  // offline instead of queuing like every other capture form (Airtable
+  // ticket rec7LEsgfHWQ8glss). When queued, the real server-computed row
+  // doesn't exist yet, so each applies the same delta locally that the
+  // server will eventually apply for real, rather than waiting on data that
+  // won't arrive until sync.
   async function restock(itemId: string, addQuantity: number) {
     setError(null);
-    try {
-      const res = await fetch(`/api/inventory/${itemId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ addQuantity }),
-      });
-      if (res.ok) {
-        const row = await res.json();
-        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity: Number(row.quantity) } : i)));
+    const result = await queuedFetch(`/api/inventory/${itemId}`, { addQuantity }, "Restock", "PATCH");
+    if (result.ok) {
+      if (result.queued) {
+        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity: i.quantity + addQuantity } : i)));
       } else {
-        setError("Couldn't update stock. Check your connection and try again.");
+        const row = result.data as { quantity: number };
+        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity: Number(row.quantity) } : i)));
       }
-    } catch {
+    } else {
       setError("Couldn't update stock. Check your connection and try again.");
     }
   }
 
   async function setUnitCost(itemId: string, cost: number | null) {
     setError(null);
-    try {
-      const res = await fetch(`/api/inventory/${itemId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unitCost: cost }),
-      });
-      if (res.ok) {
-        const row = await res.json();
-        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, unitCost: row.unitCost == null ? null : Number(row.unitCost) } : i)));
+    const result = await queuedFetch(`/api/inventory/${itemId}`, { unitCost: cost }, "Update unit cost", "PATCH");
+    if (result.ok) {
+      if (result.queued) {
+        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, unitCost: cost } : i)));
       } else {
-        setError("Couldn't save cost. Check your connection and try again.");
+        const row = result.data as { unitCost: number | null };
+        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, unitCost: row.unitCost == null ? null : Number(row.unitCost) } : i)));
       }
-    } catch {
+    } else {
       setError("Couldn't save cost. Check your connection and try again.");
     }
   }
 
   async function receiveOrder(itemId: string, orderId: string) {
     setError(null);
-    try {
-      const res = await fetch(`/api/inventory/${itemId}/orders/${orderId}/receive`, { method: "POST" });
-      if (res.ok) {
-        const row = await res.json();
-        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity: Number(row.quantity) } : i)));
-        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    const order = orders.find((o) => o.id === orderId);
+    const result = await queuedFetch(`/api/inventory/${itemId}/orders/${orderId}/receive`, {}, "Receive order", "POST");
+    if (result.ok) {
+      if (result.queued) {
+        // Mirrors the route's own logic (marks the order received and adds
+        // its quantity to on-hand stock in one action) using the order's
+        // already-known local quantity, since the real server response
+        // doesn't exist yet.
+        if (order) setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity: i.quantity + order.quantity } : i)));
       } else {
-        setError("Couldn't mark this order received. Check your connection and try again.");
+        const row = result.data as { quantity: number };
+        setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, quantity: Number(row.quantity) } : i)));
       }
-    } catch {
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    } else {
       setError("Couldn't mark this order received. Check your connection and try again.");
     }
   }
@@ -284,28 +289,31 @@ function RestockRow({
 
   async function placeOrder() {
     const parsedUnitCost = unitCost.trim() ? Number(unitCost) : null;
-    try {
-      const res = await fetch(`/api/inventory/${item.id}/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          quantity: qty,
-          supplier: supplier || null,
-          supplierContact: supplierContact || null,
-          unitCost: parsedUnitCost != null && !Number.isNaN(parsedUnitCost) ? parsedUnitCost : null,
-        }),
-      });
-      if (res.ok) {
-        const row = await res.json();
+    const result = await queuedFetch(
+      `/api/inventory/${item.id}/orders`,
+      {
+        quantity: qty,
+        supplier: supplier || null,
+        supplierContact: supplierContact || null,
+        unitCost: parsedUnitCost != null && !Number.isNaN(parsedUnitCost) ? parsedUnitCost : null,
+      },
+      "Place order"
+    );
+    if (result.ok) {
+      // Queued: no server-generated order id exists yet to show in the "On
+      // order" list -- the form just closes the same way it does on
+      // success rather than inventing a fake row (Airtable ticket
+      // rec7LEsgfHWQ8glss). It'll appear once the queue syncs and this
+      // page is next loaded.
+      if (!result.queued) {
+        const row = result.data as Order;
         onOrderPlaced({ ...row, quantity: Number(row.quantity), unitCost: row.unitCost == null ? null : Number(row.unitCost), totalCost: row.totalCost == null ? null : Number(row.totalCost) });
-        setOrderMode(false);
-        setSupplier("");
-        setSupplierContact("");
-        setUnitCost("");
-      } else {
-        onError("Couldn't place this order. Check your connection and try again.");
       }
-    } catch {
+      setOrderMode(false);
+      setSupplier("");
+      setSupplierContact("");
+      setUnitCost("");
+    } else {
       onError("Couldn't place this order. Check your connection and try again.");
     }
   }
@@ -391,26 +399,32 @@ function AddFromCatalog({
     setUnit(entry.unit);
   }
 
+  // No try/catch at all here previously -- a thrown network error (offline)
+  // meant this await never settled, and the button hung on "Adding…"
+  // indefinitely with no way out (Airtable ticket rec7LEsgfHWQ8glss).
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    const res = await fetch("/api/inventory", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        category,
-        unit,
-        quantity,
-        reorderLevel: reorderLevel === "" ? null : reorderLevel,
-        reiHours: picked?.reiHours ?? null,
-        phiDays: picked?.phiDays ?? null,
-        cautions: picked?.cautions ?? null,
-      }),
-    });
-    if (res.ok) {
-      const row = await res.json();
-      onAdded({ ...row, quantity: Number(row.quantity), reorderLevel: row.reorderLevel == null ? null : Number(row.reorderLevel) });
+    const result = await queuedFetch("/api/inventory", {
+      name,
+      category,
+      unit,
+      quantity,
+      reorderLevel: reorderLevel === "" ? null : reorderLevel,
+      reiHours: picked?.reiHours ?? null,
+      phiDays: picked?.phiDays ?? null,
+      cautions: picked?.cautions ?? null,
+    }, "Add inventory item");
+    if (result.ok) {
+      if (result.queued) {
+        // No server-generated id exists yet to add to the list -- close
+        // the form the same way onCancel does rather than inventing a fake
+        // row. It'll appear once the queue syncs and this page reloads.
+        onCancel();
+      } else {
+        const row = result.data as Item;
+        onAdded({ ...row, quantity: Number(row.quantity), reorderLevel: row.reorderLevel == null ? null : Number(row.reorderLevel) });
+      }
     } else {
       setSubmitting(false);
     }

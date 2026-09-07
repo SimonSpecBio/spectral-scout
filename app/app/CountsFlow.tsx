@@ -86,11 +86,11 @@ export default function CountsFlow({
       markEngaged();
       clearDraft();
       if (taskId) {
-        await fetch(`/api/tasks/${taskId}/complete`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ minutesSpent: null }),
-        }).catch(() => {});
+        // A bare fetch here used to swallow any failure -- offline, the
+        // scouting log above queued correctly but this completion call was
+        // simply dropped, so the task stayed overdue forever and a second
+        // scout re-walked the same bench (Airtable ticket rec7LEsgfHWQ8glss).
+        await queuedFetch(`/api/tasks/${taskId}/complete`, { minutesSpent: null }, "Task completion");
       }
       router.push(redirectHref);
     } else {

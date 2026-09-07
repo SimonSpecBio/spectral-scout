@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { queuedFetch } from "@/lib/offline-queue";
 import { useDraftAutosave, useDraftValue } from "@/lib/use-draft";
 
 export default function EstablishmentCheckForm({
@@ -28,23 +29,20 @@ export default function EstablishmentCheckForm({
 
   const clearDraft = useDraftAutosave(draftKey, { notes });
 
+  // A field-capture form (a real observation made standing at the bench)
+  // that could show an error but not actually queue offline -- a bare
+  // fetch's thrown network error was caught and surfaced as "check your
+  // connection," rather than saved for later like every other capture form
+  // in the app (Airtable ticket rec7LEsgfHWQ8glss).
   async function submit(value: boolean) {
     setEstablished(value);
     setSubmitting(true);
     setError(null);
-    try {
-      const res = await fetch(`/api/tasks/${taskId}/establishment-check`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ established: value, notes: notes.trim() || null }),
-      });
-      if (res.ok) {
-        clearDraft();
-        router.push("/app/schedule");
-      } else {
-        setError("Couldn't save this check. Check your connection and try again.");
-      }
-    } catch {
+    const result = await queuedFetch(`/api/tasks/${taskId}/establishment-check`, { established: value, notes: notes.trim() || null }, "Establishment check");
+    if (result.ok) {
+      clearDraft();
+      router.push("/app/schedule");
+    } else {
       setError("Couldn't save this check. Check your connection and try again.");
     }
     setSubmitting(false);
