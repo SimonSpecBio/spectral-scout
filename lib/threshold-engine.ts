@@ -86,15 +86,21 @@ export interface MonitoringAlert {
 // replacing it: this is a real configured numeric comparison, that one is
 // a shape-of-the-curve signal.
 export async function computeMonitoringAlerts(organizationId: string): Promise<MonitoringAlert[]> {
-  const orgFacilities = await db.select().from(facilities).where(eq(facilities.organizationId, organizationId));
+  // thresholdsBySpecies only needs organizationId, not orgFacilities' own
+  // result -- previously awaited strictly after the events query for no
+  // real reason, adding a full extra round trip to the dashboard's home
+  // load (Airtable ticket recb3yRE0dHMociTp). Fired alongside orgFacilities
+  // instead since neither depends on the other.
+  const [orgFacilities, thresholdsBySpecies] = await Promise.all([
+    db.select().from(facilities).where(eq(facilities.organizationId, organizationId)),
+    getSpeciesThresholdsMap(organizationId),
+  ]);
   const facilityIds = orgFacilities.map((f) => f.id);
   if (facilityIds.length === 0) return [];
 
   const events = await db.select().from(pestEvents).where(inArray(pestEvents.facilityId, facilityIds));
   const activeEvents = events.filter((e) => e.status === "active");
   if (activeEvents.length === 0) return [];
-
-  const thresholdsBySpecies = await getSpeciesThresholdsMap(organizationId);
 
   // Latest session per event, in one query rather than N -- pull every
   // session for these events, already newest-first, and keep the first one
@@ -210,19 +216,23 @@ export async function computeEscalationAlerts(organizationId: string): Promise<E
   if (activeEvents.length === 0) return [];
   const eventIds = activeEvents.map((e) => e.id);
 
-  const allTreatments = await db.select().from(treatments).where(inArray(treatments.pestEventId, eventIds));
+  // Neither of these depends on the other -- both only need eventIds --
+  // but used to run one after the other, adding an extra sequential round
+  // trip to the dashboard's home load (Airtable ticket recb3yRE0dHMociTp).
+  const [allTreatments, allSessions] = await Promise.all([
+    db.select().from(treatments).where(inArray(treatments.pestEventId, eventIds)),
+    // Newest-first, same convention as computeMonitoringAlerts.
+    db
+      .select()
+      .from(scoutingObservations)
+      .where(inArray(scoutingObservations.promotedPestEventId, eventIds))
+      .orderBy(desc(scoutingObservations.createdAt)),
+  ]);
   const treatmentsByEvent = new Map<string, typeof allTreatments>();
   for (const t of allTreatments) {
     if (!t.pestEventId) continue;
     treatmentsByEvent.set(t.pestEventId, [...(treatmentsByEvent.get(t.pestEventId) ?? []), t]);
   }
-
-  // Newest-first, same convention as computeMonitoringAlerts.
-  const allSessions = await db
-    .select()
-    .from(scoutingObservations)
-    .where(inArray(scoutingObservations.promotedPestEventId, eventIds))
-    .orderBy(desc(scoutingObservations.createdAt));
   const sessionsByEvent = new Map<string, typeof allSessions>();
   for (const s of allSessions) {
     if (!s.promotedPestEventId) continue;

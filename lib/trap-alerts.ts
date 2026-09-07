@@ -50,7 +50,24 @@ export interface TrapAlert {
 // deduped into it (surfaced, not hidden) rather than raised as a second,
 // competing suggestion for the same real-world problem.
 export async function computeTrapAlerts(organizationId: string): Promise<TrapAlert[]> {
-  const orgFacilities = await db.select().from(facilities).where(eq(facilities.organizationId, organizationId));
+  // thresholdRows and openEvents only need organizationId, not anything
+  // from orgFacilities/orgTraps -- previously awaited strictly after the
+  // trap-readings chain for no real reason, adding two extra sequential
+  // round trips to the dashboard's home load (Airtable ticket
+  // recb3yRE0dHMociTp). Fired alongside orgFacilities instead.
+  const [orgFacilities, thresholdRows, openEvents] = await Promise.all([
+    db.select().from(facilities).where(eq(facilities.organizationId, organizationId)),
+    db.select().from(trapThresholds).where(eq(trapThresholds.organizationId, organizationId)),
+    db
+      .select({
+        id: pestEvents.id,
+        facilityAreaId: pestEvents.facilityAreaId,
+        pestSpecies: pestEvents.pestSpecies,
+      })
+      .from(pestEvents)
+      .innerJoin(facilities, eq(pestEvents.facilityId, facilities.id))
+      .where(and(eq(facilities.organizationId, organizationId), eq(pestEvents.status, "active"))),
+  ]);
   if (orgFacilities.length === 0) return [];
   const orgTraps = await db
     .select()
@@ -77,18 +94,7 @@ export async function computeTrapAlerts(organizationId: string): Promise<TrapAle
     if (!latestByTrapSpecies.has(key)) latestByTrapSpecies.set(key, r);
   }
 
-  const thresholdRows = await db.select().from(trapThresholds).where(eq(trapThresholds.organizationId, organizationId));
   const thresholdBySpecies = new Map(thresholdRows.map((t) => [t.pestSpecies.toLowerCase(), t.catchPerDayThreshold]));
-
-  const openEvents = await db
-    .select({
-      id: pestEvents.id,
-      facilityAreaId: pestEvents.facilityAreaId,
-      pestSpecies: pestEvents.pestSpecies,
-    })
-    .from(pestEvents)
-    .innerJoin(facilities, eq(pestEvents.facilityId, facilities.id))
-    .where(and(eq(facilities.organizationId, organizationId), eq(pestEvents.status, "active")));
   const openEventByAreaSpecies = new Map(
     openEvents.filter((e) => e.facilityAreaId).map((e) => [`${e.facilityAreaId}::${e.pestSpecies.toLowerCase()}`, e.id])
   );

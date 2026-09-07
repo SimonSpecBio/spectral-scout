@@ -92,10 +92,73 @@ export default async function HomePage({
 
   const { facility: facilityParam, area: areaParam } = await searchParams;
 
-  const orgFacilities = await db
-    .select()
-    .from(facilities)
-    .where(eq(facilities.organizationId, session.organizationId!));
+  // None of the other 8 queries below actually need orgFacilities' own
+  // result -- only session.organizationId, same as orgFacilities itself --
+  // so orgFacilities used to run as a full extra sequential round trip
+  // before this batch could even start, on every single dashboard load
+  // (Airtable ticket recb3yRE0dHMociTp). Merged into the one batch instead.
+  // The rare case (a brand-new org with zero facilities yet) does a little
+  // more DB work than it needs to as a result, since the other 8 results
+  // just go unused below -- a fine trade for cutting one full round trip
+  // off the common case.
+  const [orgFacilities, events, myOpenTasks, trapAlertsRaw, scoutingAlerts, orgInventory, monitoringAlertsRaw, orgTreatments, escalationAlerts] =
+    await Promise.all([
+      db
+        .select()
+        .from(facilities)
+        .where(eq(facilities.organizationId, session.organizationId!)),
+      db
+        .select({
+          id: pestEvents.id,
+          pestSpecies: pestEvents.pestSpecies,
+          severity: pestEvents.severity,
+          status: pestEvents.status,
+          createdAt: pestEvents.createdAt,
+          resolvedAt: pestEvents.resolvedAt,
+          facilityId: pestEvents.facilityId,
+          facilityAreaId: pestEvents.facilityAreaId,
+          facilityName: facilities.name,
+          areaName: facilityAreas.name,
+        })
+        .from(pestEvents)
+        .innerJoin(facilities, eq(pestEvents.facilityId, facilities.id))
+        .leftJoin(facilityAreas, eq(pestEvents.facilityAreaId, facilityAreas.id))
+        .where(eq(facilities.organizationId, session.organizationId!)),
+      // "Dashboard Today's Tasks is this same Task list filtered to assignee =
+      // me, due = today -- not a separate store" (SCHEDULING.md). Overdue tasks
+      // assigned to me surface here too, not just tasks due exactly today,
+      // since those are exactly what needs attention first.
+      db
+        .select()
+        .from(tasks)
+        .where(and(eq(tasks.organizationId, session.organizationId!), eq(tasks.assigneeUserId, session.user!.id!), eq(tasks.status, "open"))),
+      // Trap spikes needing confirmation -- deduped alerts (an open event
+      // already tracks this pest+zone) don't get a second, competing card
+      // here; they're still visible from the trap's own row on the Traps screen.
+      computeTrapAlerts(session.organizationId!),
+      // General scouting sessions that crossed threshold with no linked event
+      // yet -- same "suggestion, needs a human to confirm" rule as trap alerts
+      // (lib/scouting-alerts.ts), just with no species known to dedupe against.
+      computeScoutingAlerts(session.organizationId!),
+      // "Treatment logged -> decrement InventoryItem; if now below
+      // reorderLevel, raise low-stock notification" (ARCHITECTURE.md's
+      // trigger rules) -- no separate notification feed exists yet, so this
+      // surfaces the same way every other exception does: as an Attention
+      // Required card, computed live from quantity vs reorderLevel rather
+      // than a stored alert.
+      db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!)),
+      // ThresholdEngine (ARCHITECTURE.md ยง3): a real configured infested-%
+      // comparison, not the trend heuristic below.
+      computeMonitoringAlerts(session.organizationId!),
+      db
+        .select({ pestEventId: treatments.pestEventId, type: treatments.type, appliedAt: treatments.appliedAt })
+        .from(treatments)
+        .innerJoin(facilities, eq(treatments.facilityId, facilities.id))
+        .where(eq(facilities.organizationId, session.organizationId!)),
+      // Treated but not improving -- the mirror of monitoringAlerts, see
+      // lib/threshold-engine.ts's comment on computeEscalationAlerts.
+      computeEscalationAlerts(session.organizationId!),
+    ]);
 
   if (orgFacilities.length === 0) {
     return (
@@ -112,63 +175,6 @@ export default async function HomePage({
     );
   }
 
-  // All seven of these only need session.organizationId/user.id, which are
-  // already known -- none depends on another's result, so they were pure
-  // added latency run one after another. Batched into one round trip
-  // instead of seven.
-  const [events, myOpenTasks, trapAlertsRaw, scoutingAlerts, orgInventory, monitoringAlertsRaw, orgTreatments, escalationAlerts] = await Promise.all([
-    db
-      .select({
-        id: pestEvents.id,
-        pestSpecies: pestEvents.pestSpecies,
-        severity: pestEvents.severity,
-        status: pestEvents.status,
-        createdAt: pestEvents.createdAt,
-        resolvedAt: pestEvents.resolvedAt,
-        facilityId: pestEvents.facilityId,
-        facilityAreaId: pestEvents.facilityAreaId,
-        facilityName: facilities.name,
-        areaName: facilityAreas.name,
-      })
-      .from(pestEvents)
-      .innerJoin(facilities, eq(pestEvents.facilityId, facilities.id))
-      .leftJoin(facilityAreas, eq(pestEvents.facilityAreaId, facilityAreas.id))
-      .where(eq(facilities.organizationId, session.organizationId!)),
-    // "Dashboard Today's Tasks is this same Task list filtered to assignee =
-    // me, due = today -- not a separate store" (SCHEDULING.md). Overdue tasks
-    // assigned to me surface here too, not just tasks due exactly today,
-    // since those are exactly what needs attention first.
-    db
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.organizationId, session.organizationId!), eq(tasks.assigneeUserId, session.user!.id!), eq(tasks.status, "open"))),
-    // Trap spikes needing confirmation -- deduped alerts (an open event
-    // already tracks this pest+zone) don't get a second, competing card
-    // here; they're still visible from the trap's own row on the Traps screen.
-    computeTrapAlerts(session.organizationId!),
-    // General scouting sessions that crossed threshold with no linked event
-    // yet -- same "suggestion, needs a human to confirm" rule as trap alerts
-    // (lib/scouting-alerts.ts), just with no species known to dedupe against.
-    computeScoutingAlerts(session.organizationId!),
-    // "Treatment logged -> decrement InventoryItem; if now below
-    // reorderLevel, raise low-stock notification" (ARCHITECTURE.md's
-    // trigger rules) -- no separate notification feed exists yet, so this
-    // surfaces the same way every other exception does: as an Attention
-    // Required card, computed live from quantity vs reorderLevel rather
-    // than a stored alert.
-    db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!)),
-    // ThresholdEngine (ARCHITECTURE.md ยง3): a real configured infested-%
-    // comparison, not the trend heuristic below.
-    computeMonitoringAlerts(session.organizationId!),
-    db
-      .select({ pestEventId: treatments.pestEventId, type: treatments.type, appliedAt: treatments.appliedAt })
-      .from(treatments)
-      .innerJoin(facilities, eq(treatments.facilityId, facilities.id))
-      .where(eq(facilities.organizationId, session.organizationId!)),
-    // Treated but not improving -- the mirror of monitoringAlerts, see
-    // lib/threshold-engine.ts's comment on computeEscalationAlerts.
-    computeEscalationAlerts(session.organizationId!),
-  ]);
   const trapAlerts = trapAlertsRaw.filter((a) => !a.dedupedIntoEventId);
 
   const active = events
