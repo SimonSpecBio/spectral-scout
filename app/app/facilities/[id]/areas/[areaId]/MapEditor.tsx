@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Circle, Image as KonvaImage, Layer, Line, Rect, Stage, Text, Transformer } from "react-konva";
 import type Konva from "konva";
 import { CANVAS_TEXT } from "@/lib/canvas-text-scale";
-import { SEVERITY_COLOR, type Severity } from "@/lib/colors";
+import { SEVERITY_COLOR, SEVERITY_TEXT_COLOR, type Severity } from "@/lib/colors";
 import { pointInShape } from "@/lib/map-zones";
 import { queuedFetch } from "@/lib/offline-queue";
 import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
@@ -362,7 +362,7 @@ export default function MapEditor({
             setTool("select");
           }}
           className={`rounded-md border px-3 py-1.5 text-sm ${
-            mode === "edit" ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+            mode === "edit" ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
           }`}
         >
           {mode === "edit" ? "Done editing" : "Edit site layout"}
@@ -389,7 +389,7 @@ export default function MapEditor({
                 setPestFormPos(null);
               }}
               className={`rounded-md border px-3 py-1.5 text-sm capitalize ${
-                tool === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                tool === t ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
               }`}
             >
               {t === "pest" ? "Pest event" : t}
@@ -739,11 +739,11 @@ export default function MapEditor({
             }}
           >
             <div className="text-sm font-medium capitalize">{displayNameForPestSpecies(selectedEvent.pestSpecies)}</div>
-            <div className="text-xs" style={{ color: SEVERITY_COLOR[selectedEvent.severity] }}>
+            <div className="text-xs" style={{ color: SEVERITY_TEXT_COLOR[selectedEvent.severity] }}>
               {selectedEvent.severity} severity
             </div>
             {selectedEvent.notes && <div className="text-xs text-[var(--text-dim)]">{selectedEvent.notes}</div>}
-            <Link href={`/app/facilities/${facilityId}/pest-events/${selectedEvent.id}`} className="text-xs text-[var(--accent)]">
+            <Link href={`/app/facilities/${facilityId}/pest-events/${selectedEvent.id}`} className="text-xs text-[var(--accent-text)]">
               View details →
             </Link>
             <div className="flex gap-2">
@@ -782,7 +782,7 @@ export default function MapEditor({
                 className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-[var(--surface-raised)]"
               >
                 <span className="min-w-0 truncate capitalize">{displayNameForPestSpecies(ev.pestSpecies)}</span>
-                <span className="shrink-0 text-xs" style={{ color: SEVERITY_COLOR[ev.severity] }}>
+                <span className="shrink-0 text-xs" style={{ color: SEVERITY_TEXT_COLOR[ev.severity] }}>
                   {ev.severity}
                 </span>
               </button>

@@ -95,7 +95,7 @@ export default function TrapReadingsFlow({
         <h1 className="text-2xl font-semibold">Log trap readings</h1>
         <div className="card p-6 text-sm text-[var(--text-dim)]">
           This area has no traps yet.{" "}
-          <Link href={`/app/new-trap?facility=${target.facilityId}&area=${target.areaId}`} className="text-[var(--accent)]">
+          <Link href={`/app/new-trap?facility=${target.facilityId}&area=${target.areaId}`} className="text-[var(--accent-text)]">
             Add a trap
           </Link>{" "}
           first.

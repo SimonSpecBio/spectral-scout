@@ -150,7 +150,7 @@ export default function TeamClient({
                 key={r}
                 onClick={() => setRole(r)}
                 className={`flex-1 rounded-md border px-3 py-1.5 text-sm capitalize ${
-                  role === r ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                  role === r ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
                 }`}
               >
                 {r === "owner" ? "Manager" : "Scout"}

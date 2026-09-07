@@ -209,7 +209,7 @@ export default function CatalogClient({
                   key={k}
                   onClick={() => setSpeciesKind(k)}
                   className={`flex-1 rounded-md border px-3 py-1.5 text-sm capitalize ${
-                    speciesKind === k ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                    speciesKind === k ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
                   }`}
                 >
                   {k}
@@ -301,7 +301,7 @@ export default function CatalogClient({
                     onClick={() => setThresholdPresenceOverride(opt.value)}
                     className={`flex-1 rounded-md border px-2 py-1.5 text-xs ${
                       thresholdPresenceOverride === opt.value
-                        ? "border-[var(--accent)] text-[var(--accent)]"
+                        ? "border-[var(--accent-text)] text-[var(--accent-text)]"
                         : "border-[var(--border)] text-[var(--text-dim)]"
                     }`}
                   >

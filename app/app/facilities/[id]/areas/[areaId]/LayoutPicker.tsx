@@ -130,7 +130,7 @@ export default function LayoutPicker({ facilityId, areaId }: { facilityId: strin
               type="button"
               onClick={() => setPreset(p.value)}
               className={`rounded-md border px-3 py-2 text-left text-sm ${
-                preset === p.value ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                preset === p.value ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
               }`}
             >
               {p.label}
@@ -143,7 +143,7 @@ export default function LayoutPicker({ facilityId, areaId }: { facilityId: strin
               type="button"
               onClick={() => setPreset(p.value)}
               className={`rounded-md border px-3 py-2 text-left text-sm ${
-                preset === p.value ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                preset === p.value ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
               }`}
             >
               {p.label}

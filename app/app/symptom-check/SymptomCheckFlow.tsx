@@ -92,7 +92,7 @@ export default function SymptomCheckFlow({ onClose }: { onClose: () => void }) {
                     className="flex items-center justify-between rounded-md border border-[var(--border)] px-3 py-2.5 text-sm"
                   >
                     <span>{displayNameForPestSpecies(id)}</span>
-                    <span className="text-[var(--accent)]">Log this &rarr;</span>
+                    <span className="text-[var(--accent-text)]">Log this &rarr;</span>
                   </Link>
                 );
               })}
@@ -149,8 +149,8 @@ export default function SymptomCheckFlow({ onClose }: { onClose: () => void }) {
                 onClick={() => setAnswers((a) => ({ ...a, where: toggleIn(a.where, o.value) }))}
                 className="rounded-full border px-3 py-1.5 text-sm"
                 style={{
-                  borderColor: answers.where.includes(o.value) ? "var(--accent)" : "var(--border)",
-                  color: answers.where.includes(o.value) ? "var(--accent)" : "var(--text-dim)",
+                  borderColor: answers.where.includes(o.value) ? "var(--accent-text)" : "var(--border)",
+                  color: answers.where.includes(o.value) ? "var(--accent-text)" : "var(--text-dim)",
                 }}
               >
                 {o.label}
@@ -203,8 +203,8 @@ export default function SymptomCheckFlow({ onClose }: { onClose: () => void }) {
                 onClick={() => setAnswers((a) => ({ ...a, closeUp: toggleIn(a.closeUp, o.value, CLOSE_UP_MAX) }))}
                 className="rounded-full border px-3 py-1.5 text-sm"
                 style={{
-                  borderColor: answers.closeUp.includes(o.value) ? "var(--accent)" : "var(--border)",
-                  color: answers.closeUp.includes(o.value) ? "var(--accent)" : "var(--text-dim)",
+                  borderColor: answers.closeUp.includes(o.value) ? "var(--accent-text)" : "var(--border)",
+                  color: answers.closeUp.includes(o.value) ? "var(--accent-text)" : "var(--text-dim)",
                 }}
               >
                 {o.label}

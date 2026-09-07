@@ -26,7 +26,7 @@ export default async function LogTrapReadingsPage({
         <h1 className="text-2xl font-semibold">Log trap readings</h1>
         <div className="card p-6 text-[var(--text-dim)]">
           No sites yet.{" "}
-          <Link href="/app/facilities" className="text-[var(--accent)]">
+          <Link href="/app/facilities" className="text-[var(--accent-text)]">
             Add your first site
           </Link>{" "}
           first.

@@ -252,7 +252,7 @@ export default function LocationPicker({
                 setPoints([]);
               }}
               className={`shrink-0 rounded-full border px-3 py-1 text-xs ${
-                currentAreaId === a.id ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                currentAreaId === a.id ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
               }`}
             >
               {a.name}
@@ -377,7 +377,7 @@ export default function LocationPicker({
 
       <div className="border-t border-[var(--border)] px-5 pb-6 pt-4">
         <div className="mb-3 flex items-center gap-2">
-          <span style={{ color: "var(--accent)" }}>&#128205;</span>
+          <span style={{ color: "var(--accent-text)" }}>&#128205;</span>
           <div>
             {pinRequired ? (
               <>

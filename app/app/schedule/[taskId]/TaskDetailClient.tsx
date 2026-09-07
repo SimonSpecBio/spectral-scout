@@ -60,7 +60,7 @@ export default function TaskDetailClient({
         <div className="flex items-center justify-between">
           <span className="label-mono">Assigned to</span>
           {isOwner && (
-            <button onClick={() => setPicking((v) => !v)} className="text-xs text-[var(--accent)]">
+            <button onClick={() => setPicking((v) => !v)} className="text-xs text-[var(--accent-text)]">
               {picking ? "Cancel" : "Reassign"}
             </button>
           )}

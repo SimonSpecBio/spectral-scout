@@ -191,7 +191,7 @@ export default function DiseaseEventForm({
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="label-mono">Leaf severity &middot; % area</span>
-          <span className="label-mono" style={{ color: "var(--accent)" }}>
+          <span className="label-mono" style={{ color: "var(--accent-text)" }}>
             {agg.leavesAssessed} / 30
           </span>
         </div>
@@ -244,7 +244,7 @@ export default function DiseaseEventForm({
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl p-3" style={{ background: "var(--surface-raised)" }}>
             <div className="label-mono">Incidence</div>
-            <div className="font-mono text-lg font-medium" style={{ color: "var(--accent)" }}>
+            <div className="font-mono text-lg font-medium" style={{ color: "var(--accent-text)" }}>
               {agg.incidencePct}%
             </div>
             <div className="label-mono">leaves infected</div>

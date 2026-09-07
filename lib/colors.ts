@@ -13,6 +13,28 @@ export const SEVERITY_COLOR: Record<Severity, string> = {
   severe: "#a3193d",
 };
 
+// SEVERITY_COLOR is tuned for fills/dots on a light card background --
+// used as TEXT (a badge's own label, a severity chip) it fails WCAG AA's
+// 4.5:1 minimum badly (low measures 1.56:1 against white, effectively
+// invisible), and severity is the single most important status in the app
+// (Airtable ticket recfKUAhJnQARzMk1, scoped to the light palette per its
+// own acceptance criteria). Same hue per severity, darkened until each one
+// clears 4.5:1 on --surface (#fff) -- verified by the standard WCAG
+// relative-luminance formula, not eyeballed: low 5.4:1, moderate 6.3:1,
+// high 6.9:1, severe (already dark enough unchanged) 7.6:1.
+//
+// Plain hex, not a --surface-aware CSS variable, matching SEVERITY_COLOR's
+// own existing convention -- neither adapts for dark mode (--surface goes
+// near-black there), which is a real, separate, already-tracked gap (a
+// dark-mode design pass is its own open ticket), not something this one
+// re-solves.
+export const SEVERITY_TEXT_COLOR: Record<Severity, string> = {
+  low: "#7a6a00",
+  moderate: "#954d00",
+  high: "#9c3a1f",
+  severe: "#a3193d",
+};
+
 export type TaskUrgency = "overdue" | "due_soon" | "scheduled" | "done" | "snoozed";
 export const URGENCY_COLOR: Record<TaskUrgency, string> = {
   overdue: "#CE5D40",

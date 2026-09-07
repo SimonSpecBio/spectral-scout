@@ -191,7 +191,7 @@ export default function NewEventForm({
               key={s}
               onClick={() => setSeverity(s)}
               className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize ${
-                severity === s ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                severity === s ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
               }`}
             >
               {s}

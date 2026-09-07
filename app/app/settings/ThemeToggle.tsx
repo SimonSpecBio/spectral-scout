@@ -17,7 +17,7 @@ export default function ThemeToggle() {
             key={t}
             onClick={() => setTheme(t)}
             className={`rounded-md border px-3 py-1.5 text-sm capitalize ${
-              theme === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+              theme === t ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
             }`}
           >
             {t}

@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <header className="flex items-center justify-end lg:hidden">
             <div className="flex items-center gap-2">
               {session.accountTier === "pilot" && (
-                <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 text-xs text-[var(--accent)]">
+                <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 text-xs text-[var(--accent-text)]">
                   Pilot program
                 </span>
               )}

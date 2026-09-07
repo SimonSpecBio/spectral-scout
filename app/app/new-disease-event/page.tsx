@@ -20,7 +20,7 @@ export default async function NewDiseaseEventPage({
         <h1 className="text-2xl font-semibold">New disease event</h1>
         <div className="card p-6 text-[var(--text-dim)]">
           No sites yet.{" "}
-          <Link href="/app/facilities" className="text-[var(--accent)]">
+          <Link href="/app/facilities" className="text-[var(--accent-text)]">
             Add your first site
           </Link>{" "}
           first.

@@ -30,7 +30,7 @@ export default async function TrapsPage({
         <h1 className="text-2xl font-semibold">Sticky traps</h1>
         <div className="card p-6 text-[var(--text-dim)]">
           No sites yet.{" "}
-          <Link href="/app/facilities" className="text-[var(--accent)]">
+          <Link href="/app/facilities" className="text-[var(--accent-text)]">
             Add your first site
           </Link>{" "}
           first.
@@ -60,7 +60,7 @@ export default async function TrapsPage({
         <h1 className="text-2xl font-semibold">Sticky traps</h1>
         <Link
           href={`/app/new-trap?facility=${selectedFacility.id}${selectedArea ? `&area=${selectedArea.id}` : ""}`}
-          className="text-sm text-[var(--accent)]"
+          className="text-sm text-[var(--accent-text)]"
         >
           + Add trap
         </Link>
@@ -113,7 +113,7 @@ export default async function TrapsPage({
           <div className="label-mono">Mean/day</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-medium" style={{ color: overCount > 0 ? "var(--accent)" : undefined }}>
+          <div className="text-lg font-medium" style={{ color: overCount > 0 ? "var(--accent-text)" : undefined }}>
             {overCount}
           </div>
           <div className="label-mono">Over</div>
@@ -125,7 +125,7 @@ export default async function TrapsPage({
           No traps yet.{" "}
           <Link
             href={`/app/new-trap?facility=${selectedFacility.id}${selectedArea ? `&area=${selectedArea.id}` : ""}`}
-            className="text-[var(--accent)]"
+            className="text-[var(--accent-text)]"
           >
             Add your first trap
           </Link>

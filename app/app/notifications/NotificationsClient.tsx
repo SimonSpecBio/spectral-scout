@@ -96,7 +96,7 @@ export default function NotificationsClient({ notifications }: { notifications: 
     <>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Notifications</h1>
-        <button onClick={markAllRead} className="text-sm text-[var(--accent)]">
+        <button onClick={markAllRead} className="text-sm text-[var(--accent-text)]">
           Mark read
         </button>
       </div>

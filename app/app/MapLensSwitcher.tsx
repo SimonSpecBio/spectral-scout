@@ -130,7 +130,7 @@ export default function MapLensSwitcher({
           </select>
           <span className="pointer-events-none text-[8px] text-[var(--text-faint)]">▾</span>
         </div>
-        <Link href="/app/facilities" className="text-[10px] text-[var(--accent)]">
+        <Link href="/app/facilities" className="text-[10px] text-[var(--accent-text)]">
           + New site
         </Link>
       </div>

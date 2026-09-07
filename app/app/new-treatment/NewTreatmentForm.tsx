@@ -157,7 +157,7 @@ export default function NewTreatmentForm({
                 key={t}
                 onClick={() => setType(t)}
                 className={`flex-1 rounded-md border px-3 py-2 text-sm ${
-                  type === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                  type === t ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
                 }`}
               >
                 {displayNameForTreatmentType(t)}

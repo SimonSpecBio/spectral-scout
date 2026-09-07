@@ -27,8 +27,11 @@
   --on-accent: #082336;
   /* Darker shade of the same brand hue, for text/links on light surfaces
      where raw --accent fails contrast (used instead of --accent for body
-     text, never for fills/buttons). */
-  --accent-text: #0b84c4;
+     text, never for fills/buttons). Was #0b84c4 -- measured 4.11:1 against
+     --surface, just under WCAG AA's 4.5:1 for normal text, discovered while
+     actually wiring this token up to its 67 call sites for the first time
+     (Airtable ticket recfKUAhJnQARzMk1). Darkened to clear it with margin. */
+  --accent-text: #086fa3;
   /* Tinted pill/badge background for accent-colored counts (the dashboard's
      "N ALERTS" badge) -- per the mockup, routine "needs attention" flags
      stay brand blue, not red. */

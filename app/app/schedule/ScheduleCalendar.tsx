@@ -103,7 +103,7 @@ export default function ScheduleCalendar({
     <div className="mx-auto flex w-full max-w-md flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Schedule</h1>
-        <Link href="/app/schedule/new" className="text-sm text-[var(--accent)]">
+        <Link href="/app/schedule/new" className="text-sm text-[var(--accent-text)]">
           + Assign
         </Link>
       </div>

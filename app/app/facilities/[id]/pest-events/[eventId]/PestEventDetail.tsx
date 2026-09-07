@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
-import { SEVERITIES, SEVERITY_COLOR, type Severity } from "@/lib/colors";
+import { SEVERITIES, SEVERITY_COLOR, SEVERITY_TEXT_COLOR, type Severity } from "@/lib/colors";
 import { queuedFetch, queuedFileFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
@@ -674,7 +674,7 @@ export default function PestEventDetail({
               setSeverityNote("");
             }}
             className="rounded-md border px-3 py-1.5 text-sm"
-            style={{ borderColor: SEVERITY_COLOR[severity], color: SEVERITY_COLOR[severity] }}
+            style={{ borderColor: SEVERITY_TEXT_COLOR[severity], color: SEVERITY_TEXT_COLOR[severity] }}
           >
             {/* "Severe severity" reads redundantly -- only append the word
                 "severity" for the non-severe levels (ticket feedback,
@@ -696,7 +696,7 @@ export default function PestEventDetail({
           <button
             onClick={() => (status === "active" ? setShowResolveConfirm((v) => !v) : toggleStatus())}
             className={`rounded-md border px-3 py-1.5 text-sm ${
-              status === "active" ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+              status === "active" ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
             }`}
           >
             {status === "active" ? "Mark resolved" : "Reopen"}
@@ -754,8 +754,8 @@ export default function PestEventDetail({
                 onClick={() => setPendingSeverity(s)}
                 className="flex-1 rounded-md border px-3 py-1.5 text-sm capitalize"
                 style={{
-                  borderColor: pendingSeverity === s ? SEVERITY_COLOR[s] : "var(--border)",
-                  color: pendingSeverity === s ? SEVERITY_COLOR[s] : "var(--text-dim)",
+                  borderColor: pendingSeverity === s ? SEVERITY_TEXT_COLOR[s] : "var(--border)",
+                  color: pendingSeverity === s ? SEVERITY_TEXT_COLOR[s] : "var(--text-dim)",
                 }}
               >
                 {s}
@@ -934,7 +934,7 @@ export default function PestEventDetail({
             <button
               onClick={submitEscalation}
               disabled={escalating}
-              className="rounded-md border border-[var(--accent)] px-3 py-1.5 text-sm text-[var(--accent)] disabled:opacity-50"
+              className="rounded-md border border-[var(--accent-text)] px-3 py-1.5 text-sm text-[var(--accent-text)] disabled:opacity-50"
             >
               {escalating ? "Sending…" : "Send to Spectral"}
             </button>
@@ -1033,7 +1033,7 @@ export default function PestEventDetail({
             </div>
           ))}
           {mapHref && (
-            <Link href={mapHref} className="px-4 py-3 text-sm text-[var(--accent)]">
+            <Link href={mapHref} className="px-4 py-3 text-sm text-[var(--accent-text)]">
               View on site map →
             </Link>
           )}
@@ -1066,7 +1066,7 @@ export default function PestEventDetail({
                   key={t}
                   onClick={() => setTreatmentType(t)}
                   className={`rounded-md border px-3 py-1.5 text-sm ${
-                    treatmentType === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                    treatmentType === t ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
                   }`}
                 >
                   {displayNameForTreatmentType(t)}

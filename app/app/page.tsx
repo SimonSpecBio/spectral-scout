@@ -166,7 +166,7 @@ export default async function HomePage({
         <h1 className="text-2xl font-semibold">Spectral Scout</h1>
         <div className="card p-6 text-[var(--text-dim)]">
           No sites yet.{" "}
-          <Link href="/app/facilities" className="text-[var(--accent)]">
+          <Link href="/app/facilities" className="text-[var(--accent-text)]">
             Add your first site
           </Link>{" "}
           to start scouting.
@@ -378,7 +378,7 @@ export default async function HomePage({
       {orgFacilities.length > 1 ? (
           <div className="flex min-w-0 flex-col gap-2">
             {facilitiesNeedingAttention > 0 && (
-              <span className="label-mono whitespace-nowrap" style={{ color: "var(--accent)" }}>
+              <span className="label-mono whitespace-nowrap" style={{ color: "var(--accent-text)" }}>
                 {facilitiesNeedingAttention === orgFacilities.length
                   ? "All sites need attention"
                   : `${facilitiesNeedingAttention} of ${orgFacilities.length} sites need attention`}
@@ -429,7 +429,7 @@ export default async function HomePage({
       {facilityEvents.length === 0 ? (
         <Link href="/app/preventive" className="card flex items-center justify-between gap-3 p-4 text-sm">
           <span>New here? See a preventive starter checklist before your first pest shows up.</span>
-          <span className="shrink-0 text-[var(--accent)]">View →</span>
+          <span className="shrink-0 text-[var(--accent-text)]">View →</span>
         </Link>
       ) : (
         (outbreaksThisWeek > 0 || outbreaksLastWeek > 0) && (
@@ -458,7 +458,7 @@ export default async function HomePage({
         {facilityActive.length} active hotspot
         {facilityActive.length === 1 ? "" : "s"} at {selectedFacility.name}
       </span>
-      <span className="shrink-0 text-[var(--accent)]">View map →</span>
+      <span className="shrink-0 text-[var(--accent-text)]">View map →</span>
     </Link>
   );
 
@@ -602,7 +602,7 @@ export default async function HomePage({
     <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <span className="label-mono">Today&apos;s tasks</span>
-          <Link href="/app/schedule" className="text-xs text-[var(--accent)]">
+          <Link href="/app/schedule" className="text-xs text-[var(--accent-text)]">
             Schedule →
           </Link>
         </div>
@@ -617,9 +617,18 @@ export default async function HomePage({
                     className="h-4 w-4 shrink-0 rounded border"
                     style={{ borderColor: taskUrgency(row.task) === "overdue" ? "var(--accent)" : "var(--text-faint)" }}
                   />
-                  <span className="text-sm" style={taskUrgency(row.task) === "overdue" ? { color: "var(--accent)" } : undefined}>
+                  {/* Overdue used to be color-only (var(--accent) text, nothing
+                      else) -- invisible to a colorblind grower regardless of
+                      contrast (Airtable ticket recfKUAhJnQARzMk1). Bold weight
+                      plus an explicit label carries the same signal without
+                      relying on color at all. */}
+                  <span
+                    className={`text-sm ${taskUrgency(row.task) === "overdue" ? "font-semibold" : ""}`}
+                    style={taskUrgency(row.task) === "overdue" ? { color: "var(--accent-text)" } : undefined}
+                  >
                     {row.task.title}
                   </span>
+                  {taskUrgency(row.task) === "overdue" && <span className="label-mono shrink-0 text-[var(--text-faint)]">OVERDUE</span>}
                 </Link>
               ) : (
                 <Link key={row.key} href={`/app/facilities/${row.event.facilityId}/pest-events/${row.event.id}`} className="flex items-center gap-3">
@@ -647,7 +656,7 @@ export default async function HomePage({
     <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <span className="label-mono">Recent activity</span>
-          <Link href="/app/timeline" className="text-xs text-[var(--accent)]">
+          <Link href="/app/timeline" className="text-xs text-[var(--accent-text)]">
             View all →
           </Link>
         </div>
@@ -694,7 +703,7 @@ export default async function HomePage({
               <span className="font-medium">Should I worry?</span>
               <span className="block text-xs text-[var(--text-dim)]">Answer a few quick questions about what you&rsquo;re seeing</span>
             </span>
-            <span className="text-[var(--accent)]">&rarr;</span>
+            <span className="text-[var(--accent-text)]">&rarr;</span>
           </Link>
         )}
         {isScout ? (

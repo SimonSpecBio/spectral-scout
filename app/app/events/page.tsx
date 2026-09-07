@@ -2,7 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { facilities, facilityAreas, pestEvents } from "@/db/schema";
-import { SEVERITY_COLOR } from "@/lib/colors";
+import { SEVERITY_COLOR, SEVERITY_TEXT_COLOR } from "@/lib/colors";
 import { requireGrowerSession } from "@/lib/session";
 import { displayNameForPestSpecies } from "@/lib/treatments-catalog";
 
@@ -106,7 +106,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
               <div className="flex items-center gap-3 text-xs text-[var(--text-dim)]">
                 <span className="capitalize">{e.status}</span>
                 <span>{daysOpen(e.createdAt, e.resolvedAt)}d</span>
-                <span className="badge capitalize" style={{ background: `${SEVERITY_COLOR[e.severity]}33`, color: SEVERITY_COLOR[e.severity] }}>
+                <span className="badge capitalize" style={{ background: `${SEVERITY_COLOR[e.severity]}33`, color: SEVERITY_TEXT_COLOR[e.severity] }}>
                   {e.severity}
                 </span>
               </div>

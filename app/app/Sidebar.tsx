@@ -39,7 +39,7 @@ export default function Sidebar({ email, isPilot }: { email: string | null | und
         <div>
           <div className="font-semibold">Spectral Scout</div>
           {isPilot && (
-            <span className="mt-1 inline-block rounded-full bg-[var(--accent)]/20 px-2 py-0.5 text-xs text-[var(--accent)]">
+            <span className="mt-1 inline-block rounded-full bg-[var(--accent)]/20 px-2 py-0.5 text-xs text-[var(--accent-text)]">
               Pilot program
             </span>
           )}

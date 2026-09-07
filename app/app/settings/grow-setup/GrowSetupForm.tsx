@@ -62,7 +62,7 @@ export default function GrowSetupForm({
               type="button"
               onClick={() => setGrowerType(growerType === t ? null : t)}
               className={`rounded-md border px-3 py-2 text-left text-sm ${
-                growerType === t ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+                growerType === t ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
               }`}
             >
               {GROWER_TYPE_LABEL[t]}
@@ -72,7 +72,7 @@ export default function GrowSetupForm({
             type="button"
             onClick={() => setGrowerType(growerType === "commercial" ? null : "commercial")}
             className={`rounded-md border px-3 py-2 text-left text-sm ${
-              growerType === "commercial" ? "border-[var(--accent)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--text-dim)]"
+              growerType === "commercial" ? "border-[var(--accent-text)] text-[var(--accent-text)]" : "border-[var(--border)] text-[var(--text-dim)]"
             }`}
           >
             {GROWER_TYPE_LABEL.commercial}

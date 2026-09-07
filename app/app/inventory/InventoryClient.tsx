@@ -200,7 +200,7 @@ export default function InventoryClient({ initialItems, initialOrders }: { initi
                                   {o.totalCost != null ? ` · $${o.totalCost.toFixed(2)}` : ""}
                                   {o.supplierContact ? ` · ${o.supplierContact}` : ""}
                                 </span>
-                                <button onClick={() => receiveOrder(item.id, o.id)} className="text-[var(--accent)]">
+                                <button onClick={() => receiveOrder(item.id, o.id)} className="text-[var(--accent-text)]">
                                   Mark received
                                 </button>
                               </div>
@@ -249,7 +249,7 @@ function UnitCostRow({ item, onSave }: { item: Item; onSave: (cost: number | nul
     return (
       <button onClick={() => setEditing(true)} className="flex items-center justify-between text-xs text-[var(--text-dim)]">
         <span>Cost per {item.unit}</span>
-        <span className="text-[var(--accent)]">{item.unitCost != null ? `$${item.unitCost.toFixed(2)}` : "Set cost"}</span>
+        <span className="text-[var(--accent-text)]">{item.unitCost != null ? `$${item.unitCost.toFixed(2)}` : "Set cost"}</span>
       </button>
     );
   }
@@ -470,7 +470,7 @@ function AddFromCatalog({
             ))}
           </div>
         )}
-        <button onClick={() => setCustom(true)} className="self-start text-xs text-[var(--accent)]">
+        <button onClick={() => setCustom(true)} className="self-start text-xs text-[var(--accent-text)]">
           Add a custom item instead
         </button>
       </div>

@@ -203,7 +203,7 @@ export default function MonitoringFlow({
               <div key={p} className="flex flex-col gap-1 rounded-lg border border-[var(--border)] p-2">
                 <div className="flex items-center justify-between text-xs text-[var(--text-dim)]">
                   Plant {p + 1}
-                  {done && <span className="text-[var(--accent)]">✓</span>}
+                  {done && <span className="text-[var(--accent-text)]">✓</span>}
                 </div>
                 {leaves.map((s, l) => (
                   <button
