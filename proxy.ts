@@ -77,7 +77,13 @@ function cspHeaderFor(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https://*.public.blob.vercel-storage.com",
     "font-src 'self'",
-    "connect-src 'self'",
+    // Sentry's ingest endpoint (Phase 0.2b, build-cycle doc 2026-09-07) --
+    // without this, the browser silently drops every client-side error
+    // report instead of sending it, since instrumentation-client.ts's
+    // Sentry.init() calls fetch/sendBeacon straight to this host, not
+    // through a same-origin route. Host is fixed per Sentry org, matches
+    // the DSN in SENTRY_DSN/NEXT_PUBLIC_SENTRY_DSN.
+    "connect-src 'self' https://o4512047240839168.ingest.us.sentry.io",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
