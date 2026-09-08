@@ -85,6 +85,9 @@ interface MonitoringSession {
   // large-jump detector (lib/case-cta.ts) as its own dimension.
   severityPct: number | null;
   assessmentType: "pest_count" | "disease_severity";
+  // Never actually null (submittedByUserId is not-null) -- typed nullable
+  // only for the same since-deleted-account safety net as loggedBy/etc.
+  submittedBy: string | null;
 }
 
 interface Event {
@@ -612,9 +615,28 @@ export default function PestEventDetail({
     setUploading(false);
   }
 
+  // Phase 1.6 (build-cycle doc, 2026-09-07): "chronological narrative, not
+  // every row as an equal panel" -- this was already the lead element on
+  // the page (a single merged, sorted list predating this phase), but it
+  // only ever combined detection/treatment/resolution. Folding monitoring
+  // sessions and comments into the same list, each carrying who did it
+  // where that's already tracked, turns it into the actual case story
+  // instead of a partial one. The detailed sections below (Treatments,
+  // Photos, Monitoring, Comments) stay as-is for full detail/editing --
+  // this doesn't replace them, it's the at-a-glance read above them.
   const timeline = [
     { label: event.loggedBy ? `Detected by ${event.loggedBy}` : "Detected", at: event.createdAt },
-    ...treatmentsList.map((t) => ({ label: `${displayNameForTreatmentType(t.type)} applied${t.product ? `: ${t.product}` : ""}`, at: t.appliedAt })),
+    ...treatmentsList.map((t) => ({
+      label: `${displayNameForTreatmentType(t.type)} applied${t.product ? `: ${t.product}` : ""}${t.loggedBy ? ` by ${t.loggedBy}` : ""}`,
+      at: t.appliedAt,
+    })),
+    ...initialMonitoring.map((s) => ({
+      label: `Monitoring logged: ${metricLabel({ kind: s.metricKind, value: s.value, severityPct: s.severityPct ?? undefined })}${
+        s.submittedBy ? ` by ${s.submittedBy}` : ""
+      }`,
+      at: s.date,
+    })),
+    ...comments.map((c) => ({ label: `Note${c.authorName ? ` from ${c.authorName}` : ""}: ${c.body}`, at: c.createdAt })),
     ...(event.resolvedAt ? [{ label: "Resolved", at: event.resolvedAt }] : []),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
@@ -1113,9 +1135,9 @@ export default function PestEventDetail({
         <h2 className="text-lg font-semibold">Timeline</h2>
         <div className="card flex flex-col divide-y divide-[var(--border)]">
           {timeline.map((item, i) => (
-            <div key={i} className="flex items-center justify-between px-4 py-3 text-sm capitalize">
-              <span>{item.label}</span>
-              <span className="text-[var(--text-dim)]">
+            <div key={i} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+              <span className="min-w-0 truncate">{item.label}</span>
+              <span className="shrink-0 text-[var(--text-dim)]">
                 <LocalDate date={item.at} format={(d) => d.toLocaleDateString()} />
               </span>
             </div>

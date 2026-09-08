@@ -88,9 +88,24 @@ export default async function PestEventPage({
     .from(observationPhotos)
     .leftJoin(authUsers, eq(observationPhotos.uploadedByUserId, authUsers.id))
     .where(eq(observationPhotos.pestEventId, eventId));
+  // Left-joined for the Phase 1.6 case-history timeline's attribution line
+  // -- submittedByUserId is not-null on every row, so unlike treatments/
+  // photos this is never expected to come back null in practice, but the
+  // join stays left in case a since-deleted account ever leaves one dangling.
   const monitoringSessions = await db
-    .select()
+    .select({
+      id: scoutingObservations.id,
+      date: scoutingObservations.date,
+      assessmentType: scoutingObservations.assessmentType,
+      sampleSize: scoutingObservations.sampleSize,
+      pestCount: scoutingObservations.pestCount,
+      leafGrid: scoutingObservations.leafGrid,
+      meanSeverityPct: scoutingObservations.meanSeverityPct,
+      submitterName: authUsers.name,
+      submitterEmail: authUsers.email,
+    })
     .from(scoutingObservations)
+    .leftJoin(authUsers, eq(scoutingObservations.submittedByUserId, authUsers.id))
     .where(eq(scoutingObservations.promotedPestEventId, eventId))
     .orderBy(desc(scoutingObservations.createdAt));
   const items = await db.select().from(inventoryItems).where(eq(inventoryItems.organizationId, session.organizationId!));
@@ -209,7 +224,17 @@ export default async function PestEventPage({
         initialMonitoring={monitoringSessions.flatMap((s) => {
           const metric = sessionMetric(s);
           return metric
-            ? [{ id: s.id, date: s.date, metricKind: metric.kind, value: metric.value, severityPct: metric.severityPct ?? null, assessmentType: s.assessmentType }]
+            ? [
+                {
+                  id: s.id,
+                  date: s.date,
+                  metricKind: metric.kind,
+                  value: metric.value,
+                  severityPct: metric.severityPct ?? null,
+                  assessmentType: s.assessmentType,
+                  submittedBy: s.submitterName ?? s.submitterEmail ?? null,
+                },
+              ]
             : [];
         })}
         inventoryItems={items.map((i) => ({
