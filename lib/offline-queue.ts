@@ -339,7 +339,7 @@ let flushing = false;
 // trigger is a session that expired while a scout worked offline for a
 // couple hours: every queued item would 401 on reconnect and the whole
 // queue vanished with the UI reporting success).
-function isRetryableStatus(status: number): boolean {
+export function isRetryableStatus(status: number): boolean {
   return status === 401 || status === 403 || status === 408 || status === 429 || status >= 500;
 }
 

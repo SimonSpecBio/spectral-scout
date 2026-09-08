@@ -23,6 +23,17 @@ const DAY_MS = 86_400_000;
 // an org with nothing but ordinary catalog products.
 const MIN_LOOKBACK_DAYS = 30;
 
+// Pure half of lookbackDaysFor below -- split out (Phase 0.3, build-cycle
+// doc 2026-09-07) so the actual decision math (does a 45-day PHI product
+// correctly widen past the 30-day floor?) has a unit test that doesn't need
+// a database. Never called with negative inputs in practice (phiDays/
+// reiHours are non-negative columns), but Math.max/ceil handle it sanely
+// either way.
+export function computeLookbackDays(maxPhiDays: number, maxReiHours: number): number {
+  const fromRei = Math.ceil(maxReiHours / 24);
+  return Math.max(MIN_LOOKBACK_DAYS, maxPhiDays, fromRei) + 1;
+}
+
 // Derives how far back a restriction can still be "live" from the actual
 // REI/PHI values in this org's inventory, rather than assuming the fixed
 // 30-day floor covers every product a grower might enter by hand
@@ -36,9 +47,27 @@ async function lookbackDaysFor(facilityId: string): Promise<number> {
     .select({ maxPhiDays: max(inventoryItems.phiDays), maxReiHours: max(inventoryItems.reiHours) })
     .from(inventoryItems)
     .where(eq(inventoryItems.organizationId, facility.organizationId));
-  const fromPhi = row?.maxPhiDays ?? 0;
-  const fromRei = Math.ceil((row?.maxReiHours ?? 0) / 24);
-  return Math.max(MIN_LOOKBACK_DAYS, fromPhi, fromRei) + 1;
+  return computeLookbackDays(row?.maxPhiDays ?? 0, row?.maxReiHours ?? 0);
+}
+
+// Pure half of the per-treatment REI/PHI window math inside computeRestrictions
+// below -- split out for the same reason as computeLookbackDays. A null
+// reiHours/phiDays (the product carries no restriction of that kind) must
+// produce a null end date and an inactive flag, never a false restriction.
+export function computeRestrictionWindow(
+  appliedAt: Date,
+  reiHours: number | null,
+  phiDays: number | null,
+  now: number = Date.now()
+): { reiEndsAt: Date | null; phiEndsAt: Date | null; reiActive: boolean; phiActive: boolean } {
+  const reiEndsAt = reiHours != null ? new Date(appliedAt.getTime() + reiHours * 3_600_000) : null;
+  const phiEndsAt = phiDays != null ? new Date(appliedAt.getTime() + phiDays * DAY_MS) : null;
+  return {
+    reiEndsAt,
+    phiEndsAt,
+    reiActive: !!reiEndsAt && reiEndsAt.getTime() > now,
+    phiActive: !!phiEndsAt && phiEndsAt.getTime() > now,
+  };
 }
 
 // bayKey (not the display label) is the actual join key app/api/tasks/
@@ -166,8 +195,7 @@ export async function computeRestrictions(facilityId: string): Promise<Restricti
     .map((r) => {
       const { treatment: t, item } = r;
       const location = locations.get(t.id)!;
-      const reiEndsAt = item.reiHours != null ? new Date(t.appliedAt.getTime() + item.reiHours * 3_600_000) : null;
-      const phiEndsAt = item.phiDays != null ? new Date(t.appliedAt.getTime() + item.phiDays * DAY_MS) : null;
+      const window = computeRestrictionWindow(t.appliedAt, item.reiHours, item.phiDays, now);
       return {
         treatmentId: t.id,
         bay: location.label,
@@ -177,10 +205,7 @@ export async function computeRestrictions(facilityId: string): Promise<Restricti
         appliedAt: t.appliedAt,
         reiHours: item.reiHours,
         phiDays: item.phiDays,
-        reiEndsAt,
-        phiEndsAt,
-        reiActive: !!reiEndsAt && reiEndsAt.getTime() > now,
-        phiActive: !!phiEndsAt && phiEndsAt.getTime() > now,
+        ...window,
       };
     });
 }
