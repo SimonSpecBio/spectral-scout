@@ -1,8 +1,13 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { facilities, facilityAreas, pestEvents, trapReadings, traps, trapThresholds } from "@/db/schema";
+import { facilities, facilityAreas, pestEvents, trapReadings, traps, trapThresholds, treatments } from "@/db/schema";
 import { bayLabel, nearestBay } from "@/lib/floorplan-bays";
 import { findPestProgram } from "@/lib/treatments-catalog";
+
+const DAY_MS = 86_400_000;
+function daysSince(at: Date, now: Date): number {
+  return Math.max(0, Math.floor((now.getTime() - at.getTime()) / DAY_MS));
+}
 
 // Falls back to this whenever an org hasn't configured a custom
 // catch/day threshold for a species AND the catalog has no sourced
@@ -127,7 +132,29 @@ export async function computeTrapAlerts(organizationId: string): Promise<TrapAle
 export interface TrapStatus {
   trap: { id: string; label: string; x: number; y: number; facilityAreaId: string };
   bayLabel: string;
-  latestReadings: { pestSpecies: string; catchPerDay: number; count: number; daysDeployed: number; at: Date; overThreshold: boolean }[];
+  latestReadings: {
+    pestSpecies: string;
+    catchPerDay: number;
+    count: number;
+    daysDeployed: number;
+    at: Date;
+    overThreshold: boolean;
+    threshold: number;
+    // Phase 2 (build-cycle doc, 2026-09-07): "previous, trend-if-enough,
+    // threshold, over/under" -- the SECOND-most-recent reading for this
+    // same species, for a plain before/after comparison. Null the first
+    // time a species is read at this trap; there's nothing to compare yet.
+    previousCatchPerDay: number | null;
+    daysSinceReading: number;
+    // Null when no event-scoped treatment has ever targeted this pest in
+    // this trap's area -- "context if cheap": only matches treatments tied
+    // to a Pest Event (whose area is already known with no zone/geometry
+    // resolution needed), not standalone Application Log entries with a
+    // dropped pin, which would need the heavier resolveBayLabels lookup
+    // lib/rei-phi.ts uses. A real gap for the minority of areas that only
+    // ever get standalone releases, accepted for this pass.
+    daysSinceTreatment: number | null;
+  }[];
   history: number[]; // catch/day for the trap's single most-recently-read species, oldest to newest, for a sparkline
   overThreshold: boolean;
 }
@@ -156,21 +183,51 @@ export async function computeTrapStatuses(facilityId: string): Promise<TrapStatu
   const thresholdBySpecies = new Map(thresholdRows.map((t) => [t.pestSpecies.toLowerCase(), t.catchPerDayThreshold]));
   const thresholdFor = (species: string) => catchPerDayThresholdFor(species, thresholdBySpecies);
   const catchPerDay = (r: { count: number; daysDeployed: number }) => (r.daysDeployed > 0 ? r.count / r.daysDeployed : r.count);
+  const now = new Date();
+
+  // "Days since treatment" (Phase 2's "context if cheap") -- only
+  // event-scoped treatments, whose area is already known via their pest
+  // event with no zone/geometry resolution needed (see the TrapStatus
+  // comment above on why standalone Application Log entries are skipped).
+  // targetPest is reliably populated even when a grower didn't type one --
+  // the treatment POST route defaults it to the event's own pestSpecies.
+  const areaTreatments = await db
+    .select({ facilityAreaId: pestEvents.facilityAreaId, targetPest: treatments.targetPest, appliedAt: treatments.appliedAt })
+    .from(treatments)
+    .innerJoin(pestEvents, eq(treatments.pestEventId, pestEvents.id))
+    .where(eq(pestEvents.facilityId, facilityId));
+  const lastTreatmentByAreaSpecies = new Map<string, Date>();
+  for (const t of areaTreatments) {
+    if (!t.facilityAreaId || !t.targetPest) continue;
+    const key = `${t.facilityAreaId}::${t.targetPest.toLowerCase()}`;
+    const existing = lastTreatmentByAreaSpecies.get(key);
+    if (!existing || t.appliedAt > existing) lastTreatmentByAreaSpecies.set(key, t.appliedAt);
+  }
 
   return facilityTraps.map((trap) => {
     const readings = readingsByTrap.get(trap.id) ?? [];
-    const latestBySpecies = new Map<string, (typeof readings)[number]>();
+    // All readings for the trap, grouped by species but each group still
+    // newest-first (readings itself already is) -- [0] is "latest," [1]
+    // is "previous," same reading this trap logged last time for this pest.
+    const readingsBySpecies = new Map<string, typeof readings>();
     for (const r of readings) {
       const key = r.pestSpecies.toLowerCase();
-      if (!latestBySpecies.has(key)) latestBySpecies.set(key, r);
+      readingsBySpecies.set(key, [...(readingsBySpecies.get(key) ?? []), r]);
     }
-    const latestReadings = [...latestBySpecies.values()].map((r) => ({
+    const latestReadings = [...readingsBySpecies.values()].map(([r, prev]) => ({
       pestSpecies: r.pestSpecies,
       catchPerDay: catchPerDay(r),
       count: r.count,
       daysDeployed: r.daysDeployed,
       at: r.createdAt,
       overThreshold: catchPerDay(r) >= thresholdFor(r.pestSpecies),
+      threshold: thresholdFor(r.pestSpecies),
+      previousCatchPerDay: prev ? catchPerDay(prev) : null,
+      daysSinceReading: daysSince(r.createdAt, now),
+      daysSinceTreatment: (() => {
+        const appliedAt = lastTreatmentByAreaSpecies.get(`${trap.facilityAreaId}::${r.pestSpecies.toLowerCase()}`);
+        return appliedAt ? daysSince(appliedAt, now) : null;
+      })(),
     }));
 
     const mostRecentSpecies = readings[0]?.pestSpecies.toLowerCase() ?? null;

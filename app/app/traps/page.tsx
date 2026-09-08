@@ -164,12 +164,24 @@ export default async function TrapsPage({
                     <div className="label-mono">/DAY</div>
                   </div>
                 </Link>
+                {latest && (
+                  // Phase 2 (build-cycle doc, 2026-09-07): "previous, trend-
+                  // if-enough, threshold, over/under" plus "context if
+                  // cheap" -- a plain before/after and the actual threshold
+                  // number, not just a colored dot, so over/under means
+                  // something without opening the reading itself.
+                  <div className="px-3.5 pb-2 text-xs text-[var(--text-faint)]">
+                    {latest.previousCatchPerDay != null && `was ${latest.previousCatchPerDay.toFixed(1)}/day · `}
+                    threshold {latest.threshold}/day ({latest.overThreshold ? "over" : "under"}) · {latest.daysSinceReading}d since reading
+                    {latest.daysSinceTreatment != null && ` · treated ${latest.daysSinceTreatment}d ago`}
+                  </div>
+                )}
                 {alert && (
                   <Link
                     href={
                       alert.dedupedIntoEventId
                         ? `/app/facilities/${selectedFacility.id}/pest-events/${alert.dedupedIntoEventId}`
-                        : `/app/new-event?facility=${selectedFacility.id}&area=${s.trap.facilityAreaId}`
+                        : `/app/new-event?facility=${selectedFacility.id}&area=${s.trap.facilityAreaId}&species=${encodeURIComponent(alert.pestSpecies)}`
                     }
                     className="mx-3.5 mb-3.5 flex items-center justify-between rounded-lg px-3 py-2 text-xs"
                     style={{ background: "var(--danger-bg)" }}
