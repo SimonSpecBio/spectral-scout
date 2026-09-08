@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatCaseId } from "@/lib/case-id";
 import { getOrgLogEntries, KIND_COLOR } from "@/lib/logs";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -92,7 +93,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
                           {e.at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true })} · {e.sub}
                         </div>
                       </div>
-                      {e.eventId && <span className="label-mono text-[var(--text-faint)]">PE-{e.eventId.slice(0, 4).toUpperCase()}</span>}
+                      {e.eventId && <span className="label-mono text-[var(--text-faint)]">{formatCaseId(e.caseNumber ?? null, e.eventId)}</span>}
                     </div>
                   </div>
                 );

@@ -6,6 +6,7 @@ import { capturedDateOrToday } from "@/lib/captured-date";
 import { locationLabel } from "@/lib/floorplan-bays";
 import { getOwnedFacility } from "@/lib/facilities";
 import { insertScoutingObservation, parseMonitoringPayload } from "@/lib/monitoring";
+import { assignCaseNumber } from "@/lib/pest-events";
 import { notifyTaskAssigned } from "@/lib/push";
 import { requireGrowerSession } from "@/lib/session";
 import { assignLeastLoadedWorker } from "@/lib/tasks";
@@ -116,36 +117,45 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // this returns nothing and the row is fetched below instead of erroring.
   // Only applies once an area is actually known; a pin-less event (no
   // facilityAreaId) has nothing to dedupe against.
-  let row: typeof pestEvents.$inferSelect;
-  let isNewCase: boolean;
-  if (facilityAreaId) {
-    const [inserted] = await db
-      .insert(pestEvents)
-      .values({
-        facilityId: id,
-        facilityAreaId,
-        mapObjectId,
-        x: typeof body.x === "number" ? body.x : null,
-        y: typeof body.y === "number" ? body.y : null,
-        spanPositions: spanPositions?.length ? spanPositions : null,
-        clientRequestId,
-        kind,
-        pestSpecies,
-        scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,
-        severity,
-        notes: typeof body.notes === "string" && body.notes ? body.notes : null,
-        createdByUserId: session.user!.id!,
-      })
-      .onConflictDoNothing({
-        target: [pestEvents.facilityAreaId, pestEvents.pestSpecies],
-        where: eq(pestEvents.status, "active"),
-      })
-      .returning();
-    if (inserted) {
-      row = inserted;
-      isNewCase = true;
-    } else {
-      const [existing] = await db
+  // Case number assignment (Phase 1.7) shares a transaction with the
+  // insert it's for -- assignCaseNumber's counter increment and this row's
+  // creation commit or roll back together, so a failed insert (a
+  // constraint violation, an aborted request) can never burn a number
+  // with nothing behind it.
+  const { row, isNewCase } = await db.transaction(async (tx) => {
+    if (facilityAreaId) {
+      const caseNumber = await assignCaseNumber(tx, session.organizationId!);
+      const [inserted] = await tx
+        .insert(pestEvents)
+        .values({
+          facilityId: id,
+          facilityAreaId,
+          mapObjectId,
+          caseNumber,
+          x: typeof body.x === "number" ? body.x : null,
+          y: typeof body.y === "number" ? body.y : null,
+          spanPositions: spanPositions?.length ? spanPositions : null,
+          clientRequestId,
+          kind,
+          pestSpecies,
+          scientificName: typeof body.scientificName === "string" && body.scientificName ? body.scientificName : null,
+          severity,
+          notes: typeof body.notes === "string" && body.notes ? body.notes : null,
+          createdByUserId: session.user!.id!,
+        })
+        .onConflictDoNothing({
+          target: [pestEvents.facilityAreaId, pestEvents.pestSpecies],
+          where: eq(pestEvents.status, "active"),
+        })
+        .returning();
+      if (inserted) {
+        return { row: inserted, isNewCase: true };
+      }
+      // Conflict: a concurrent request already won the open-case slot --
+      // the case number assigned above goes unused (a gap in the sequence,
+      // not a collision) rather than being un-incremented, same tradeoff
+      // apply-treatment.ts's stock decrement already accepts elsewhere.
+      const [existing] = await tx
         .select()
         .from(pestEvents)
         .where(
@@ -155,16 +165,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             eq(pestEvents.status, "active")
           )
         );
-      row = existing;
-      isNewCase = false;
+      return { row: existing, isNewCase: false };
     }
-  } else {
-    [row] = await db
+    const caseNumber = await assignCaseNumber(tx, session.organizationId!);
+    const [inserted] = await tx
       .insert(pestEvents)
       .values({
         facilityId: id,
         facilityAreaId,
         mapObjectId,
+        caseNumber,
         x: typeof body.x === "number" ? body.x : null,
         y: typeof body.y === "number" ? body.y : null,
         spanPositions: spanPositions?.length ? spanPositions : null,
@@ -177,8 +187,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         createdByUserId: session.user!.id!,
       })
       .returning();
-    isNewCase = true;
-  }
+    return { row: inserted, isNewCase: true };
+  });
 
   // An initial assessment (e.g. the disease-event form's leaf-severity grid)
   // taken at creation time, folded into this same request instead of a

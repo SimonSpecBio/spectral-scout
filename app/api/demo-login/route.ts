@@ -17,6 +17,7 @@ import {
 import { CURRENT_CONSENT_VERSION } from "@/lib/consent";
 import { DEMO_MANAGER_EMAIL, DEMO_QUERY_PARAM, DEMO_SCOUT_EMAIL, DEMO_SESSION_MAX_AGE_MS } from "@/lib/demo-account";
 import { grid2d } from "@/lib/layout-presets";
+import { assignCaseNumber } from "@/lib/pest-events";
 
 // Best-effort, in-memory, per-IP -- same "doesn't survive a cold start,
 // stops a scripted hammering loop" tradeoff as lib/rate-limit.ts's
@@ -171,6 +172,7 @@ async function ensureDemoFacility(organizationId: string, userId: string): Promi
         facilityId: facility.id,
         facilityAreaId: area.id,
         mapObjectId: objects[0].id,
+        caseNumber: await assignCaseNumber(tx, organizationId),
         x: 99,
         y: 40,
         kind: "pest",
@@ -184,6 +186,7 @@ async function ensureDemoFacility(organizationId: string, userId: string): Promi
       facilityId: facility.id,
       facilityAreaId: area.id,
       mapObjectId: objects[2].id,
+      caseNumber: await assignCaseNumber(tx, organizationId),
       x: 99,
       y: 96,
       kind: "pest",
@@ -196,6 +199,7 @@ async function ensureDemoFacility(organizationId: string, userId: string): Promi
       facilityId: facility.id,
       facilityAreaId: area.id,
       mapObjectId: objects[5].id,
+      caseNumber: await assignCaseNumber(tx, organizationId),
       x: 223,
       y: 68,
       kind: "pathogen",

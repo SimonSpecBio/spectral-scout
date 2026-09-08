@@ -85,6 +85,14 @@ export const organizations = pgTable("scout_organization", {
   // ft tent", "~200 sq ft"), same "real data, not forced precision"
   // approach as inventoryItems.unitCost.
   growSizeLabel: text("grow_size_label"),
+  // Phase 1.7 (build-cycle doc, 2026-09-07): the next org-scoped sequential
+  // number to hand out for a pest event's human-readable CASE-NNNNNN id
+  // (lib/pest-events.ts's assignCaseNumber). Incremented atomically via a
+  // single UPDATE...RETURNING (same race-safe pattern as
+  // lib/apply-treatment.ts's inventory decrement), inside the same
+  // transaction as the pestEvents insert it's for. Starts at 1 for a new
+  // org; existing orgs were backfilled from their real event history.
+  nextCaseNumber: integer("next_case_number").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
@@ -341,6 +349,16 @@ export const pestEvents = pgTable(
     // every NULL as distinct from every other NULL, so this imposes no
     // constraint at all on a row that never went through the queue.
     clientRequestId: text("client_request_id").unique(),
+    // Phase 1.7 (build-cycle doc, 2026-09-07): org-scoped sequential id for
+    // talk/UI/export/support -- displayed as CASE-NNNNNN
+    // (lib/pest-events.ts's formatCaseId). Replaces the old PE-{uuid.slice}
+    // display, which looked like a case number but wasn't sequential,
+    // wasn't searchable anywhere, and collided at roughly 1 in 65k within
+    // an org. Nullable only because a handful of pre-existing rows predate
+    // this column and a one-time backfill assigns them a real number after
+    // the fact in creation order -- every event created going forward
+    // always gets one atomically at insert time (assignCaseNumber).
+    caseNumber: integer("case_number"),
     x: numeric("x", { mode: "number" }),
     y: numeric("y", { mode: "number" }),
     // Extra canvas-space points beyond x/y, for an outbreak that spans more

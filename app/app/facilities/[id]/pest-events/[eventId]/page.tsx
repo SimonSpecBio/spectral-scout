@@ -146,6 +146,7 @@ export default async function PestEventPage({
         facilityId={id}
         event={{
           id: event.id,
+          caseNumber: event.caseNumber,
           kind: event.kind,
           pestSpecies: event.pestSpecies,
           scientificName: event.scientificName,

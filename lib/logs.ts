@@ -21,9 +21,11 @@ export interface LogEntry {
   label: string;
   sub: string;
   // Set only for entries tied to one Pest/Disease Event -- Timeline (19)
-  // links out to it and shows the PE-### code; Logs (13) doesn't use these.
+  // links out to it and shows the CASE-###### code (lib/case-id.ts's
+  // formatCaseId); Logs (13) doesn't use these.
   facilityId?: string;
   eventId?: string;
+  caseNumber?: number | null;
 }
 
 // A filterable, bay-keyed chronological record (13_logs_history.svg) --
@@ -77,6 +79,7 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
       sub: loc.toUpperCase(),
       facilityId: e.facilityId,
       eventId: e.id,
+      caseNumber: e.caseNumber,
     });
     if (e.resolvedAt) {
       entries.push({
@@ -86,6 +89,7 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
         sub: loc.toUpperCase(),
         facilityId: e.facilityId,
         eventId: e.id,
+        caseNumber: e.caseNumber,
       });
     }
   }
@@ -104,6 +108,7 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
       // routine sessions don't, and Timeline's own href logic falls back to
       // the facility page whenever eventId is absent.
       eventId: s.promotedPestEventId ?? undefined,
+      caseNumber: s.promotedPestEventId ? (eventById.get(s.promotedPestEventId)?.caseNumber ?? null) : null,
     });
   }
 
@@ -117,6 +122,7 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
       sub: (loc ?? "").toUpperCase(),
       facilityId: t.facilityId,
       eventId: t.pestEventId ?? undefined,
+      caseNumber: event?.caseNumber ?? null,
     });
   }
 

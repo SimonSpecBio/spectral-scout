@@ -1,7 +1,23 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { pestEvents, tasks } from "@/db/schema";
+import { organizations, pestEvents, tasks } from "@/db/schema";
 import { getOwnedFacility } from "@/lib/facilities";
+
+// Atomic per-org sequential number -- a single UPDATE...RETURNING is
+// atomic under Postgres's own row-level locking (same race-safe pattern
+// as lib/apply-treatment.ts's inventory decrement), so two concurrent
+// event creations for the same org can never receive the same number.
+// Callers pass the transaction they're already inserting the pest event
+// in, not the top-level `db`, so the number and the row it's for commit
+// or roll back together.
+export async function assignCaseNumber(tx: { update: typeof db.update }, organizationId: string): Promise<number> {
+  const [row] = await tx
+    .update(organizations)
+    .set({ nextCaseNumber: sql`${organizations.nextCaseNumber} + 1` })
+    .where(eq(organizations.id, organizationId))
+    .returning({ nextCaseNumber: organizations.nextCaseNumber });
+  return row.nextCaseNumber - 1;
+}
 
 // Shared by every route nested under a pest event (the event itself,
 // treatments, photos) -- confirms the event exists AND belongs to the

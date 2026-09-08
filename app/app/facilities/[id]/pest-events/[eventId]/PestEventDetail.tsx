@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { initialsFor } from "@/lib/avatar";
+import { formatCaseId } from "@/lib/case-id";
 import { SEVERITIES, SEVERITY_COLOR, SEVERITY_TEXT_COLOR, type Severity } from "@/lib/colors";
 import { queuedFetch, queuedFileFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
@@ -84,6 +85,10 @@ interface MonitoringSession {
 
 interface Event {
   id: string;
+  // Phase 1.7 (build-cycle doc, 2026-09-07): org-scoped sequential number
+  // for the CASE-###### display id (lib/case-id.ts's formatCaseId). null
+  // only for a handful of pre-backfill stragglers.
+  caseNumber: number | null;
   kind: "pest" | "pathogen";
   pestSpecies: string;
   scientificName: string | null;
@@ -650,6 +655,7 @@ export default function PestEventDetail({
               <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEVERITY_COLOR[severity] }} />
             </div>
             {event.scientificName && <div className="text-sm italic text-[var(--text-dim)]">{event.scientificName}</div>}
+            <div className="label-mono text-[var(--text-faint)]">{formatCaseId(event.caseNumber, event.id)}</div>
             <div className="text-sm text-[var(--text-dim)]">
               {locationLabel}
               {event.spanCount > 0 && (
