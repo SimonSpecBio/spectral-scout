@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BAYS } from "@/lib/floorplan-bays";
 
 const IDLE_FILL = "var(--idle-fill)";
@@ -10,6 +10,31 @@ const MAX_ZOOM = 2.5;
 function touchDistance(touches: React.TouchList): number {
   const [a, b] = [touches[0], touches[1]];
   return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+}
+
+// CSS-width zoom + pinch was never anchored to the pinch midpoint or the
+// scroll position, so on a phone it grew from the container's corner
+// instead of under the user's fingers, and once zoomed past 100% the SVG's
+// intrinsic aspect ratio (296x322) made the whole card grow tall enough to
+// need scrolling past the fold (Simon, live feedback, 2026-09-07: "the zoom
+// functionality is entirely fucked on phone ... makes the map super tall
+// on mobile and it doesnt zoom to where i pinch to" -- also asked twice to
+// remove the +/- control on mobile specifically). Rather than attempt a
+// pinch-anchored transform-origin fix under time pressure, zoom (buttons
+// and pinch both) is disabled below the desktop breakpoint entirely -- the
+// map always renders at a clean, fixed fit on mobile, no zoom state to get
+// stuck at 250% with no way back. Desktop keeps the existing button-driven
+// zoom (no pinch gesture to anchor there in the first place).
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    setIsDesktop(mq.matches);
+    const onChange = () => setIsDesktop(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return isDesktop;
 }
 
 // The shared bay-bar canvas underneath every dashboard map lens (Pests,
@@ -41,11 +66,15 @@ export default function BayBarMap({
   // MapEditor.tsx's Konva Stage already uses, just against this component's
   // plain CSS-width zoom instead of a canvas transform. Buttons stay as a
   // secondary control (mouse/trackpad, or a device pinch doesn't register).
+  const isDesktop = useIsDesktop();
   const [zoom, setZoom] = useState(1);
   const pinchState = useRef<{ distance: number; zoom: number } | null>(null);
+  // Fixed at 100% below the desktop breakpoint regardless of any zoom state
+  // left over from before the viewport shrank (e.g. rotating a tablet).
+  const effectiveZoom = isDesktop ? zoom : 1;
 
   function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
-    if (e.touches.length !== 2) {
+    if (!isDesktop || e.touches.length !== 2) {
       pinchState.current = null;
       return;
     }
@@ -72,25 +101,27 @@ export default function BayBarMap({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 self-end">
-        <button
-          type="button"
-          onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - 0.25))}
-          disabled={zoom <= MIN_ZOOM}
-          className="rounded-md border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-dim)] disabled:opacity-40"
-        >
-          −
-        </button>
-        <span className="label-mono w-8 text-center text-xs">{Math.round(zoom * 100)}%</span>
-        <button
-          type="button"
-          onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + 0.25))}
-          disabled={zoom >= MAX_ZOOM}
-          className="rounded-md border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-dim)] disabled:opacity-40"
-        >
-          +
-        </button>
-      </div>
+      {isDesktop && (
+        <div className="flex items-center gap-2 self-end">
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - 0.25))}
+            disabled={zoom <= MIN_ZOOM}
+            className="rounded-md border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-dim)] disabled:opacity-40"
+          >
+            −
+          </button>
+          <span className="label-mono w-8 text-center text-xs">{Math.round(zoom * 100)}%</span>
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + 0.25))}
+            disabled={zoom >= MAX_ZOOM}
+            className="rounded-md border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-dim)] disabled:opacity-40"
+          >
+            +
+          </button>
+        </div>
+      )}
       <div
         className="overflow-auto"
         style={{ background: "var(--map-canvas-bg)", borderRadius: "var(--radius-md)" }}
@@ -100,7 +131,7 @@ export default function BayBarMap({
         <svg
           viewBox="0 0 296 322"
           className="block"
-          style={{ width: `${zoom * 100}%`, minWidth: zoom === 1 ? "100%" : `${zoom * 100}%` }}
+          style={{ width: `${effectiveZoom * 100}%`, minWidth: effectiveZoom === 1 ? "100%" : `${effectiveZoom * 100}%` }}
         >
           <defs>
             <radialGradient id="heatGlow" cx="50%" cy="50%" r="50%">

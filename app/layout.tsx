@@ -30,9 +30,9 @@ export const metadata: Metadata = {
 };
 
 // Pinch/double-tap zoom is disabled app-wide (ticket C2) -- there's no
-// per-route override in App Router's viewport export, so MapEditor.tsx's
-// Konva Stage and BayBarMap.tsx's plain SVG each need their own JS-driven
-// zoom to make up for losing native pinch.
+// per-route override in App Router's viewport export, so MapEditor.tsx and
+// BayBarMap.tsx's plain SVG canvases each need their own JS-driven zoom to
+// make up for losing native pinch.
 export const viewport: Viewport = {
   themeColor: "#F6F4F0",
   width: "device-width",

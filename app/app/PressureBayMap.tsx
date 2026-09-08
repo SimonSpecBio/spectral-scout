@@ -119,11 +119,21 @@ export default function PressureBayMap({
   // on the main map there should automatically be a little dotted line and
   // arrow showing how the pest is spreading"). Grouped by species, sorted
   // chronologically, one arrow per consecutive step to a DIFFERENT bay --
-  // traces the path an outbreak actually walked over time, not every pair.
-  // Capped to the most recent MAX_CHAIN events per species so a pest with
-  // a long history in this area doesn't clutter the map with its entire
-  // past instead of its recent movement.
-  const MAX_CHAIN = 8;
+  // traces the path an outbreak actually walked, not every pair.
+  //
+  // Time-gated (MAX_GAP_DAYS), not just capped by count -- a real
+  // production account (Simon, live feedback, 2026-09-07: "these lines on
+  // the map seem totally random and not related to anything") had the same
+  // pest species recur independently across unrelated weeks-apart
+  // outbreaks in totally different bays (normal recurring-pest behavior,
+  // not one outbreak spreading), and connecting every historical
+  // recurrence read as arrows appearing "from nowhere." Same 7-day window
+  // as RECENTLY_TREATED_DAYS elsewhere in the app (MapEditor.tsx) for
+  // "recent enough to still be the same episode." A gap longer than that
+  // breaks the chain -- it doesn't stop a later, closely-timed pair from
+  // still connecting.
+  const MAX_GAP_DAYS = 7;
+  const MAX_GAP_MS = MAX_GAP_DAYS * 86_400_000;
   const bySpecies = new Map<string, SpreadHistoryEvent[]>();
   for (const ev of spreadHistoryEvents) {
     const list = bySpecies.get(ev.pestSpecies) ?? [];
@@ -133,18 +143,21 @@ export default function PressureBayMap({
   const spreadEdges: { x1: number; y1: number; x2: number; y2: number }[] = [];
   for (const evs of bySpecies.values()) {
     if (evs.length < 2) continue;
-    const sorted = [...evs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).slice(-MAX_CHAIN);
+    const sorted = [...evs].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     let prevKey: string | null = null;
     let prevCenter: { x: number; y: number } | null = null;
+    let prevTime: number | null = null;
     for (const ev of sorted) {
       const bay = nearestBay(ev.x, ev.y);
       const key = `${bay.row}${bay.index}`;
       const center = centerOf(bay);
-      if (prevKey && prevKey !== key && prevCenter) {
+      const time = new Date(ev.createdAt).getTime();
+      if (prevKey && prevKey !== key && prevCenter && prevTime != null && time - prevTime <= MAX_GAP_MS) {
         spreadEdges.push({ x1: prevCenter.x, y1: prevCenter.y, x2: center.x, y2: center.y });
       }
       prevKey = key;
       prevCenter = center;
+      prevTime = time;
     }
   }
 
