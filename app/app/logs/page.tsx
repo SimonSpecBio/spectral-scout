@@ -111,7 +111,10 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: KIND_COLOR[e.kind] }} />
                   <div className="flex-1">
                     <div className="text-sm">{e.label}</div>
-                    <div className="label-mono">{e.sub}</div>
+                    <div className="label-mono">
+                      {e.sub}
+                      {e.who && ` · ${e.who.toUpperCase()}`}
+                    </div>
                   </div>
                 </div>
               ))}

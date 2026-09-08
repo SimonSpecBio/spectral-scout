@@ -37,13 +37,17 @@ export async function GET(request: NextRequest) {
   // "include, carry the flag" was the doc's own decision on a stock-
   // discrepancy-flagged treatment rather than excluding or rejecting it
   // (Engineering Principle 5: the spray physically happened).
-  const header = ["Date", "Time", "Type", "Label", "Detail", "Dose", "Stock Discrepancy"];
+  // Who (Phase 4, build-cycle doc, 2026-09-07): "for a surface whose stated
+  // job is crew oversight, that is the missing dimension" -- blank when not
+  // tracked (see lib/logs.ts's `who` field comment for the specific cases).
+  const header = ["Date", "Time", "Type", "Label", "Detail", "Who", "Dose", "Stock Discrepancy"];
   const rows = filtered.map((e) => [
     e.at.toISOString().slice(0, 10),
     e.at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }),
     e.kind,
     e.label,
     e.sub,
+    e.who ?? "",
     e.doseDetail ?? "",
     e.stockWentNegative ? "yes" : "",
   ]);

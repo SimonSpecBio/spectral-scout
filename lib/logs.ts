@@ -1,5 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
+import { users as authUsers } from "@/db/auth-schema";
 import { facilities, facilityAreas, pestEvents, scoutingObservations, tasks, treatments, trapReadings, traps } from "@/db/schema";
 import { metricLabel, sessionMetric } from "@/lib/threshold-engine";
 import { displayNameForPestSpecies, displayNameForTreatmentType } from "@/lib/treatments-catalog";
@@ -32,6 +33,14 @@ export interface LogEntry {
   // export's Dose/Stock Discrepancy columns.
   doseDetail?: string;
   stockWentNegative?: boolean;
+  // Phase 4 (build-cycle doc, 2026-09-07): "LogEntry has no who, though
+  // submittedByUserId/operatorUserId/createdByUserId all exist and are
+  // read then discarded -- for a surface whose stated job is crew
+  // oversight, that is the missing dimension." Null for the same reasons
+  // the equivalent fields elsewhere in this app go null (logged before
+  // the column existed, or a since-deleted account) and for the
+  // trap-reading group entry, which can span more than one submitter.
+  who?: string | null;
 }
 
 // Same fields the case page's own Treatments list formats (PestEventDetail
@@ -89,6 +98,25 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
   const trapIds = orgTraps.map((t) => t.id);
   const readings = trapIds.length > 0 ? await db.select().from(trapReadings).where(inArray(trapReadings.trapId, trapIds)) : [];
 
+  // One batched lookup for every "who" across all five entry types, rather
+  // than a join per query above -- these ids aren't foreign keys (same
+  // matched-by-value convention as scout_membership.userId), so a name is
+  // resolved here instead of relying on drizzle relations.
+  const userIds = [
+    ...new Set(
+      [
+        ...events.map((e) => e.createdByUserId),
+        ...sessions.map((s) => s.submittedByUserId),
+        ...appliedTreatments.map((t) => t.operatorUserId),
+        ...readings.map((r) => r.submittedByUserId),
+        ...doneTasks.map((t) => t.completedByUserId),
+      ].filter((id): id is string => !!id)
+    ),
+  ];
+  const users = userIds.length > 0 ? await db.select({ id: authUsers.id, name: authUsers.name, email: authUsers.email }).from(authUsers).where(inArray(authUsers.id, userIds)) : [];
+  const userNameById = new Map(users.map((u) => [u.id, u.name ?? u.email]));
+  const whoFor = (userId: string | null | undefined) => (userId ? (userNameById.get(userId) ?? null) : null);
+
   const trapById = new Map(orgTraps.map((t) => [t.id, t]));
   const eventById = new Map(events.map((e) => [e.id, e]));
 
@@ -104,6 +132,7 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
       facilityId: e.facilityId,
       eventId: e.id,
       caseNumber: e.caseNumber,
+      who: whoFor(e.createdByUserId),
     });
     if (e.resolvedAt) {
       entries.push({
@@ -114,6 +143,11 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
         facilityId: e.facilityId,
         eventId: e.id,
         caseNumber: e.caseNumber,
+        // Not e.createdByUserId -- that's who DETECTED it, not who
+        // resolved it, and pestEvents tracks no separate resolver id
+        // (auto-resolve has no user at all). Left unattributed rather
+        // than guessing.
+        who: null,
       });
     }
   }
@@ -133,6 +167,7 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
       // the facility page whenever eventId is absent.
       eventId: s.promotedPestEventId ?? undefined,
       caseNumber: s.promotedPestEventId ? (eventById.get(s.promotedPestEventId)?.caseNumber ?? null) : null,
+      who: whoFor(s.submittedByUserId),
     });
   }
 
@@ -149,6 +184,7 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
       caseNumber: event?.caseNumber ?? null,
       doseDetail: t.type === "spectral_light" ? formatSpectralDose(t) : undefined,
       stockWentNegative: t.stockWentNegative,
+      who: whoFor(t.operatorUserId),
     });
   }
 
@@ -161,13 +197,42 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
   }
   for (const group of readingsByTrapDay.values()) {
     const loc = areaNameById.get(trapById.get(group[0].trapId)?.facilityAreaId ?? "") ?? "";
-    entries.push({ at: group[0].createdAt, kind: "monitoring", label: "Trap readings logged", sub: `${group.length} TRAPS · ${loc}`.toUpperCase() });
+    // Only attributed when every reading in the group came from the same
+    // person -- a mixed-submitter group (two scouts covering one round) has
+    // no single "who" to name.
+    const allSameSubmitter = group.every((r) => r.submittedByUserId === group[0].submittedByUserId);
+    entries.push({
+      at: group[0].createdAt,
+      kind: "monitoring",
+      label: "Trap readings logged",
+      sub: `${group.length} TRAPS · ${loc}`.toUpperCase(),
+      who: allSameSubmitter ? whoFor(group[0].submittedByUserId) : null,
+    });
   }
 
+  // CountsFlow/MonitoringFlow/DiseaseMonitoringFlow all post the monitoring
+  // session THEN complete the linked task as two sequential requests in one
+  // field action -- without this, that one action showed as two rows in two
+  // different categories with two different timestamps (Phase 4, build-
+  // cycle doc, 2026-09-07: "one field action, two log rows"). Only "scout"
+  // and "monitor" tasks ever trigger this (lib/tasks.ts's taskActionHref is
+  // the only thing that routes a task into one of those three flows) -- a
+  // task of any other type completed here is real, standalone work and
+  // keeps its own row. The session is matched by area + a tight time
+  // window rather than a stored link, since no FK connects the two tables
+  // (a task doesn't know which observation, if any, completed it).
+  const TASK_SESSION_DEDUP_WINDOW_MS = 5 * 60_000;
   for (const t of doneTasks) {
     if (t.status !== "done" || !t.completedAt) continue;
+    const isMonitoringRoundTask = (t.type === "scout" || t.type === "monitor") && t.facilityAreaId != null;
+    const hasMatchingSession =
+      isMonitoringRoundTask &&
+      sessions.some(
+        (s) => s.facilityAreaId === t.facilityAreaId && Math.abs(s.createdAt.getTime() - t.completedAt!.getTime()) <= TASK_SESSION_DEDUP_WINDOW_MS
+      );
+    if (hasMatchingSession) continue;
     const loc = areaNameById.get(t.facilityAreaId ?? "") ?? facilityNameById.get(t.facilityId ?? "") ?? "";
-    entries.push({ at: t.completedAt, kind: "treatment", label: t.title, sub: loc.toUpperCase() });
+    entries.push({ at: t.completedAt, kind: "treatment", label: t.title, sub: loc.toUpperCase(), who: whoFor(t.completedByUserId) });
   }
 
   return entries.sort((a, b) => b.at.getTime() - a.at.getTime());
