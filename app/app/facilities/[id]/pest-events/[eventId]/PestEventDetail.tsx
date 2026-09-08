@@ -9,6 +9,7 @@ import { SEVERITIES, SEVERITY_COLOR, SEVERITY_TEXT_COLOR, type Severity } from "
 import { queuedFetch, queuedFileFetch } from "@/lib/offline-queue";
 import { markEngaged } from "@/lib/pwa-engagement";
 import type { FollowUpSuggestion } from "@/lib/recommendations";
+import { computePrimaryCta, computeTrendSignal, type TrendObservation } from "@/lib/case-cta";
 import { metricLabel, type MetricKind, type SpeciesThresholds } from "@/lib/scout-metric";
 import { buildSpectralLightProtocol } from "@/lib/spectral-light";
 import { thresholdSourceFor } from "@/lib/threshold-sources";
@@ -80,6 +81,9 @@ interface MonitoringSession {
   date: string;
   metricKind: MetricKind;
   value: number;
+  // Only present for a disease_severity session -- feeds the CTA's
+  // large-jump detector (lib/case-cta.ts) as its own dimension.
+  severityPct: number | null;
   assessmentType: "pest_count" | "disease_severity";
 }
 
@@ -112,6 +116,8 @@ export default function PestEventDetail({
   locationLabel,
   mapHref,
   facilityAreaId,
+  hasAnyTreatment,
+  openRecheck,
   initialTreatments,
   initialPhotos,
   initialMonitoring,
@@ -132,6 +138,10 @@ export default function PestEventDetail({
   locationLabel: string;
   mapHref: string | null;
   facilityAreaId: string | null;
+  // Phase 1.2 (build-cycle doc, 2026-09-07): the one-primary-CTA inputs --
+  // gathered server-side in page.tsx since they each need their own query.
+  hasAnyTreatment: boolean;
+  openRecheck: { id: string; dueAt: string } | null;
   initialTreatments: Treatment[];
   initialPhotos: Photo[];
   initialMonitoring: MonitoringSession[];
@@ -642,6 +652,31 @@ export default function PestEventDetail({
   const changeVsBaseline =
     densities.length >= 2 && baselineDensity > 0 ? Math.round(((baselineDensity - latestDensity) / baselineDensity) * 100) : null;
 
+  // Phase 1.2/1.4 (build-cycle doc, 2026-09-07): one primary CTA per case.
+  // Reuses the same `chronological` run (oldest-first, one consistent
+  // metric kind) the chart already computes above, so the CTA's notion of
+  // "trend" never disagrees with what the chart is showing.
+  const trendObservations: TrendObservation[] = chronological.map((s) => ({
+    kind: s.metricKind,
+    value: s.value,
+    severityPct: s.severityPct ?? undefined,
+  }));
+  const trend = computeTrendSignal(trendObservations);
+  const primaryCta = computePrimaryCta({
+    status: event.status,
+    hasAnyTreatment,
+    openRecheck: openRecheck ? { dueAt: new Date(openRecheck.dueAt) } : null,
+    trend,
+  });
+  const primaryCtaHref =
+    primaryCta.kind === "worsening" || primaryCta.kind === "review_recommendation"
+      ? "#recommended"
+      : primaryCta.kind === "recheck_due" || primaryCta.kind === "recheck_scheduled"
+        ? `/app/facilities/${facilityId}/pest-events/${event.id}/monitoring?taskId=${openRecheck!.id}&method=plant_sampling`
+        : primaryCta.kind === "improving"
+          ? `/app/facilities/${facilityId}/pest-events/${event.id}/monitoring`
+          : null;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-y-2">
@@ -672,6 +707,18 @@ export default function PestEventDetail({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {primaryCtaHref && (
+            <Link
+              href={primaryCtaHref}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                primaryCta.kind === "worsening"
+                  ? "bg-[var(--danger)] text-white"
+                  : "bg-[var(--accent)] text-[var(--on-accent)]"
+              }`}
+            >
+              {primaryCta.label}
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => {

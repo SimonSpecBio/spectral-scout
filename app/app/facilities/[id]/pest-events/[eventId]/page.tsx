@@ -1,9 +1,18 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { users as authUsers } from "@/db/auth-schema";
-import { facilityAreas, inventoryItems, monitoringThresholds, observationPhotos, pestEventComments, scoutingObservations, treatments } from "@/db/schema";
+import {
+  facilityAreas,
+  inventoryItems,
+  monitoringThresholds,
+  observationPhotos,
+  pestEventComments,
+  scoutingObservations,
+  tasks,
+  treatments,
+} from "@/db/schema";
 import { getOwnedPestEvent } from "@/lib/pest-events";
 import { getOwnedFacility } from "@/lib/facilities";
 import { isHomeGrower } from "@/lib/grower-type";
@@ -53,6 +62,16 @@ export default async function PestEventPage({
     .from(treatments)
     .leftJoin(authUsers, eq(treatments.operatorUserId, authUsers.id))
     .where(eq(treatments.pestEventId, eventId));
+  // Phase 1.2 (build-cycle doc, 2026-09-07): the primary CTA needs to know
+  // whether a recheck is already scheduled and, if so, when -- "monitor"
+  // is the recheck task type (see lib/tasks.ts's taskActionHref). Soonest
+  // due date first in the rare case more than one somehow exists open at
+  // once.
+  const [openRecheckTask] = await db
+    .select({ id: tasks.id, dueAt: tasks.dueAt })
+    .from(tasks)
+    .where(and(eq(tasks.pestEventId, eventId), eq(tasks.type, "monitor"), eq(tasks.status, "open")))
+    .orderBy(tasks.dueAt);
   // Left-joined for the Photos tab's tap-to-reveal uploader name (Airtable
   // ticket B6/B7) -- null for photos uploaded before uploadedByUserId
   // existed, or a since-deleted account; the UI shows "Unknown" for those.
@@ -159,6 +178,8 @@ export default async function PestEventPage({
           spanCount: event.spanPositions?.length ?? 0,
         }}
         locationLabel={locationLabel}
+        hasAnyTreatment={eventTreatments.length > 0}
+        openRecheck={openRecheckTask ? { id: openRecheckTask.id, dueAt: openRecheckTask.dueAt.toISOString() } : null}
         mapHref={area ? `/app/facilities/${id}/areas/${area.id}` : null}
         initialTab={initialTab}
         facilityAreaId={area?.id ?? null}
@@ -187,7 +208,9 @@ export default async function PestEventPage({
         isPilotTier={session.accountTier === "pilot"}
         initialMonitoring={monitoringSessions.flatMap((s) => {
           const metric = sessionMetric(s);
-          return metric ? [{ id: s.id, date: s.date, metricKind: metric.kind, value: metric.value, assessmentType: s.assessmentType }] : [];
+          return metric
+            ? [{ id: s.id, date: s.date, metricKind: metric.kind, value: metric.value, severityPct: metric.severityPct ?? null, assessmentType: s.assessmentType }]
+            : [];
         })}
         inventoryItems={items.map((i) => ({
           id: i.id,
