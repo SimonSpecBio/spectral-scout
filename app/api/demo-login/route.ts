@@ -11,10 +11,11 @@ import {
   organizations,
   pestEvents,
   scoutingObservations,
+  tasks,
   treatments,
 } from "@/db/schema";
 import { CURRENT_CONSENT_VERSION } from "@/lib/consent";
-import { DEMO_EMAIL, DEMO_QUERY_PARAM, DEMO_SESSION_MAX_AGE_MS } from "@/lib/demo-account";
+import { DEMO_MANAGER_EMAIL, DEMO_QUERY_PARAM, DEMO_SCOUT_EMAIL, DEMO_SESSION_MAX_AGE_MS } from "@/lib/demo-account";
 import { grid2d } from "@/lib/layout-presets";
 
 // Best-effort, in-memory, per-IP -- same "doesn't survive a cold start,
@@ -38,23 +39,24 @@ function checkDemoLoginRateLimit(ip: string): boolean {
   return true;
 }
 
-// One shared, always-onboarded account anyone can click straight into --
-// Simon's explicit call (2026-08-30): a single test account, shared data,
-// no per-visitor isolation. Pre-fills state/consent so proxy.ts's
-// onboarding gate never fires for it. Idempotent find-or-create (same
-// transaction + retry-on-unique-violation shape as auth.ts's
-// provisionMembership) since this route, unlike normal sign-in, is
-// designed to be hit concurrently by multiple people/agents at once,
-// including the very first request that has to create the row.
-async function ensureDemoUser() {
-  const [existing] = await db.select().from(users).where(eq(users.email, DEMO_EMAIL));
+// Two real identities in the SAME shared org (Phase 0.75, build-cycle doc
+// 2026-09-07), not a UI role switcher -- ensureDemoManager always runs
+// first (creating the org if this is the very first demo visit ever,
+// regardless of which link someone actually clicked) so ensureDemoScout
+// always has a real org to join as a member of, never one of its own.
+// Idempotent find-or-create (same transaction + retry-on-unique-violation
+// shape as auth.ts's provisionMembership) since this route is designed to
+// be hit concurrently by multiple people/agents at once, including the
+// very first request that has to create the row.
+async function ensureDemoManager() {
+  const [existing] = await db.select().from(users).where(eq(users.email, DEMO_MANAGER_EMAIL));
   if (existing) return existing;
 
   try {
     return await db.transaction(async (tx) => {
-      let [user] = await tx.select().from(users).where(eq(users.email, DEMO_EMAIL));
+      let [user] = await tx.select().from(users).where(eq(users.email, DEMO_MANAGER_EMAIL));
       if (!user) {
-        [user] = await tx.insert(users).values({ email: DEMO_EMAIL, name: "Test Account", emailVerified: new Date() }).returning();
+        [user] = await tx.insert(users).values({ email: DEMO_MANAGER_EMAIL, name: "Test Account", emailVerified: new Date() }).returning();
       }
       const [membership] = await tx.select().from(memberships).where(eq(memberships.userId, user.id));
       if (!membership) {
@@ -75,7 +77,37 @@ async function ensureDemoUser() {
     });
   } catch (err) {
     if ((err as { code?: string }).code === "23505") {
-      const [user] = await db.select().from(users).where(eq(users.email, DEMO_EMAIL));
+      const [user] = await db.select().from(users).where(eq(users.email, DEMO_MANAGER_EMAIL));
+      return user;
+    }
+    throw err;
+  }
+}
+
+// A Scout (member) identity in the exact same org the manager already
+// owns -- ensureDemoManager above guarantees that org exists before this
+// ever runs. Before this, ensureDemoUser only ever created an owner, so
+// the Scout home (Today's Tasks -> case -> action) was unreachable
+// without a real customer org (the actual blocker Phase 1.3 named).
+async function ensureDemoScout(organizationId: string) {
+  const [existing] = await db.select().from(users).where(eq(users.email, DEMO_SCOUT_EMAIL));
+  if (existing) return existing;
+
+  try {
+    return await db.transaction(async (tx) => {
+      let [user] = await tx.select().from(users).where(eq(users.email, DEMO_SCOUT_EMAIL));
+      if (!user) {
+        [user] = await tx.insert(users).values({ email: DEMO_SCOUT_EMAIL, name: "Test Scout", emailVerified: new Date() }).returning();
+      }
+      const [membership] = await tx.select().from(memberships).where(eq(memberships.userId, user.id));
+      if (!membership) {
+        await tx.insert(memberships).values({ userId: user.id, organizationId, role: "member" });
+      }
+      return user;
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") {
+      const [user] = await db.select().from(users).where(eq(users.email, DEMO_SCOUT_EMAIL));
       return user;
     }
     throw err;
@@ -95,20 +127,28 @@ async function ensureDemoUser() {
 // same canonical form every event now stores (see resolveCanonicalPestId)
 // -- findPestProgram/displayNameForPestSpecies both resolve an id, so
 // these seeded events get real thresholds/recommendations and a proper
-// display name exactly like a grower's own.
-async function ensureDemoFacility(organizationId: string, userId: string) {
+// display name exactly like a grower's own. Returns the facility/area ids
+// either way (freshly created or already existing) so callers needing
+// them (ensureDemoScoutTask) don't have to re-query.
+async function ensureDemoFacility(organizationId: string, userId: string): Promise<{ facilityId: string; areaId: string }> {
   const [existingFacility] = await db
     .select()
     .from(facilities)
     .where(and(eq(facilities.organizationId, organizationId), eq(facilities.name, "Steele ST")));
-  if (existingFacility) return;
+  if (existingFacility) {
+    const [area] = await db.select().from(facilityAreas).where(eq(facilityAreas.facilityId, existingFacility.id));
+    return { facilityId: existingFacility.id, areaId: area.id };
+  }
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [alreadyThere] = await tx
       .select()
       .from(facilities)
       .where(and(eq(facilities.organizationId, organizationId), eq(facilities.name, "Steele ST")));
-    if (alreadyThere) return;
+    if (alreadyThere) {
+      const [area] = await tx.select().from(facilityAreas).where(eq(facilityAreas.facilityId, alreadyThere.id));
+      return { facilityId: alreadyThere.id, areaId: area.id };
+    }
 
     const [facility] = await tx.insert(facilities).values({ organizationId, name: "Steele ST" }).returning();
     const [area] = await tx
@@ -205,6 +245,33 @@ async function ensureDemoFacility(organizationId: string, userId: string) {
       operatorUserId: userId,
       minutesSpent: 5,
     });
+
+    return { facilityId: facility.id, areaId: area.id };
+  });
+}
+
+// Gives the Scout demo something real to land on -- "tasks-first" means
+// nothing if Today's Tasks is empty. Idempotent on title match (same
+// convention as ensureDemoFacility's own "does the fixture specifically
+// exist" check), so this only ever seeds once regardless of how many
+// times the Scout demo link gets clicked.
+async function ensureDemoScoutTask(organizationId: string, facilityId: string, areaId: string, scoutUserId: string) {
+  const title = "Recheck spider mites, Bench A1";
+  const [existing] = await db.select().from(tasks).where(and(eq(tasks.organizationId, organizationId), eq(tasks.title, title)));
+  if (existing) return;
+
+  await db.insert(tasks).values({
+    organizationId,
+    facilityId,
+    facilityAreaId: areaId,
+    type: "monitor",
+    title,
+    x: 99,
+    y: 40,
+    assigneeUserId: scoutUserId,
+    createdByUserId: scoutUserId,
+    source: "manual",
+    dueAt: new Date(),
   });
 }
 
@@ -214,9 +281,19 @@ async function handleDemoLogin(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
   }
 
-  const user = await ensureDemoUser();
-  const [membership] = await db.select().from(memberships).where(eq(memberships.userId, user.id));
-  await ensureDemoFacility(membership.organizationId, user.id);
+  // ensureDemoManager always runs first, whichever identity was actually
+  // requested -- it's the one that can create the shared org from
+  // scratch; ensureDemoScout only ever joins an org that's already there.
+  const manager = await ensureDemoManager();
+  const [managerMembership] = await db.select().from(memberships).where(eq(memberships.userId, manager.id));
+  const { facilityId, areaId } = await ensureDemoFacility(managerMembership.organizationId, manager.id);
+
+  const role = request.nextUrl.searchParams.get("role") === "scout" ? "scout" : "manager";
+  let user = manager;
+  if (role === "scout") {
+    user = await ensureDemoScout(managerMembership.organizationId);
+    await ensureDemoScoutTask(managerMembership.organizationId, facilityId, areaId, user.id);
+  }
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
   await db.insert(sessions).values({ sessionToken, userId: user.id, expires: new Date(Date.now() + DEMO_SESSION_MAX_AGE_MS) });

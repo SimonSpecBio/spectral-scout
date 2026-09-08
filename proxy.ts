@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { sessions, users } from "@/db/auth-schema";
 import { memberships, organizations } from "@/db/schema";
 import { CURRENT_CONSENT_VERSION } from "@/lib/consent";
-import { DEMO_EMAIL, DEMO_QUERY_PARAM, DEMO_SESSION_MAX_AGE_MS } from "@/lib/demo-account";
+import { DEMO_EMAILS, DEMO_QUERY_PARAM, DEMO_SESSION_MAX_AGE_MS } from "@/lib/demo-account";
 import { encodeSessionHeader, SESSION_HEADER_NAME } from "@/lib/session-cache";
 
 // A stateless HTTP client (a lot of simple AI-agent web fetchers, as
@@ -13,15 +13,15 @@ import { encodeSessionHeader, SESSION_HEADER_NAME } from "@/lib/session-cache";
 // carry its Set-Cookie into the next request -- so the token also travels
 // in the URL itself (see app/api/demo-login/route.ts). Resolved directly
 // against the sessions table rather than through auth()'s cookie-based
-// lookup, and hard-locked to the fixed demo account by email: a token
-// value that happened to belong to some OTHER user's real session could
-// never be used this way to get into their account, only ever the shared
-// demo org.
+// lookup, and hard-locked to the two fixed demo accounts (Manager/Scout,
+// same shared org) by email: a token value that happened to belong to some
+// OTHER user's real session could never be used this way to get into their
+// account, only ever the shared demo org.
 async function resolveDemoQuerySession(token: string) {
   const [row] = await db.select().from(sessions).where(eq(sessions.sessionToken, token));
   if (!row || row.expires < new Date()) return null;
   const [user] = await db.select().from(users).where(eq(users.id, row.userId));
-  if (!user || user.email !== DEMO_EMAIL) return null;
+  if (!user || !(DEMO_EMAILS as readonly string[]).includes(user.email ?? "")) return null;
   const [membership] = await db.select().from(memberships).where(eq(memberships.userId, user.id));
   if (!membership) return null;
   const [org] = await db.select().from(organizations).where(eq(organizations.id, membership.organizationId));
@@ -148,7 +148,7 @@ export default auth(async (req) => {
       // way the value that ends up in the URL/browser-history/server-logs
       // and the value that actually authenticates this browser going
       // forward are two different tokens -- knowing one no longer means
-      // holding the other. Same demo-only/DEMO_EMAIL lock as
+      // holding the other. Same demo-only/DEMO_EMAILS lock as
       // resolveDemoQuerySession itself, so this still can never mint a
       // session for anything but the one shared demo org.
       const freshToken = crypto.randomUUID() + crypto.randomUUID();

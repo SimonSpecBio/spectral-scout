@@ -62,9 +62,20 @@ export default async function SignInPage({
       <SignInForm initialEmail={email} callbackUrl={callbackUrl} />
 
       <div className="flex flex-col items-center gap-1">
-        <a href="/api/demo-login" className="text-xs text-[var(--text-dim)] underline">
-          Just want to poke around? Try the test account →
-        </a>
+        <p className="text-xs text-[var(--text-dim)]">Just want to poke around?</p>
+        {/* Two real identities in the same shared org (Phase 0.75,
+            build-cycle doc 2026-09-07), not a role switcher -- Manager
+            (owner) sees the map + exceptions, Scout (member) leads with
+            Today's Tasks. Same demo-account guards (no invites, no photo
+            uploads) apply to both. */}
+        <div className="flex gap-3">
+          <a href="/api/demo-login" className="text-xs text-[var(--text-dim)] underline">
+            Try as Manager →
+          </a>
+          <a href="/api/demo-login?role=scout" className="text-xs text-[var(--text-dim)] underline">
+            Try as Scout →
+          </a>
+        </div>
         {/* Shared org, no per-visitor isolation -- explicit here rather
             than discovered the hard way (product brief, 5 Sep 2026, Task
             1: "graffiti is a real risk"). Photo uploads and invites are
