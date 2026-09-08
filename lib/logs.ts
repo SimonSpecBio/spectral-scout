@@ -26,6 +26,30 @@ export interface LogEntry {
   facilityId?: string;
   eventId?: string;
   caseNumber?: number | null;
+  // Treatment entries only (Phase 1.5, build-cycle doc, 2026-09-07) --
+  // extraction-only, same "present but unrendered by the Logs page itself"
+  // convention as facilityId/eventId/caseNumber above. Consumed by the CSV
+  // export's Dose/Stock Discrepancy columns.
+  doseDetail?: string;
+  stockWentNegative?: boolean;
+}
+
+// Same fields the case page's own Treatments list formats (PestEventDetail
+// .tsx) -- duplicated rather than shared since that's a client component
+// and this file pulls in @/db, which doesn't bundle for the browser.
+function formatSpectralDose(t: {
+  fixtureId: string | null;
+  minutesAfterDark: number | null;
+  durationMin: number | null;
+  pulseCount: number | null;
+}): string | undefined {
+  const parts = [
+    t.fixtureId,
+    t.minutesAfterDark != null && `${t.minutesAfterDark}min after dark`,
+    t.durationMin != null && `${t.durationMin}min duration`,
+    t.pulseCount === 2 && "2 pulses",
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
 // A filterable, bay-keyed chronological record (13_logs_history.svg) --
@@ -123,6 +147,8 @@ export async function getOrgLogEntries(organizationId: string): Promise<LogEntry
       facilityId: t.facilityId,
       eventId: t.pestEventId ?? undefined,
       caseNumber: event?.caseNumber ?? null,
+      doseDetail: t.type === "spectral_light" ? formatSpectralDose(t) : undefined,
+      stockWentNegative: t.stockWentNegative,
     });
   }
 

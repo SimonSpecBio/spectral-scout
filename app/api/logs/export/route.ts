@@ -32,13 +32,20 @@ export async function GET(request: NextRequest) {
     filtered = filtered.filter((e) => e.at <= toDate);
   }
 
-  const header = ["Date", "Time", "Type", "Label", "Detail"];
+  // Dose/Stock Discrepancy (Phase 1.5, build-cycle doc, 2026-09-07): only
+  // ever populated on treatment rows, blank for event/monitoring rows --
+  // "include, carry the flag" was the doc's own decision on a stock-
+  // discrepancy-flagged treatment rather than excluding or rejecting it
+  // (Engineering Principle 5: the spray physically happened).
+  const header = ["Date", "Time", "Type", "Label", "Detail", "Dose", "Stock Discrepancy"];
   const rows = filtered.map((e) => [
     e.at.toISOString().slice(0, 10),
     e.at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }),
     e.kind,
     e.label,
     e.sub,
+    e.doseDetail ?? "",
+    e.stockWentNegative ? "yes" : "",
   ]);
   const csv = [header, ...rows].map((row) => row.map(csvField).join(",")).join("\r\n") + "\r\n";
 

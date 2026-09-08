@@ -794,6 +794,14 @@ export const treatments = pgTable(
   pulseCount: integer("pulse_count").default(1),
   secondPulseOffsetMinutes: integer("second_pulse_offset_minutes"),
   secondPulseDurationMinutes: integer("second_pulse_duration_minutes"),
+  // Set once, at insert, by lib/apply-treatment.ts when the recorded
+  // on-hand quantity couldn't cover quantityUsed and was floored to 0
+  // instead of rejecting the treatment (Engineering Principle 5: the spray
+  // physically happened, ledger tidiness doesn't get to erase it). Was
+  // computed and returned in the API response but never stored, so it was
+  // lost the moment that response was rendered -- Phase 1.5's dose/outcome
+  // export needs to carry this flag through, which requires it to persist.
+  stockWentNegative: boolean("stock_went_negative").notNull().default(false),
   },
   (table) => [
     index("scout_treatment_facility_id_idx").on(table.facilityId),

@@ -100,6 +100,10 @@ export async function insertTreatmentAndDecrementStock(organizationId: string, v
         // atomic update above already covers.
         await tx.update(inventoryItems).set({ quantity: 0 }).where(eq(inventoryItems.id, inventoryItemId));
         stockWentNegative = true;
+        // Carry the flag onto the row itself -- previously only returned
+        // in the API response, so it was lost as soon as that response was
+        // rendered. Phase 1.5's dose/outcome export needs it to persist.
+        await tx.update(treatments).set({ stockWentNegative: true }).where(eq(treatments.id, inserted.id));
       }
     }
 

@@ -316,6 +316,13 @@
       "when": 1788854459832,
       "tag": "0044_mute_magdalene",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1788858696308,
+      "tag": "0045_fast_darkstar",
+      "breakpoints": true
     }
   ]
 }

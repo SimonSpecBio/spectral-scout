@@ -19,6 +19,10 @@ interface TreatmentMarker {
   product: string | null;
   loggedBy: string | null;
   appliedAt: string;
+  // type === "spectral_light" only -- Phase 1.5 (build-cycle doc,
+  // 2026-09-07)'s dose->outcome join. Undefined/null for every other type.
+  minutesAfterDark?: number | null;
+  durationMin?: number | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -217,7 +221,20 @@ export default function EventChart({
         (() => {
           const x = pointX(new Date(activeTreatmentData.appliedAt).getTime());
           const boxW = 96;
-          const boxH = 28;
+          // A spectral_light treatment gets a third line for its dose
+          // (Phase 1.5) -- taller box only when there's a real dose to show,
+          // so every other treatment type's tooltip is unchanged.
+          const doseLine =
+            activeTreatmentData.type === "spectral_light" &&
+            (activeTreatmentData.minutesAfterDark != null || activeTreatmentData.durationMin != null)
+              ? [
+                  activeTreatmentData.minutesAfterDark != null && `${activeTreatmentData.minutesAfterDark}min after dark`,
+                  activeTreatmentData.durationMin != null && `${activeTreatmentData.durationMin}min duration`,
+                ]
+                  .filter(Boolean)
+                  .join(", ")
+              : null;
+          const boxH = doseLine ? 37 : 28;
           const boxX = Math.min(Math.max(x - boxW / 2, PAD), W - PAD - boxW);
           // Bounds-aware, not just clamped -- the treatment row sits close
           // to the chart's bottom edge, so a tooltip opening straight down
@@ -244,6 +261,11 @@ export default function EventChart({
                   20
                 )}
               </text>
+              {doseLine && (
+                <text x={6} y={29} fontFamily="ui-monospace, monospace" fontSize={6} fill="var(--text-dim)">
+                  {truncate(doseLine, 20)}
+                </text>
+              )}
             </g>
           );
         })()}

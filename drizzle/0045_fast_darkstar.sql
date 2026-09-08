@@ -1,0 +1,1 @@
+ALTER TABLE "scout_treatment" ADD COLUMN "stock_went_negative" boolean DEFAULT false NOT NULL;

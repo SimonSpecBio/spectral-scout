@@ -56,6 +56,13 @@ export default async function PestEventPage({
       notes: treatments.notes,
       appliedAt: treatments.appliedAt,
       inventoryItemId: treatments.inventoryItemId,
+      fixtureId: treatments.fixtureId,
+      minutesAfterDark: treatments.minutesAfterDark,
+      durationMin: treatments.durationMin,
+      pulseCount: treatments.pulseCount,
+      secondPulseOffsetMinutes: treatments.secondPulseOffsetMinutes,
+      secondPulseDurationMinutes: treatments.secondPulseDurationMinutes,
+      stockWentNegative: treatments.stockWentNegative,
       operatorName: authUsers.name,
       operatorEmail: authUsers.email,
     })
@@ -207,6 +214,13 @@ export default async function PestEventPage({
           notes: t.notes,
           appliedAt: t.appliedAt.toISOString(),
           loggedBy: t.operatorName ?? t.operatorEmail ?? null,
+          fixtureId: t.fixtureId,
+          minutesAfterDark: t.minutesAfterDark,
+          durationMin: t.durationMin,
+          pulseCount: t.pulseCount,
+          secondPulseOffsetMinutes: t.secondPulseOffsetMinutes,
+          secondPulseDurationMinutes: t.secondPulseDurationMinutes,
+          stockWentNegative: t.stockWentNegative,
         }))}
         initialPhotos={photos.map((p) => ({
           id: p.id,

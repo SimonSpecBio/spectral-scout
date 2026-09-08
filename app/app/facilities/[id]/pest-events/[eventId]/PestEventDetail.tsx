@@ -53,6 +53,19 @@ interface Treatment {
   // since-deleted account -- the chart's treatment-marker tooltip just
   // omits it rather than showing a broken name (ticket B4).
   loggedBy: string | null;
+  // type === "spectral_light" only -- captured at log time (NewTreatmentForm
+  // and this page's own inline form) but never shown anywhere on the case
+  // page until Phase 1.5 (build-cycle doc, 2026-09-07)'s dose->outcome join.
+  fixtureId: string | null;
+  minutesAfterDark: number | null;
+  durationMin: number | null;
+  pulseCount: number | null;
+  secondPulseOffsetMinutes: number | null;
+  secondPulseDurationMinutes: number | null;
+  // Set when this treatment's recorded quantityUsed exceeded on-hand stock
+  // and got floored to 0 rather than rejected (lib/apply-treatment.ts) --
+  // the spray happened regardless, this just flags the ledger as behind.
+  stockWentNegative: boolean;
 }
 
 interface Photo {
@@ -937,7 +950,15 @@ export default function PestEventDetail({
             metricKind={chartMetricKind}
             threshold={chartThreshold}
             presenceTriggered={thresholds.presenceTriggered}
-            treatments={treatmentsList.map((t) => ({ id: t.id, type: t.type, product: t.product, loggedBy: t.loggedBy, appliedAt: t.appliedAt }))}
+            treatments={treatmentsList.map((t) => ({
+              id: t.id,
+              type: t.type,
+              product: t.product,
+              loggedBy: t.loggedBy,
+              appliedAt: t.appliedAt,
+              minutesAfterDark: t.minutesAfterDark,
+              durationMin: t.durationMin,
+            }))}
             detectedAt={event.createdAt}
           />
           <div className="flex flex-wrap items-center justify-around gap-6 text-center">
@@ -1370,7 +1391,27 @@ export default function PestEventDetail({
                   {displayNameForTreatmentType(t.type)}
                   {t.product && `: ${t.product}`}
                 </div>
+                {t.type === "spectral_light" && (t.fixtureId || t.minutesAfterDark != null || t.durationMin != null) && (
+                  <div className="text-xs text-[var(--text-dim)]">
+                    {[
+                      t.fixtureId,
+                      t.minutesAfterDark != null && `${t.minutesAfterDark}min after dark`,
+                      t.durationMin != null && `${t.durationMin}min duration`,
+                      t.pulseCount === 2 &&
+                        `2 pulses${t.secondPulseOffsetMinutes != null ? `, 2nd at +${t.secondPulseOffsetMinutes}min` : ""}${
+                          t.secondPulseDurationMinutes != null ? ` for ${t.secondPulseDurationMinutes}min` : ""
+                        }`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                )}
                 {t.notes && <div className="text-[var(--text-dim)]">{t.notes}</div>}
+                {t.stockWentNegative && (
+                  <div className="text-xs" style={{ color: "var(--danger)" }}>
+                    Recorded stock ran out -- inventory may be behind
+                  </div>
+                )}
                 <div className="text-xs text-[var(--text-dim)]">
                   <LocalDate date={t.appliedAt} format={(d) => d.toLocaleDateString()} />
                 </div>
