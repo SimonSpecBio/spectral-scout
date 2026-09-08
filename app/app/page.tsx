@@ -541,10 +541,13 @@ export default async function HomePage({
                       style={{ background: SEVERITY_COLOR[eventSeverityById.get(a.eventId) ?? bandFromMetric(a.metricKind, a.value)] }}
                     />
                     <div className="flex-1">
-                      <div className="text-sm">{displayNameForPestSpecies(a.pestSpecies)} over threshold</div>
+                      <div className="text-sm">
+                        {displayNameForPestSpecies(a.pestSpecies)} {a.crossed.length === 1 && a.crossed[0] === "severity" ? "severity " : ""}over threshold
+                      </div>
                       <div className="label-mono">
-                        {metricLabel({ kind: a.metricKind, value: a.value }).toUpperCase()} &middot; THRESHOLD{" "}
+                        {metricLabel({ kind: a.metricKind, value: a.value, severityPct: a.severityValue }).toUpperCase()} &middot; THRESHOLD{" "}
                         {a.metricKind === "occupancy" ? `${a.threshold}%` : `${a.threshold}/LEAF`}
+                        {a.severityThreshold != null ? ` / ${a.severityThreshold}%` : ""}
                       </div>
                     </div>
                     <span className="text-[var(--text-faint)]">›</span>

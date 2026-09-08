@@ -26,38 +26,80 @@ export const DEFAULT_INFESTED_PCT_THRESHOLD = 15;
 // the same way the occupancy default already is.
 export const DEFAULT_DENSITY_THRESHOLD = 3;
 
+// Phase 0.6 (build-cycle doc, 2026-09-07): a disease_severity session's
+// mean-leaf-area-severity dimension, checked independently from incidence
+// (DEFAULT_INFESTED_PCT_THRESHOLD). 25% lines up with the old 5-class
+// disease scale's "25-50%" boundary (now collapsed into the "Medium"
+// class, 2026-09-07) -- a defensible generic "this is more than trace
+// damage" cutoff, not a number invented from nothing, same reasoning as
+// the two defaults above.
+export const DEFAULT_SEVERITY_PCT_THRESHOLD = 25;
+
 export type MetricKind = "occupancy" | "density";
 
 export interface SessionMetric {
   kind: MetricKind;
   value: number;
+  // Only present for a disease_severity session -- the % leaf-area
+  // severity dimension alongside incidence (kind/value above, which for a
+  // disease session is % of leaves showing ANY damage). Checked
+  // independently against its own threshold in isOverThreshold; never
+  // averaged into value, since incidence and severity mean different
+  // things and a grower needs to know which one moved (build-cycle doc,
+  // 2026-09-07: "Do not average the two into one index").
+  severityPct?: number;
 }
 
-// The one place that decides which metric a session's raw sampleSize/
-// pestCount actually means. leafGrid present => a real per-leaf grid was
-// walked (Plant sampling, disease severity), so pestCount is a count of
-// infested leaves out of sampleSize checked -- a true 0-100 occupancy
-// percentage. leafGrid null => Counts' quick tally, where pestCount is a
-// raw bug count that can exceed sampleSize -- reduces to mean pests per
-// leaf instead. Every threshold/alert function in threshold-engine.ts
-// reads a session's metric through this instead of assuming one shape, so
-// the two methods can never again get compared on the wrong scale.
-export function sessionMetric(session: { sampleSize: number | null; pestCount: number | null; leafGrid: unknown }): SessionMetric | null {
+// The one place that decides which metric(s) a session's raw sampleSize/
+// pestCount/meanSeverityPct actually mean. Branches on assessmentType, not
+// on leafGrid presence -- assessmentType is the authoritative field
+// (db/schema.ts's own comment: it exists so a grid "can't be silently
+// misread"), leafGrid presence is only used *within* the pest_count branch
+// to tell Plant sampling (a real per-leaf grid, occupancy) apart from
+// Counts (a raw tally, density) -- assessmentType alone can't make that
+// distinction, since both share the same "pest_count" value.
+//
+// A disease_severity session yields BOTH an incidence value (kind:
+// "occupancy", same % dimension a pest_count Plant-sampling session
+// produces -- % of leaves showing any damage) and a severityPct (mean %
+// leaf area across assessed leaves) riding alongside it. Every
+// threshold/alert function in threshold-engine.ts reads a session's
+// metric through this instead of assuming one shape, so the two methods
+// (and now the two disease dimensions) can never again get compared on
+// the wrong scale.
+export function sessionMetric(session: {
+  sampleSize: number | null;
+  pestCount: number | null;
+  leafGrid: unknown;
+  assessmentType?: "pest_count" | "disease_severity";
+  meanSeverityPct?: number | null;
+}): SessionMetric | null {
   if (!session.sampleSize) return null;
   const pestCount = session.pestCount ?? 0;
+  const incidencePct = Math.round((pestCount / session.sampleSize) * 100);
+
+  if (session.assessmentType === "disease_severity") {
+    return { kind: "occupancy", value: incidencePct, severityPct: session.meanSeverityPct ?? 0 };
+  }
   if (session.leafGrid != null) {
-    return { kind: "occupancy", value: Math.round((pestCount / session.sampleSize) * 100) };
+    return { kind: "occupancy", value: incidencePct };
   }
   return { kind: "density", value: Math.round((pestCount / session.sampleSize) * 10) / 10 };
 }
 
 export function metricLabel(metric: SessionMetric): string {
-  return metric.kind === "occupancy" ? `${metric.value}% infested` : `${metric.value} pests/leaf`;
+  const primary = metric.kind === "occupancy" ? `${metric.value}% infested` : `${metric.value} pests/leaf`;
+  return metric.severityPct != null ? `${primary}, ${metric.severityPct}% mean leaf area` : primary;
 }
 
 export interface SpeciesThresholds {
   pct: number;
   density: number;
+  // Phase 0.6: only meaningful for a disease_severity session's
+  // severityPct dimension -- unused for pest_count sessions, but always
+  // populated (falls back to DEFAULT_SEVERITY_PCT_THRESHOLD) so callers
+  // never need a null-handling path, same convention as pct/density.
+  severityPct: number;
   // Resolved (catalog default, then org override) presence-triggered flag
   // -- see lib/treatments-catalog.ts's PestProgram.presenceTriggered
   // comment. When true, pct/density are meaningless for comparison (any
@@ -76,6 +118,27 @@ export function thresholdFor(metric: SessionMetric, thresholds: SpeciesThreshold
 // so a presence-triggered species (mealybug, broad mite, whitefly,
 // botrytis -- lib/treatments-catalog.ts) can't be silently re-broken by a
 // future caller re-implementing the comparison against pct/density.
+//
+// A disease_severity session (metric.severityPct present) is over
+// threshold if EITHER incidence or severity crosses its own threshold --
+// never averaged into one index, per the build-cycle doc's explicit call.
+// Presence-triggered species are unaffected by severityPct entirely: any
+// detection at all already trips the alert regardless of how severe it is.
 export function isOverThreshold(metric: SessionMetric, thresholds: SpeciesThresholds): boolean {
-  return thresholds.presenceTriggered ? metric.value > 0 : metric.value >= thresholdFor(metric, thresholds);
+  if (thresholds.presenceTriggered) return metric.value > 0;
+  const incidenceCrossed = metric.value >= thresholdFor(metric, thresholds);
+  const severityCrossed = metric.severityPct != null && metric.severityPct >= thresholds.severityPct;
+  return incidenceCrossed || severityCrossed;
+}
+
+// Which dimension(s) actually crossed -- for alert copy that names what
+// moved, rather than a bare "over threshold" with no way to tell a grower
+// whether it was incidence or severity (or, for a presence-triggered
+// species, neither dimension really -- any detection at all is the trigger).
+export function crossedDimensions(metric: SessionMetric, thresholds: SpeciesThresholds): ("incidence" | "severity")[] {
+  if (thresholds.presenceTriggered) return metric.value > 0 ? ["incidence"] : [];
+  const crossed: ("incidence" | "severity")[] = [];
+  if (metric.value >= thresholdFor(metric, thresholds)) crossed.push("incidence");
+  if (metric.severityPct != null && metric.severityPct >= thresholds.severityPct) crossed.push("severity");
+  return crossed;
 }

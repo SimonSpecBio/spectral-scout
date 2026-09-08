@@ -3,8 +3,10 @@ import { db } from "@/db";
 import { facilities, monitoringThresholds, pestEvents, scoutingObservations, treatments } from "@/db/schema";
 import { resolvePestEvent } from "@/lib/pest-events";
 import {
+  crossedDimensions,
   DEFAULT_DENSITY_THRESHOLD,
   DEFAULT_INFESTED_PCT_THRESHOLD,
+  DEFAULT_SEVERITY_PCT_THRESHOLD,
   isOverThreshold,
   sessionMetric,
   thresholdFor,
@@ -19,7 +21,15 @@ import { findPestProgram } from "@/lib/treatments-catalog";
 // one module -- only PestEventDetail.tsx (a client component) needs to
 // import the pure pieces from lib/scout-metric.ts directly, since this
 // file's `db` import can't be bundled for the browser.
-export { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, isOverThreshold, sessionMetric, metricLabel } from "@/lib/scout-metric";
+export {
+  crossedDimensions,
+  DEFAULT_DENSITY_THRESHOLD,
+  DEFAULT_INFESTED_PCT_THRESHOLD,
+  DEFAULT_SEVERITY_PCT_THRESHOLD,
+  isOverThreshold,
+  sessionMetric,
+  metricLabel,
+} from "@/lib/scout-metric";
 export type { MetricKind, SessionMetric, SpeciesThresholds } from "@/lib/scout-metric";
 
 // Falls back to this before ever reaching the flat generic DEFAULT_*
@@ -28,11 +38,16 @@ export type { MetricKind, SessionMetric, SpeciesThresholds } from "@/lib/scout-m
 // for the handful of species where a defensible number actually exists.
 // Species with no PestProgram match, or no threshold field set on their
 // program, still land on the flat generic defaults -- unchanged behavior.
+// No PestProgram carries a per-species severity threshold yet (Phase 0.6
+// only adds the mechanism, not new researched-per-species data), so that
+// dimension always lands on the flat generic default until/unless a real
+// sourced figure gets added there the same way pct/density were.
 function builtinThresholdsFor(pestSpecies: string): SpeciesThresholds {
   const program = findPestProgram(pestSpecies);
   return {
     pct: program?.defaultOccupancyPctThreshold ?? DEFAULT_INFESTED_PCT_THRESHOLD,
     density: program?.defaultDensityThreshold ?? DEFAULT_DENSITY_THRESHOLD,
+    severityPct: DEFAULT_SEVERITY_PCT_THRESHOLD,
     presenceTriggered: program?.presenceTriggered ?? false,
   };
 }
@@ -52,6 +67,7 @@ async function getSpeciesThresholdsMap(organizationId: string): Promise<Map<stri
     map.set(row.pestSpecies.toLowerCase(), {
       pct: row.infestedPctThreshold ?? builtin.pct,
       density: row.densityThreshold ?? builtin.density,
+      severityPct: row.severityPctThreshold ?? builtin.severityPct,
       presenceTriggered: row.presenceTriggeredOverride ?? builtin.presenceTriggered,
     });
   }
@@ -75,6 +91,15 @@ export interface MonitoringAlert {
   value: number;
   threshold: number;
   at: Date;
+  // Which dimension(s) actually crossed -- ["incidence"], ["severity"], or
+  // both for a disease_severity session where both happen to be over at
+  // once. Always ["incidence"] for a pest_count session or a presence-
+  // triggered species, since severity has no meaning there.
+  crossed: ("incidence" | "severity")[];
+  // Only set for a disease_severity session -- the severity dimension
+  // riding alongside the primary incidence value/threshold above.
+  severityValue?: number;
+  severityThreshold?: number;
 }
 
 // The ThresholdEngine ARCHITECTURE.md ยง3 describes: "sample -> reduce to
@@ -131,7 +156,8 @@ export async function computeMonitoringAlerts(organizationId: string): Promise<M
     if (!metric) continue;
 
     const thresholds = thresholdsBySpecies.get(event.pestSpecies.toLowerCase()) ?? builtinThresholdsFor(event.pestSpecies);
-    if (!isOverThreshold(metric, thresholds)) continue;
+    const crossed = crossedDimensions(metric, thresholds);
+    if (crossed.length === 0) continue;
 
     alerts.push({
       eventId: event.id,
@@ -144,6 +170,8 @@ export async function computeMonitoringAlerts(organizationId: string): Promise<M
       // "any detection," not a real percentage/density number.
       threshold: thresholds.presenceTriggered ? 0 : thresholdFor(metric, thresholds),
       at: latest.createdAt,
+      crossed,
+      ...(metric.severityPct != null ? { severityValue: metric.severityPct, severityThreshold: thresholds.severityPct } : {}),
     });
   }
   return alerts;

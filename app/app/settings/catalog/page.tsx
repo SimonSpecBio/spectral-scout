@@ -3,7 +3,7 @@ import Link from "next/link";
 import { db } from "@/db";
 import { customSpecies, monitoringThresholds, trapThresholds } from "@/db/schema";
 import { requireGrowerSession } from "@/lib/session";
-import { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD } from "@/lib/threshold-engine";
+import { DEFAULT_DENSITY_THRESHOLD, DEFAULT_INFESTED_PCT_THRESHOLD, DEFAULT_SEVERITY_PCT_THRESHOLD } from "@/lib/threshold-engine";
 import { DEFAULT_CATCH_PER_DAY_THRESHOLD } from "@/lib/trap-alerts";
 import CatalogClient from "./CatalogClient";
 
@@ -49,6 +49,7 @@ export default async function CatalogSettingsPage() {
         initialTrapThresholds={trapThresholdRows.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() }))}
         defaultPctThreshold={DEFAULT_INFESTED_PCT_THRESHOLD}
         defaultDensityThreshold={DEFAULT_DENSITY_THRESHOLD}
+        defaultSeverityPctThreshold={DEFAULT_SEVERITY_PCT_THRESHOLD}
         defaultCatchPerDayThreshold={DEFAULT_CATCH_PER_DAY_THRESHOLD}
       />
     </div>

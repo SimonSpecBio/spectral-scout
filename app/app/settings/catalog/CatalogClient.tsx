@@ -15,6 +15,7 @@ interface ThresholdRow {
   pestSpecies: string;
   infestedPctThreshold: number | null;
   densityThreshold: number | null;
+  severityPctThreshold: number | null;
   presenceTriggeredOverride: boolean | null;
   createdAt: string;
 }
@@ -40,6 +41,7 @@ export default function CatalogClient({
   initialTrapThresholds,
   defaultPctThreshold,
   defaultDensityThreshold,
+  defaultSeverityPctThreshold,
   defaultCatchPerDayThreshold,
 }: {
   isOwner: boolean;
@@ -48,6 +50,7 @@ export default function CatalogClient({
   initialTrapThresholds: TrapThresholdRow[];
   defaultPctThreshold: number;
   defaultDensityThreshold: number;
+  defaultSeverityPctThreshold: number;
   defaultCatchPerDayThreshold: number;
 }) {
   const [species, setSpecies] = useState(initialSpecies);
@@ -68,6 +71,7 @@ export default function CatalogClient({
   const [thresholdName, setThresholdName] = useState("");
   const [thresholdPct, setThresholdPct] = useState("");
   const [thresholdDensity, setThresholdDensity] = useState("");
+  const [thresholdSeverityPct, setThresholdSeverityPct] = useState("");
   // null = use the catalog default (or generic numeric fallback) for
   // whatever name is typed above; true/false = force presence-triggered
   // mode on or off regardless of what the catalog says.
@@ -113,6 +117,7 @@ export default function CatalogClient({
         pestSpecies: thresholdName,
         infestedPctThreshold: thresholdPct || null,
         densityThreshold: thresholdDensity || null,
+        severityPctThreshold: thresholdSeverityPct || null,
         presenceTriggeredOverride: thresholdPresenceOverride,
       }),
     });
@@ -125,6 +130,7 @@ export default function CatalogClient({
       setThresholdName("");
       setThresholdPct("");
       setThresholdDensity("");
+      setThresholdSeverityPct("");
       setThresholdPresenceOverride(null);
     } else {
       const body = await res.json().catch(() => ({}));
@@ -246,8 +252,9 @@ export default function CatalogClient({
           <div className="text-sm font-medium">Monitoring thresholds</div>
           <p className="text-xs text-[var(--text-dim)]">
             What triggers a monitoring alert for a species -- % infested for a Plant sampling leaf-by-leaf walk, mean pests/leaf for a
-            Counts tally (the two aren&apos;t the same scale, so each has its own threshold). Anything not listed uses the defaults,{" "}
-            {defaultPctThreshold}% / {defaultDensityThreshold} per leaf.
+            Counts tally, mean leaf-area severity for a disease assessment (checked independently from % infested -- either crossing
+            alerts). Anything not listed uses the defaults, {defaultPctThreshold}% / {defaultDensityThreshold} per leaf /{" "}
+            {defaultSeverityPctThreshold}% severity.
           </p>
         </div>
 
@@ -260,7 +267,7 @@ export default function CatalogClient({
                   <span className="label-mono">
                     {resolvedPresenceTriggered(t)
                       ? "Alert on any detection"
-                      : `${t.infestedPctThreshold ?? defaultPctThreshold}% · ${t.densityThreshold ?? defaultDensityThreshold}/leaf`}
+                      : `${t.infestedPctThreshold ?? defaultPctThreshold}% · ${t.densityThreshold ?? defaultDensityThreshold}/leaf · ${t.severityPctThreshold ?? defaultSeverityPctThreshold}% severity`}
                   </span>
                   {isOwner && (
                     <button onClick={() => removeThreshold(t)} className="text-xs text-[var(--danger)]">
@@ -334,6 +341,19 @@ export default function CatalogClient({
                     min="0"
                     step="0.1"
                     placeholder={`${defaultDensityThreshold}`}
+                    className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2 text-sm text-[var(--text-dim)]">
+                  Severity threshold (disease, % leaf area)
+                  <input
+                    value={thresholdSeverityPct}
+                    onChange={(e) => setThresholdSeverityPct(e.target.value)}
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder={`${defaultSeverityPctThreshold}%`}
                     className="w-24 rounded-md border border-[var(--border)] bg-transparent px-3 py-2 text-sm text-[var(--text)]"
                   />
                 </label>

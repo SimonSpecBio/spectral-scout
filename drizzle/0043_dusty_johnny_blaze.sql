@@ -1,0 +1,1 @@
+ALTER TABLE "scout_monitoring_threshold" ADD COLUMN "severity_pct_threshold" numeric;

@@ -1040,6 +1040,13 @@ export const monitoringThresholds = pgTable(
     pestSpecies: text("pest_species").notNull(),
     infestedPctThreshold: numeric("infested_pct_threshold", { mode: "number" }),
     densityThreshold: numeric("density_threshold", { mode: "number" }),
+    // Phase 0.6 (build-cycle doc, 2026-09-07): a disease_severity session's
+    // mean leaf-area severity, checked independently from infestedPctThreshold
+    // (incidence) -- a case where the same number of leaves are infected but
+    // each one is twice as bad used to read as flat/stable because nothing
+    // ever consulted this dimension. Null = no override, use
+    // DEFAULT_SEVERITY_PCT_THRESHOLD (lib/scout-metric.ts).
+    severityPctThreshold: numeric("severity_pct_threshold", { mode: "number" }),
     // Null = no override, use the catalog's presenceTriggered flag (or the
     // generic numeric defaults, for a species with neither). An org can
     // force EITHER direction explicitly -- true even for a species the

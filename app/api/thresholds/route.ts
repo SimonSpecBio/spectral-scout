@@ -51,6 +51,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  let severityPctThreshold: number | null | undefined;
+  if (body.severityPctThreshold !== undefined && body.severityPctThreshold !== null && body.severityPctThreshold !== "") {
+    severityPctThreshold = Number(body.severityPctThreshold);
+    if (!Number.isFinite(severityPctThreshold) || severityPctThreshold <= 0 || severityPctThreshold > 100) {
+      return NextResponse.json({ error: "severityPctThreshold must be between 0 and 100" }, { status: 400 });
+    }
+  }
+
   // Tri-state: absent -> leave whatever's already saved (or unset, on a
   // fresh row) alone; true/false -> an explicit override in that
   // direction; null -> explicitly clear back to the catalog default. This
@@ -61,8 +69,16 @@ export async function POST(request: NextRequest) {
     presenceTriggeredOverride = body.presenceTriggeredOverride === null ? null : Boolean(body.presenceTriggeredOverride);
   }
 
-  if (infestedPctThreshold === undefined && densityThreshold === undefined && presenceTriggeredOverride === undefined) {
-    return NextResponse.json({ error: "infestedPctThreshold, densityThreshold, or presenceTriggeredOverride is required" }, { status: 400 });
+  if (
+    infestedPctThreshold === undefined &&
+    densityThreshold === undefined &&
+    severityPctThreshold === undefined &&
+    presenceTriggeredOverride === undefined
+  ) {
+    return NextResponse.json(
+      { error: "infestedPctThreshold, densityThreshold, severityPctThreshold, or presenceTriggeredOverride is required" },
+      { status: 400 }
+    );
   }
 
   const existing = await db
@@ -77,6 +93,7 @@ export async function POST(request: NextRequest) {
       .set({
         ...(infestedPctThreshold !== undefined ? { infestedPctThreshold } : {}),
         ...(densityThreshold !== undefined ? { densityThreshold } : {}),
+        ...(severityPctThreshold !== undefined ? { severityPctThreshold } : {}),
         ...(presenceTriggeredOverride !== undefined ? { presenceTriggeredOverride } : {}),
       })
       .where(eq(monitoringThresholds.id, match.id))
@@ -91,6 +108,7 @@ export async function POST(request: NextRequest) {
       pestSpecies,
       infestedPctThreshold: infestedPctThreshold ?? null,
       densityThreshold: densityThreshold ?? null,
+      severityPctThreshold: severityPctThreshold ?? null,
       presenceTriggeredOverride: presenceTriggeredOverride ?? null,
     })
     .returning();

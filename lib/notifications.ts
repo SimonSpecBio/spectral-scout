@@ -47,11 +47,16 @@ export async function computeNotifications(organizationId: string, userId: strin
 
   const monitoringAlerts = await computeMonitoringAlerts(organizationId);
   for (const a of monitoringAlerts) {
+    // Names which dimension crossed (Phase 0.6, build-cycle doc
+    // 2026-09-07) -- a disease case where severity alone crossed (leaves
+    // just as infected, but each one is worse) used to be indistinguishable
+    // from a plain incidence alert, or invisible entirely.
+    const severityOnly = a.crossed.length === 1 && a.crossed[0] === "severity";
     notifications.push({
       id: `threshold-${a.eventId}`,
       kind: "threshold",
-      title: `${displayNameForPestSpecies(a.pestSpecies)} over threshold`,
-      sub: metricLabel({ kind: a.metricKind, value: a.value }),
+      title: `${displayNameForPestSpecies(a.pestSpecies)} ${severityOnly ? "severity" : ""} over threshold`.replace("  ", " "),
+      sub: metricLabel({ kind: a.metricKind, value: a.value, severityPct: a.severityValue }),
       at: a.at,
       href: `/app/facilities/${a.facilityId}/pest-events/${a.eventId}`,
     });

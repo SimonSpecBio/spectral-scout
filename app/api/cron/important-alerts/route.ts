@@ -74,10 +74,11 @@ export async function GET(request: NextRequest) {
       });
     }
     for (const a of monitoringAlerts) {
+      const severityOnly = a.crossed.length === 1 && a.crossed[0] === "severity";
       candidates.push({
         alertKey: `threshold-${a.eventId}`,
-        title: `${displayNameForPestSpecies(a.pestSpecies)} over threshold`,
-        body: metricLabel({ kind: a.metricKind, value: a.value }),
+        title: `${displayNameForPestSpecies(a.pestSpecies)} ${severityOnly ? "severity" : ""} over threshold`.replace("  ", " "),
+        body: metricLabel({ kind: a.metricKind, value: a.value, severityPct: a.severityValue }),
         url: `/app/facilities/${a.facilityId}/pest-events/${a.eventId}`,
       });
     }
