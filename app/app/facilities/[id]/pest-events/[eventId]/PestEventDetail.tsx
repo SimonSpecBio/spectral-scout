@@ -652,6 +652,19 @@ export default function PestEventDetail({
   const changeVsBaseline =
     densities.length >= 2 && baselineDensity > 0 ? Math.round(((baselineDensity - latestDensity) / baselineDensity) * 100) : null;
 
+  // Phase 1.5 (build-cycle doc, 2026-09-07): a disease_severity session
+  // carries two dimensions that move independently (0.6's "don't average
+  // them" decision) -- the chart above only ever plots incidence, so
+  // without this the severity number a case's own trend/CTA reads from
+  // (lib/case-cta.ts) was invisible on the page itself. Shown only when
+  // real severity readings exist, side by side with incidence, so it's
+  // visible which one actually moved rather than a single blended number.
+  const severities = chronological.map((s) => s.severityPct).filter((v): v is number => v != null);
+  const latestSeverity = severities[severities.length - 1];
+  const baselineSeverity = severities[0];
+  const severityChangeVsBaseline =
+    severities.length >= 2 ? Math.round(((baselineSeverity - latestSeverity) / Math.max(baselineSeverity, 1)) * 100) : null;
+
   // Phase 1.2/1.4 (build-cycle doc, 2026-09-07): one primary CTA per case.
   // Reuses the same `chronological` run (oldest-first, one consistent
   // metric kind) the chart already computes above, so the CTA's notion of
@@ -920,6 +933,22 @@ export default function PestEventDetail({
                 <div className="text-xs text-[var(--text-dim)]">since detection</div>
               </div>
             )}
+            {latestSeverity != null && (
+              <div>
+                <div className="text-2xl font-semibold">{Math.round(latestSeverity)}%</div>
+                <div className="text-xs text-[var(--text-dim)]">latest severity (mean leaf area)</div>
+              </div>
+            )}
+            {severityChangeVsBaseline != null && (
+              <div>
+                <div
+                  className={`text-2xl font-semibold ${severityChangeVsBaseline >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}
+                >
+                  {severityChangeVsBaseline >= 0 ? "▼" : "▲"} {Math.abs(severityChangeVsBaseline)}%
+                </div>
+                <div className="text-xs text-[var(--text-dim)]">severity since detection</div>
+              </div>
+            )}
             {SHOW_SESSIONS_LOGGED_STAT && (
               <div>
                 <div className="text-2xl font-semibold">{densities.length}</div>
@@ -950,6 +979,12 @@ export default function PestEventDetail({
               />
             </div>
           </div>
+          {latestSeverity != null && (
+            <div>
+              <div className="text-2xl font-semibold">{Math.round(latestSeverity)}%</div>
+              <div className="text-xs text-[var(--text-dim)]">latest severity (mean leaf area)</div>
+            </div>
+          )}
           {SHOW_MORE_SESSIONS_HINT && (
             <div className="text-xs text-[var(--text-faint)]">
               {MIN_SESSIONS_FOR_CHART - densities.length} more session{MIN_SESSIONS_FOR_CHART - densities.length === 1 ? "" : "s"} for a trend chart
