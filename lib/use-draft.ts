@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { namespacedKey } from "@/lib/client-identity";
 
 // Extracted from six near-identical copies (CountsFlow, MonitoringFlow,
 // DiseaseMonitoringFlow, NewEventForm, DiseaseEventForm, NewTreatmentForm)
@@ -28,10 +29,13 @@ import { useEffect, useState } from "react";
 // in-effect lint rule. Returns the raw parsed object (or null); callers
 // validate and default each field themselves, exactly as every original
 // copy already did.
+// Keys are namespaced by the signed-in identity (Task 763) so a draft
+// autosaved by one account is never restored into a form for a different
+// account that signs in next on the same device.
 export function useDraftValue(key: string): unknown {
   const [draft] = useState(() => {
     try {
-      const raw = localStorage.getItem(key);
+      const raw = localStorage.getItem(namespacedKey(key));
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -47,7 +51,7 @@ export function useDraftValue(key: string): unknown {
 export function useDraftAutosave(key: string, value: unknown): () => void {
   useEffect(() => {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(namespacedKey(key), JSON.stringify(value));
     } catch {
       /* storage full or unavailable */
     }
@@ -55,7 +59,7 @@ export function useDraftAutosave(key: string, value: unknown): () => void {
 
   return function clear() {
     try {
-      localStorage.removeItem(key);
+      localStorage.removeItem(namespacedKey(key));
     } catch {
       /* ignore */
     }

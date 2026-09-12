@@ -4,11 +4,13 @@ import { parseTheme, THEME_COOKIE } from "@/lib/theme";
 import { requireGrowerSession } from "@/lib/session";
 import BottomNav from "./BottomNav";
 import HeaderMenu from "./HeaderMenu";
+import IdentityBoot from "./IdentityBoot";
 import InstallPrompt from "./InstallPrompt";
 import NotificationBell from "./NotificationBell";
 import OfflineBanner from "./OfflineBanner";
 import OfflineQueueBadge from "./OfflineQueueBadge";
 import OfflineQueueFailedBadge from "./OfflineQueueFailedBadge";
+import OfflineQueueRecoveryBanner from "./OfflineQueueRecoveryBanner";
 import SessionExpiredBanner from "./SessionExpiredBanner";
 import StripDemoParam from "./StripDemoParam";
 import Sidebar from "./Sidebar";
@@ -25,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ThemeProvider initialTheme={theme}>
+      <IdentityBoot userId={session.user?.id} />
       <div className="mx-auto flex max-w-6xl gap-8 px-6 pb-28 pt-1.5 lg:pb-8 lg:pt-8">
         <Sidebar email={session.user?.email} isPilot={session.accountTier === "pilot"} />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5 lg:gap-6">
@@ -45,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <OfflineBanner />
         <OfflineQueueBadge />
         <OfflineQueueFailedBadge />
+        <OfflineQueueRecoveryBanner />
         <SessionExpiredBanner />
         <StripDemoParam />
         <InstallPrompt />
