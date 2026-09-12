@@ -4,10 +4,10 @@ This document defines the engineering half of Scout release promotion. It does *
 
 ## Candidate identity
 
-Every pull request into `master` runs `.github/workflows/scout-ci.yml` against the exact candidate commit. The workflow records an artifact containing:
+Every pull request into `master` runs `.github/workflows/scout-ci.yml` against the exact candidate head commit. The workflow records an artifact containing:
 
-- repository and exact Git commit SHA;
-- Git ref and GitHub Actions run/attempt identifiers;
+- repository and exact tested Git commit SHA;
+- Git event SHA/ref and GitHub Actions run/attempt identifiers;
 - `package-lock.json` SHA-256;
 - schema/migration tree SHA-256;
 - current decision/catalog-related source tree SHA-256 until CR2 introduces first-class policy/catalog version identifiers.
@@ -22,7 +22,7 @@ Before ordinary merge/promotion, the intended required checks are:
    - `npm ci` from the committed lockfile;
    - `npm run typecheck`;
    - `npm test`, including any integration suites discovered by Vitest;
-   - `npm run lint` with no silent `|| true` or warning suppression in CI;
+   - `npm run lint:ci`, which runs the full ESLint scan and permits only the exact pre-existing error keys listed in `ci/eslint-baseline.json`; any new error or stale baseline entry fails CI. The baseline is owned by Ops task `recgW0znTtkrHiYI1` and is not a general lint bypass;
    - `npm run ci:migrations`, which fails when Drizzle generation changes committed schema/migration state;
    - `npm run build` with CI-only placeholder configuration and no production credentials.
 2. `Scout CI / dependency-security`
