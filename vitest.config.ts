@@ -12,7 +12,11 @@ export default defineConfig({
     alias: { "@": path.resolve(__dirname, ".") },
   },
   test: {
+    // jsdom is the default because lib/offline-queue.test.ts needs
+    // window/navigator/indexedDB. The database-backed suites under test/db
+    // run against pglite (real server-side Postgres) and opt into the node
+    // environment per-file via a `// @vitest-environment node` docblock.
     environment: "jsdom",
-    include: ["lib/**/*.test.ts"],
+    include: ["lib/**/*.test.ts", "test/**/*.test.ts"],
   },
 });
