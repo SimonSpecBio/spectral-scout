@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { facilityAreas } from "@/db/schema";
 import { isDemoSession } from "@/lib/demo-account";
 import { getOwnedFacility } from "@/lib/facilities";
+import { consumeRateLimit, RATE_LIMIT_POLICIES } from "@/lib/rate-limit-store";
 import { requireGrowerSession } from "@/lib/session";
 import { safeFileName, stripImageMetadata, validateImageUpload } from "@/lib/validate-upload";
 
@@ -32,6 +33,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!(file instanceof File)) return NextResponse.json({ error: "file is required" }, { status: 400 });
   const uploadError = validateImageUpload(file);
   if (uploadError) return NextResponse.json({ error: uploadError }, { status: 400 });
+
+  const quota = await consumeRateLimit(
+    "blob.upload.actor",
+    `${session.organizationId!}:${session.user!.id!}`,
+    RATE_LIMIT_POLICIES.paidUploadActor
+  );
+  if (!quota.allowed) {
+    return NextResponse.json(
+      { error: "Too many uploads. Try again later." },
+      { status: 429, headers: { "Retry-After": String(quota.retryAfterSeconds) } }
+    );
+  }
 
   const stripped = await stripImageMetadata(Buffer.from(await file.arrayBuffer()), file.type);
   const blob = await put(`facility-areas/${areaId}/background-${Date.now()}-${safeFileName(file.name)}`, stripped, {

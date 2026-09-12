@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invites, membershipRoleEnum, memberships } from "@/db/schema";
 import { isDemoSession } from "@/lib/demo-account";
+import { consumeRateLimit, RATE_LIMIT_POLICIES } from "@/lib/rate-limit-store";
 import { getTeam } from "@/lib/team";
 import { requireGrowerSession } from "@/lib/session";
 
@@ -32,6 +33,18 @@ export async function POST(request: NextRequest) {
     .from(invites)
     .where(and(eq(invites.organizationId, session.organizationId!), eq(invites.email, email)));
   if (existingInvite) return NextResponse.json({ error: "Already invited" }, { status: 409 });
+
+  const quota = await consumeRateLimit(
+    "team.invite.actor",
+    `${session.organizationId!}:${session.user!.id!}`,
+    RATE_LIMIT_POLICIES.teamInviteActor
+  );
+  if (!quota.allowed) {
+    return NextResponse.json(
+      { error: "Too many invitations. Try again later." },
+      { status: 429, headers: { "Retry-After": String(quota.retryAfterSeconds) } }
+    );
+  }
 
   const [row] = await db
     .insert(invites)
