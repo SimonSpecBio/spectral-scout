@@ -1,0 +1,26 @@
+{
+  "ownerTask": "recgW0znTtkrHiYI1",
+  "sourceRun": "34684505429",
+  "createdAt": "2026-09-12",
+  "entries": [
+    "app/app/BayBarMap.tsx|32|react-hooks/set-state-in-effect",
+    "app/app/InstallPrompt.tsx|44|react-hooks/set-state-in-effect",
+    "app/app/MapLensSwitcher.tsx|98|react-hooks/purity",
+    "app/app/facilities/[id]/pest-events/[eventId]/PestEventDetail.tsx|393|react-hooks/purity",
+    "app/app/facilities/[id]/pest-events/[eventId]/PestEventDetail.tsx|1097|react/no-unescaped-entities",
+    "app/app/facilities/[id]/pest-events/[eventId]/PestEventDetail.tsx|1499|react/no-unescaped-entities",
+    "app/app/facilities/[id]/pest-events/[eventId]/PestEventDetail.tsx|1617|react/no-unescaped-entities",
+    "app/app/facilities/[id]/pest-events/[eventId]/RecommendationsPanel.tsx|144|react-hooks/set-state-in-effect",
+    "app/app/facilities/[id]/pest-events/[eventId]/RecommendationsPanel.tsx|290|react-hooks/static-components",
+    "app/app/notifications/NotificationsClient.tsx|43|react-hooks/set-state-in-effect",
+    "app/app/page.tsx|208|react-hooks/purity",
+    "app/app/page.tsx|211|react-hooks/purity",
+    "app/app/rei-phi/page.tsx|87|react-hooks/purity",
+    "app/app/rei-phi/page.tsx|106|react-hooks/purity",
+    "app/app/search/SearchClient.tsx|27|react-hooks/set-state-in-effect",
+    "app/app/settings/NotificationsToggle.tsx|25|react-hooks/set-state-in-effect",
+    "app/app/settings/legal/page.tsx|32|react/no-unescaped-entities",
+    "scripts/gen-icons.js|6|@typescript-eslint/no-require-imports",
+    "scripts/gen-icons.js|7|@typescript-eslint/no-require-imports"
+  ]
+}
