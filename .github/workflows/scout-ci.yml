@@ -38,11 +38,11 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Check out exact candidate commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Use Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -52,8 +52,8 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm test
-      - name: Lint
-        run: npm run lint
+      - name: Lint against owned baseline
+        run: npm run lint:ci
       - name: Verify committed migration state
         run: npm run ci:migrations
       - name: Production build
@@ -65,11 +65,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out exact candidate commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Use Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -81,7 +81,7 @@ jobs:
         run: npm audit --audit-level=critical
       - name: Upload audit evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: npm-audit-${{ github.sha }}
           path: npm-audit.json
@@ -95,7 +95,7 @@ jobs:
     if: always()
     steps:
       - name: Check out exact candidate commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Record immutable candidate identities
@@ -125,7 +125,7 @@ jobs:
           EOF
           cat ci-evidence/candidate.json >> "$GITHUB_STEP_SUMMARY"
       - name: Upload candidate evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: scout-candidate-${{ github.sha }}
           path: ci-evidence/candidate.json
