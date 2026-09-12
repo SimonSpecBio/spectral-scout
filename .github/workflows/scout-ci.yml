@@ -40,6 +40,7 @@ jobs:
       - name: Check out exact candidate commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Use Node 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -67,6 +68,7 @@ jobs:
       - name: Check out exact candidate commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Use Node 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -83,7 +85,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: npm-audit-${{ github.sha }}
+          name: npm-audit-${{ github.event.pull_request.head.sha || github.sha }}
           path: npm-audit.json
           if-no-files-found: error
           retention-days: 30
@@ -97,12 +99,14 @@ jobs:
       - name: Check out exact candidate commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Record immutable candidate identities
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p ci-evidence
+          tested_commit=$(git rev-parse HEAD)
           lock_sha=$(sha256sum package-lock.json | awk '{print $1}')
           schema_sha=$(git ls-files db drizzle drizzle.config.ts | sort | xargs sha256sum | sha256sum | awk '{print $1}')
           decision_files=$(git ls-files 'lib/*' 'db/*' | grep -Ei '(pest|catalog|threshold|decision|recommend|protocol)' || true)
@@ -114,7 +118,8 @@ jobs:
           cat > ci-evidence/candidate.json <<EOF
           {
             "repository": "${GITHUB_REPOSITORY}",
-            "commit": "${GITHUB_SHA}",
+            "commit": "${tested_commit}",
+            "event_sha": "${GITHUB_SHA}",
             "ref": "${GITHUB_REF}",
             "lockfile_sha256": "${lock_sha}",
             "schema_migration_tree_sha256": "${schema_sha}",
@@ -127,7 +132,7 @@ jobs:
       - name: Upload candidate evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: scout-candidate-${{ github.sha }}
+          name: scout-candidate-${{ github.event.pull_request.head.sha || github.sha }}
           path: ci-evidence/candidate.json
           if-no-files-found: error
           retention-days: 90
