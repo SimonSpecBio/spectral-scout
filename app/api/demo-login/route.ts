@@ -18,27 +18,7 @@ import { CURRENT_CONSENT_VERSION } from "@/lib/consent";
 import { DEMO_MANAGER_EMAIL, DEMO_QUERY_PARAM, DEMO_SCOUT_EMAIL, DEMO_SESSION_MAX_AGE_MS } from "@/lib/demo-account";
 import { grid2d } from "@/lib/layout-presets";
 import { assignCaseNumber } from "@/lib/pest-events";
-
-// Best-effort, in-memory, per-IP -- same "doesn't survive a cold start,
-// stops a scripted hammering loop" tradeoff as lib/rate-limit.ts's
-// checkSignInRateLimit, just keyed by IP since this route (unlike sign-in)
-// has no email to key on and is designed to be clickable with zero
-// verification by anyone -- including the AI agents Simon wants poking at
-// it, so the cap is generous, not a per-human assumption.
-const WINDOW_MS = 15 * 60_000;
-const MAX_ATTEMPTS = 30;
-const hits = new Map<string, { count: number; windowStart: number }>();
-function checkDemoLoginRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = hits.get(ip);
-  if (!entry || now - entry.windowStart > WINDOW_MS) {
-    hits.set(ip, { count: 1, windowStart: now });
-    return true;
-  }
-  if (entry.count >= MAX_ATTEMPTS) return false;
-  entry.count += 1;
-  return true;
-}
+import { consumeRateLimit, RATE_LIMIT_POLICIES } from "@/lib/rate-limit-store";
 
 // Two real identities in the SAME shared org (Phase 0.75, build-cycle doc
 // 2026-09-07), not a UI role switcher -- ensureDemoManager always runs
@@ -281,8 +261,12 @@ async function ensureDemoScoutTask(organizationId: string, facilityId: string, a
 
 async function handleDemoLogin(request: NextRequest): Promise<NextResponse> {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!checkDemoLoginRateLimit(ip)) {
-    return NextResponse.json({ error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
+  const quota = await consumeRateLimit("demo.login.ip", ip, RATE_LIMIT_POLICIES.demoLoginIp);
+  if (!quota.allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts. Try again in a few minutes." },
+      { status: 429, headers: { "Retry-After": String(quota.retryAfterSeconds) } }
+    );
   }
 
   // ensureDemoManager always runs first, whichever identity was actually
