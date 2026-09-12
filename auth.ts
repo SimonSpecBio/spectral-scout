@@ -6,6 +6,7 @@ import Nodemailer from "next-auth/providers/nodemailer";
 import { db } from "@/db";
 import { accounts, sessions, users, verificationTokens } from "@/db/auth-schema";
 import { invites, memberships, organizations, staff } from "@/db/schema";
+import { isGoogleEmailAuthoritative } from "@/lib/auth-linking";
 import { checkSignInRateLimit } from "@/lib/rate-limit";
 
 // Same static-allowlist pattern as spectral-ops/spectral-rnd/spectral-pilot's
@@ -100,19 +101,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // able to sign up with Google instead of magic-link (2026-09-04).
     //
     // allowDangerousEmailAccountLinking (Task 603, decision recorded
-    // 2026-09-05): kept ON, deliberately. Threat model -- this auto-links a
-    // Google sign-in to an existing user row with the same email, created
-    // by ANY method (an earlier magic-link sign-in, most likely). Since
-    // Google verifies the email address itself before ever reaching us,
-    // the only way to exploit this is to control an email address someone
-    // else already used to sign up here, which is already a full account
-    // takeover via the magic-link path regardless of this flag (whoever
-    // controls the inbox can just request a new link). Turning it off
-    // would break the exact feature just shipped -- a grower who signed up
-    // with email X via magic-link, then later clicks "Sign in with
-    // Google" using a Google account that happens to be X, would hit
-    // OAuthAccountNotLinked ("confirm your identity, sign in with the
-    // original account") instead of landing in their own existing org.
+    // 2026-09-05): kept ON so a grower who signed up with email X via
+    // magic-link can later "Sign in with Google" using the Google account
+    // for X and land in their own existing org, instead of hitting
+    // OAuthAccountNotLinked.
+    //
+    // Task 764 narrows the danger this flag would otherwise carry: the flag
+    // links purely by email, without regard to whether Google actually
+    // verified that address. The signIn callback below now refuses a Google
+    // sign-in whose email Google has NOT verified
+    // (isGoogleEmailAuthoritative), so an untrusted provider assertion can no
+    // longer auto-link into (or create) an account. Verified Gmail/Workspace
+    // -- the only accounts real growers use -- are unaffected.
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -129,13 +129,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   session: { strategy: "database" },
   callbacks: {
-    async signIn({ user, account, email }) {
+    async signIn({ user, account, email, profile }) {
       // Staff are identified by the allowlist regardless of provider; org
       // provisioning for everyone else (grower self-serve, via Google or
       // email) happens in the session callback below, on first successful
       // sign-in.
       const userEmail = user.email?.toLowerCase();
       if (!userEmail) return false;
+
+      // Task 764: a Google sign-in is trusted to link/create an account only
+      // when Google has verified the email (email_verified). An unverified
+      // assertion is refused here -- before allowDangerousEmailAccountLinking
+      // could auto-link it into an existing user/org -- and the person is sent
+      // back to sign in with their original method (magic-link to the real
+      // inbox). Returning a redirect string (not false) lands on this app's
+      // own /sign-in with a controlled code, same pattern as RateLimited below.
+      if (account?.provider === "google" && !isGoogleEmailAuthoritative(profile)) {
+        return `/sign-in?error=UnverifiedGoogleEmail&email=${encodeURIComponent(userEmail)}`;
+      }
 
       // email.verificationRequest is true specifically on the call that's
       // about to send a magic-link email (not the later call after the

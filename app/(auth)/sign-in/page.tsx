@@ -13,6 +13,11 @@ function errorMessageFor(code: string | undefined): string | null {
   switch (code) {
     case "RateLimited":
       return "You've requested a few sign-in links already. Check your inbox and spam folder, or try again in 15 minutes.";
+    case "UnverifiedGoogleEmail":
+      // Task 764: the Google account's email isn't verified by Google, so we
+      // won't link or create an account from it. Direct them to email
+      // sign-in, which proves control of the actual inbox.
+      return "We couldn't confirm that Google account's email address. Sign in with your email below instead -- it works with any address.";
     case "Verification":
       return "That sign-in link has expired or was already used. Request a new one below.";
     case "OAuthAccountNotLinked":
