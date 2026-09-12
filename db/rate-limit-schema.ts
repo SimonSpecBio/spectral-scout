@@ -14,4 +14,4 @@ export const rateLimitBuckets = pgTable(
     uniqueIndex("scout_rate_limit_bucket_scope_key_window_unique").on(table.scope, table.keyHash, table.bucketStart),
     index("scout_rate_limit_bucket_expires_at_idx").on(table.expiresAt),
   ]
-);
+).enableRLS();
