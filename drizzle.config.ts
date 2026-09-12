@@ -9,7 +9,7 @@ if (existsSync(".env.local")) {
 
 export default defineConfig({
   out: "./drizzle",
-  schema: ["./db/schema.ts", "./db/auth-schema.ts"],
+  schema: ["./db/schema.ts", "./db/rate-limit-schema.ts", "./db/auth-schema.ts"],
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL!,
