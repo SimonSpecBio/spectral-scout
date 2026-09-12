@@ -1,0 +1,138 @@
+name: Scout CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scout-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  DATABASE_URL: postgresql://scout_ci:scout_ci@127.0.0.1:5432/scout_ci?sslmode=disable
+  AUTH_SECRET: ci-only-not-a-production-secret-ci-only
+  ALLOWED_STAFF_EMAILS: staff@example.invalid
+  GOOGLE_CLIENT_ID: ci-client-id
+  GOOGLE_CLIENT_SECRET: ci-client-secret
+  EMAIL_SERVER: smtp://127.0.0.1:2525
+  EMAIL_FROM: Scout CI <scout-ci@example.invalid>
+  BLOB_READ_WRITE_TOKEN: vercel_blob_rw_ci_only
+  CRON_SECRET: ci-only-cron-secret
+  VAPID_PUBLIC_KEY: ci-only-public-key
+  VAPID_PRIVATE_KEY: ci-only-private-key
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: ci-only-public-key
+  SENTRY_DSN: ""
+  NEXT_PUBLIC_SENTRY_DSN: ""
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Use Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependency tree
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Lint against owned baseline
+        run: npm run lint:ci
+      - name: Verify committed migration state
+        run: npm run ci:migrations
+      - name: Production build
+        run: npm run build
+
+  dependency-security:
+    name: dependency-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Use Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependency tree
+        run: npm ci --ignore-scripts
+      - name: Capture complete npm audit evidence
+        run: npm audit --json > npm-audit.json || true
+      - name: Fail closed on critical dependency advisories
+        run: npm audit --audit-level=critical
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-audit-${{ github.event.pull_request.head.sha || github.sha }}
+          path: npm-audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+  candidate-evidence:
+    name: candidate-evidence
+    runs-on: ubuntu-latest
+    needs: [verify, dependency-security]
+    if: always()
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Record immutable candidate identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-evidence
+          tested_commit=$(git rev-parse HEAD)
+          lock_sha=$(sha256sum package-lock.json | awk '{print $1}')
+          schema_sha=$(git ls-files db drizzle drizzle.config.ts | sort | xargs sha256sum | sha256sum | awk '{print $1}')
+          decision_files=$(git ls-files 'lib/*' 'db/*' | grep -Ei '(pest|catalog|threshold|decision|recommend|protocol)' || true)
+          if [ -n "$decision_files" ]; then
+            decision_sha=$(printf '%s\n' "$decision_files" | sort | xargs sha256sum | sha256sum | awk '{print $1}')
+          else
+            decision_sha="none"
+          fi
+          cat > ci-evidence/candidate.json <<EOF
+          {
+            "repository": "${GITHUB_REPOSITORY}",
+            "commit": "${tested_commit}",
+            "event_sha": "${GITHUB_SHA}",
+            "ref": "${GITHUB_REF}",
+            "lockfile_sha256": "${lock_sha}",
+            "schema_migration_tree_sha256": "${schema_sha}",
+            "decision_catalog_source_tree_sha256": "${decision_sha}",
+            "run_id": "${GITHUB_RUN_ID}",
+            "run_attempt": "${GITHUB_RUN_ATTEMPT}"
+          }
+          EOF
+          cat ci-evidence/candidate.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload candidate evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: scout-candidate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ci-evidence/candidate.json
+          if-no-files-found: error
+          retention-days: 90

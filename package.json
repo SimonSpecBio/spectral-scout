@@ -7,10 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "lint:ci": "node scripts/check-eslint-baseline.mjs",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "ci:migrations": "npm run db:generate && git diff --exit-code -- db drizzle drizzle.config.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
