@@ -1,12 +1,16 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { eq } from "drizzle-orm";
-import NextAuth from "next-auth";
+import NextAuth, { AuthError } from "next-auth";
 import Google from "next-auth/providers/google";
 import Nodemailer from "next-auth/providers/nodemailer";
 import { db } from "@/db";
 import { accounts, sessions, users, verificationTokens } from "@/db/auth-schema";
 import { invites, memberships, organizations, staff } from "@/db/schema";
 import { checkSignInRateLimit } from "@/lib/rate-limit";
+
+class RateLimitedAuthError extends AuthError {
+  static type = "RateLimited";
+}
 
 // Same static-allowlist pattern as spectral-ops/spectral-rnd/spectral-pilot's
 // staff side -- internal Spectral team only.
@@ -141,19 +145,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // about to send a magic-link email (not the later call after the
       // grower clicks the link) -- the right checkpoint to throttle before
       // this triggers a real Resend send. Scoped to the nodemailer
-      // provider only; Google (staff) sign-in is unaffected.
-      //
-      // Returning false here used to render NextAuth's generic
-      // "AccessDenied -- You do not have permission to sign in" (Task 602)
-      // -- indistinguishable from a real denial, for a grower who just
-      // asked for a second link because the first was slow to arrive.
-      // Returning a redirect string instead of false skips that generic
-      // path entirely: the signIn callback's return value becomes the
-      // actual redirect target when it's a string (not run through
-      // Auth.js's error-code allowlist at all), landing straight on
-      // /sign-in with a code this app defines and controls.
-      if (account?.provider === "nodemailer" && email?.verificationRequest && !checkSignInRateLimit(userEmail)) {
-        return `/sign-in?error=RateLimited&email=${encodeURIComponent(userEmail)}`;
+      // provider only; Google sign-in is unaffected. A custom AuthError
+      // preserves the branded Auth.js error path instead of returning a
+      // generic access denial when the persistent quota is exhausted.
+      if (account?.provider === "nodemailer" && email?.verificationRequest) {
+        const allowed = await checkSignInRateLimit(userEmail);
+        if (!allowed) throw new RateLimitedAuthError("Too many sign-in links requested. Try again later.");
       }
 
       return true;
