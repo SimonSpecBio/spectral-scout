@@ -1,6 +1,18 @@
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dismissFailed, flushQueue, getFailed, getPending, isRetryableStatus, onAuthRequired, queuedFetch } from "./offline-queue";
+import {
+  adoptOrphans,
+  discardOrphans,
+  dismissFailed,
+  flushQueue,
+  getFailed,
+  getOrphanCount,
+  getPending,
+  isRetryableStatus,
+  onAuthRequired,
+  queuedFetch,
+} from "./offline-queue";
+import { setActiveIdentity } from "./client-identity";
 
 // The real API always answers with application/json (NextResponse.json), which
 // is the signal Task 761's acknowledgement check keys off to tell a committed
@@ -60,8 +72,31 @@ function resetDatabase(): Promise<void> {
   });
 }
 
+// Adds a raw item with NO identity field -- simulates a queued capture left by
+// an app version from before per-identity namespacing (Task 763).
+function addLegacyPending(item: Record<string, unknown>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("spectral-scout-offline", 2);
+    req.onsuccess = () => {
+      const db = req.result;
+      const tx = db.transaction("pending", "readwrite");
+      tx.objectStore("pending").add(item);
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
 beforeEach(async () => {
   await resetDatabase();
+  setActiveIdentity(null); // start each test with no owner (matches pre-763 behavior)
   vi.stubGlobal("fetch", vi.fn());
   Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
 });
@@ -286,5 +321,96 @@ describe("validated acknowledgement (Task 761)", () => {
     // Not a commit for this item -> preserved (never deleted on a mismatched ack).
     expect(await getPending()).toHaveLength(1);
     expect(await getFailed()).toHaveLength(0);
+  });
+});
+
+// Task 763: browser-local work is owned by the signed-in identity. On a shared
+// device, an account switch must never surface or replay the previous user's
+// captures, and the same user's pending work must survive re-authentication.
+describe("per-identity namespacing (Task 763)", () => {
+  it("scopes pending work to the signed-in identity across an account switch", async () => {
+    setActiveIdentity("userA");
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TypeError("offline"));
+    await queuedFetch("/api/x", { a: 1 }, "A capture");
+    expect(await getPending()).toHaveLength(1);
+
+    // Switch to a different account -> the first account's work is invisible.
+    setActiveIdentity("userB");
+    expect(await getPending()).toHaveLength(0);
+    expect(await getFailed()).toHaveLength(0);
+
+    // The original user signs back in -> their pending work is preserved.
+    setActiveIdentity("userA");
+    const pending = await getPending();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].url).toBe("/api/x");
+  });
+
+  it("never replays one account's queued item while a different account is signed in", async () => {
+    setActiveIdentity("userA");
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TypeError("offline"));
+    await queuedFetch("/api/x", { a: 1 }, "A capture");
+
+    // As userB, a flush must not touch userA's item -- so fetch is never called.
+    // (Clear the mock first: the offline capture above already recorded one
+    // rejected fetch attempt.)
+    setActiveIdentity("userB");
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonRes({ id: "committed" }));
+    fetchMock.mockClear();
+    await flushQueue();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // userA's item is intact and replays normally once they are back.
+    setActiveIdentity("userA");
+    await flushQueue();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await getPending()).toHaveLength(0);
+  });
+
+  it("keeps a captured body from being replayed under another identity", async () => {
+    setActiveIdentity("userA");
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TypeError("offline"));
+    await queuedFetch("/api/x", { secret: "A's data" }, "A capture");
+
+    // userB flushes -> nothing sent, so A's body can never reach the server as B.
+    setActiveIdentity("userB");
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonRes({ id: "committed" }));
+    fetchMock.mockClear(); // ignore the rejected attempt from the offline capture above
+    await flushQueue();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  describe("legacy orphan recovery", () => {
+    it("does not surface or replay unowned legacy items, but exposes them for recovery", async () => {
+      await addLegacyPending({ url: "/api/legacy", method: "POST", body: { a: 1 }, createdAt: Date.now(), label: "Legacy" });
+      setActiveIdentity("userA");
+
+      // Not owned by anyone provable -> invisible to the normal queue...
+      expect(await getPending()).toHaveLength(0);
+      // ...but offered for explicit recovery.
+      expect(await getOrphanCount()).toBe(1);
+    });
+
+    it("adopts orphans into the current identity so they sync as that user", async () => {
+      await addLegacyPending({ url: "/api/legacy", method: "POST", body: { a: 1 }, createdAt: Date.now(), label: "Legacy" });
+      setActiveIdentity("userA");
+
+      await adoptOrphans();
+      expect(await getOrphanCount()).toBe(0);
+      const pending = await getPending();
+      expect(pending).toHaveLength(1);
+      expect(pending[0].url).toBe("/api/legacy");
+    });
+
+    it("discards orphans when the user chooses not to claim them", async () => {
+      await addLegacyPending({ url: "/api/legacy", method: "POST", body: { a: 1 }, createdAt: Date.now(), label: "Legacy" });
+      setActiveIdentity("userA");
+
+      await discardOrphans();
+      expect(await getOrphanCount()).toBe(0);
+      expect(await getPending()).toHaveLength(0);
+    });
   });
 });

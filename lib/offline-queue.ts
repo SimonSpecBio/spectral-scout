@@ -1,3 +1,5 @@
+import { getActiveIdentity, onIdentityChanged } from "@/lib/client-identity";
+
 // Offline capture queue -- originally scoped to just scouting/sampling
 // sessions, trap readings, and treatments (the three types INSTALL_PWA.md's
 // spec called out), extended to every field-capture form (facilities,
@@ -45,6 +47,12 @@ interface PendingRequest {
   // caption) -- appended to the same multipart form as the file itself,
   // both on the immediate-send path and on queued replay.
   extraFields?: Record<string, string>;
+  // The signed-in identity that captured this item (Task 763). Reads and
+  // replay are filtered to the current identity so one account never sees or
+  // replays another's queued work on a shared device. `undefined` marks a
+  // legacy item from before namespacing -- ownership unprovable, handled via
+  // the orphan recovery path rather than ever auto-replayed.
+  identity?: string | null;
   createdAt: number;
   label: string; // human-readable, shown in the pending-sync indicator
 }
@@ -85,22 +93,38 @@ async function enqueue(
   extraFields?: Record<string, string>
 ): Promise<void> {
   const db = await openDB();
+  const identity = getActiveIdentity();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).add({ url, method, body, isFile, fileFieldName, extraFields, createdAt: Date.now(), label });
+    tx.objectStore(STORE).add({ url, method, body, isFile, fileFieldName, extraFields, identity, createdAt: Date.now(), label });
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
   notifyChanged();
 }
 
-export async function getPending(): Promise<PendingRequest[]> {
+async function readAllFrom(store: string): Promise<PendingRequest[]> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const req = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
+    const req = db.transaction(store, "readonly").objectStore(store).getAll();
     req.onsuccess = () => resolve(req.result as PendingRequest[]);
     req.onerror = () => reject(req.error);
   });
+}
+
+// True when an item belongs to the account currently signed in. A fresh item
+// captured while no owner was known is stamped null; a legacy item predating
+// namespacing has no identity field at all (undefined) and belongs to nobody
+// provable -- see the orphan recovery helpers below.
+function belongsToCurrentIdentity(item: PendingRequest): boolean {
+  return (item.identity ?? null) === getActiveIdentity();
+}
+
+// Only ever returns the current identity's pending work -- another account's
+// queued captures stay in storage but are invisible here (and so never flush)
+// until that account signs back in.
+export async function getPending(): Promise<PendingRequest[]> {
+  return (await readAllFrom(STORE)).filter(belongsToCurrentIdentity);
 }
 
 async function removePending(id: number): Promise<void> {
@@ -114,12 +138,54 @@ async function removePending(id: number): Promise<void> {
 }
 
 export async function getFailed(): Promise<FailedRequest[]> {
+  return (await readAllFrom(FAILED_STORE)).filter(belongsToCurrentIdentity) as FailedRequest[];
+}
+
+// --- Orphan recovery (Task 763) ------------------------------------------
+// Legacy pending/failed items from before per-identity namespacing carry no
+// owner. They are never auto-replayed (that could submit one person's capture
+// as another). Instead the current user is offered an explicit choice: adopt
+// them (claim ownership -- almost always correct, since a pre-namespacing
+// device had a single user) or discard.
+function isOrphan(item: PendingRequest): boolean {
+  return item.identity === undefined;
+}
+
+export async function getOrphanCount(): Promise<number> {
+  const [pending, failed] = await Promise.all([readAllFrom(STORE), readAllFrom(FAILED_STORE)]);
+  return pending.filter(isOrphan).length + failed.filter(isOrphan).length;
+}
+
+async function reassignOrphans(action: "adopt" | "discard"): Promise<void> {
+  const identity = getActiveIdentity();
   const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const req = db.transaction(FAILED_STORE, "readonly").objectStore(FAILED_STORE).getAll();
-    req.onsuccess = () => resolve(req.result as FailedRequest[]);
-    req.onerror = () => reject(req.error);
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction([STORE, FAILED_STORE], "readwrite");
+    for (const store of [STORE, FAILED_STORE]) {
+      const os = tx.objectStore(store);
+      const req = os.getAll();
+      req.onsuccess = () => {
+        for (const item of req.result as PendingRequest[]) {
+          if (item.identity !== undefined) continue;
+          if (action === "adopt") os.put({ ...item, identity });
+          else os.delete(item.id);
+        }
+      };
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
+  notifyChanged();
+}
+
+// Claim legacy items for the signed-in user; the next flush replays them.
+export async function adoptOrphans(): Promise<void> {
+  await reassignOrphans("adopt");
+}
+
+// Drop legacy items whose owner can't be proven.
+export async function discardOrphans(): Promise<void> {
+  await reassignOrphans("discard");
 }
 
 // A grower dismissing a failed item after re-entering it by hand (or just
@@ -506,5 +572,12 @@ export function initOfflineQueue(): void {
     if (document.visibilityState === "visible") flushQueue();
   });
   window.addEventListener("pageshow", () => flushQueue());
+  // Account switch / re-auth: re-scope the badges to the new owner and flush
+  // that owner's own pending work (never the previous account's, which
+  // getPending now filters out).
+  onIdentityChanged(() => {
+    notifyChanged();
+    flushQueue();
+  });
   if (navigator.onLine) flushQueue();
 }
