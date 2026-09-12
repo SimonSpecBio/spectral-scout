@@ -26,6 +26,7 @@ export type IdempotencyClaim = {
 };
 
 function normalizeForFingerprint(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) return value.map(normalizeForFingerprint);
   if (!value || typeof value !== "object") return value;
 
@@ -93,9 +94,6 @@ export async function claimIdempotencyKey(
   `);
   const existing = existingResult.rows[0] as ReceiptRow | undefined;
   if (!existing) {
-    // This should be unreachable: ON CONFLICT can only lose to a row on the
-    // same unique tuple. Fail closed rather than execute business effects
-    // without a durable replay receipt.
     throw new Error("Idempotency receipt conflict resolved without an existing receipt");
   }
   if (existing.request_fingerprint !== fingerprint) throw new IdempotencyConflictError();
