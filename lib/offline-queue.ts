@@ -249,12 +249,75 @@ function withCapturedDate(body: unknown): unknown {
   return { ...body, capturedDate: capturedDateLocal(now), capturedAt: now.toISOString(), clientRequestId: crypto.randomUUID() };
 }
 
+// Task 761: a 2xx status alone does NOT prove a field mutation committed.
+// A service worker serving a cached HTML app shell, or the server bouncing an
+// expired session to the sign-in/onboarding page, both surface here as a
+// perfectly "ok" 200 whose body is HTML -- not this app's JSON API
+// acknowledging a committed write. Treating those as success is exactly how a
+// queued capture used to be deleted on flush without ever reaching the
+// database (res.ok-only handling). A committed field mutation is only ever our
+// JSON API returning an object/array result; anything else -- an HTML shell, a
+// sign-in redirect, malformed JSON, or a payload for some other request -- is
+// not a commit and must never clear pending work.
+//
+// ACK_CONTRACT_VERSION marks this as a versioned client-side contract so a
+// future server-emitted acknowledgement envelope can be negotiated without
+// silently changing what counts as committed.
+export const ACK_CONTRACT_VERSION = 1;
+
+type Ack =
+  | { kind: "committed"; data: unknown }
+  | { kind: "auth-wall" } // 2xx but not our JSON API -- HTML shell / sign-in redirect
+  | { kind: "invalid" }; // JSON content type but malformed, an error body, or for a different request
+
+// Reads a response and decides whether it is a trustworthy commit
+// acknowledgement. Consumes the body at most once (via res.json()).
+async function readAck(res: Response, sentClientRequestId: string | null): Promise<Ack> {
+  const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
+  // The single most important check: our API always answers with
+  // application/json (NextResponse.json). An HTML content type is a shell or a
+  // sign-in/onboarding page the session got redirected to, never a write.
+  if (!contentType.includes("application/json")) return { kind: "auth-wall" };
+
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    return { kind: "invalid" }; // malformed JSON -- do not trust it as a commit
+  }
+  if (body === null || typeof body !== "object") return { kind: "invalid" };
+
+  if (!Array.isArray(body)) {
+    const obj = body as Record<string, unknown>;
+    // A committed mutation returns the created/updated resource (an object,
+    // typically carrying an id) or an explicit { ok: true } -- never an
+    // { error } body on a 2xx.
+    if ("error" in obj && !("id" in obj) && obj.ok !== true) return { kind: "invalid" };
+    // Opportunistic request-identity check (forward compatible): if the server
+    // echoes a clientRequestId, it must be the one we sent. Routes that don't
+    // echo it are unaffected -- the field is simply absent, and the check is
+    // skipped.
+    if (sentClientRequestId && typeof obj.clientRequestId === "string" && obj.clientRequestId !== sentClientRequestId) {
+      return { kind: "invalid" };
+    }
+  }
+  return { kind: "committed", data: body };
+}
+
+function clientRequestIdOf(body: unknown): string | null {
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    const v = (body as Record<string, unknown>).clientRequestId;
+    if (typeof v === "string") return v;
+  }
+  return null;
+}
+
 export async function queuedFetch(
   url: string,
   body: unknown,
   label: string,
   method: string = "POST"
-): Promise<{ ok: boolean; queued: boolean; data?: unknown }> {
+): Promise<{ ok: boolean; queued: boolean; data?: unknown; authRequired?: boolean }> {
   inFlightMutations++;
   const stampedBody = withCapturedDate(body);
   try {
@@ -268,7 +331,17 @@ export async function queuedFetch(
           body: JSON.stringify(stampedBody),
           signal: controller.signal,
         });
-        if (res.ok) return { ok: true, queued: false, data: await res.json() };
+        if (res.ok) {
+          const ack = await readAck(res, clientRequestIdOf(stampedBody));
+          if (ack.kind === "committed") return { ok: true, queued: false, data: ack.data };
+          // A 2xx that isn't a real commit (auth wall / stale shell / malformed
+          // body). The capture did NOT land, so never report it committed:
+          // preserve it in the queue to replay once the session is restored,
+          // and surface the auth-needed state when that's the cause.
+          await enqueue(url, method, stampedBody, label);
+          if (ack.kind === "auth-wall") notifyAuthRequired();
+          return { ok: true, queued: true, authRequired: ack.kind === "auth-wall" };
+        }
         return { ok: false, queued: false };
       } catch {
         // network failure while the browser thought it was online (flaky
@@ -295,7 +368,7 @@ export async function queuedFileFetch(
   fieldName: string,
   label: string,
   extraFields?: Record<string, string>
-): Promise<{ ok: boolean; queued: boolean; data?: unknown }> {
+): Promise<{ ok: boolean; queued: boolean; data?: unknown; authRequired?: boolean }> {
   inFlightMutations++;
   try {
     if (typeof navigator !== "undefined" && navigator.onLine) {
@@ -306,7 +379,17 @@ export async function queuedFileFetch(
         form.append(fieldName, file);
         if (extraFields) for (const [k, v] of Object.entries(extraFields)) form.append(k, v);
         const res = await fetch(url, { method: "POST", body: form, signal: controller.signal });
-        if (res.ok) return { ok: true, queued: false, data: await res.json() };
+        if (res.ok) {
+          // A file upload carries no clientRequestId (its body is the raw
+          // File), so identity can't be echo-checked; the JSON-ack validation
+          // (content type + committed result) still rules out HTML shells and
+          // sign-in redirects.
+          const ack = await readAck(res, null);
+          if (ack.kind === "committed") return { ok: true, queued: false, data: ack.data };
+          await enqueue(url, "POST", file, label, true, fieldName, extraFields);
+          if (ack.kind === "auth-wall") notifyAuthRequired();
+          return { ok: true, queued: true, authRequired: ack.kind === "auth-wall" };
+        }
         return { ok: false, queued: false };
       } catch {
         // see queuedFetch above
@@ -361,8 +444,19 @@ export async function flushQueue(): Promise<void> {
           res = await fetch(item.url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(item.body) });
         }
         if (res.ok) {
-          await removePending(item.id);
-          continue;
+          const ack = await readAck(res, item.isFile ? null : clientRequestIdOf(item.body));
+          if (ack.kind === "committed") {
+            await removePending(item.id);
+            continue;
+          }
+          // A 2xx that isn't a real commit -- e.g. the session expired mid-flush
+          // and the server returned the sign-in page as a 200 (HTML), or a
+          // stale service-worker shell. Deleting on this is the exact data-loss
+          // bug this ticket closes. Leave the item (and everything queued after
+          // it -- order matters) to replay once the session is restored, and
+          // prompt a real sign-in when that's the cause.
+          if (ack.kind === "auth-wall") notifyAuthRequired();
+          break;
         }
         if (isRetryableStatus(res.status)) {
           // Leave this item (and everything queued after it, since replay

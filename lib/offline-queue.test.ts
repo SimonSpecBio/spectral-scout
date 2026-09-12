@@ -2,6 +2,21 @@ import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dismissFailed, flushQueue, getFailed, getPending, isRetryableStatus, onAuthRequired, queuedFetch } from "./offline-queue";
 
+// The real API always answers with application/json (NextResponse.json), which
+// is the signal Task 761's acknowledgement check keys off to tell a committed
+// write apart from an HTML shell or a sign-in redirect served as a 200. A bare
+// `new Response(string)` defaults to text/plain, so success mocks must set the
+// header to look like the real server.
+function jsonRes(body: unknown, status = 200): Response {
+  return new Response(typeof body === "string" ? body : JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+function htmlRes(status = 200): Response {
+  return new Response("<!doctype html><title>Sign in</title>", { status, headers: { "content-type": "text/html" } });
+}
+
 // A field tool used in greenhouse dead zones lives or dies on this file
 // never silently losing or duplicating a submission. Its own top-of-file
 // comment flags it as "only exercised via npm run build" -- this is the
@@ -67,7 +82,7 @@ describe("isRetryableStatus", () => {
 
 describe("queuedFetch", () => {
   it("succeeds immediately online -- nothing is queued", async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response(JSON.stringify({ id: "1" }), { status: 200 }));
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonRes({ id: "1" }));
     const result = await queuedFetch("/api/x", { a: 1 }, "Test");
     expect(result).toEqual({ ok: true, queued: false, data: { id: "1" } });
     expect(await getPending()).toHaveLength(0);
@@ -112,7 +127,7 @@ describe("flushQueue", () => {
     await queuedFetch("/api/x", { a: 1 }, "Test");
     expect(await getPending()).toHaveLength(1);
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response("{}", { status: 200 }));
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonRes({}));
     await flushQueue();
     expect(await getPending()).toHaveLength(0);
   });
@@ -123,7 +138,7 @@ describe("flushQueue", () => {
     const queuedBody = (await getPending())[0].body as { clientRequestId: string };
 
     const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
+    fetchMock.mockResolvedValue(jsonRes({}));
     await flushQueue();
 
     const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
@@ -173,5 +188,103 @@ describe("flushQueue", () => {
     const stillPending = await getPending();
     expect(stillPending).toHaveLength(2); // both untouched, original order preserved
     expect(stillPending[0].url).toBe("/api/first");
+  });
+});
+
+// Task 761: a 2xx is not proof of a commit. These cover the failure modes a
+// bare res.ok check let through -- an HTML app shell, a sign-in/onboarding
+// redirect served as 200, malformed JSON, and a payload for a different
+// request -- none of which may ever clear pending field work.
+describe("validated acknowledgement (Task 761)", () => {
+  it("online: a 200 HTML app shell is not a commit -- capture is queued, not reported committed", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(htmlRes(200));
+    const result = await queuedFetch("/api/x", { a: 1 }, "Test");
+    expect(result.queued).toBe(true);
+    expect(result.data).toBeUndefined();
+    expect(await getPending()).toHaveLength(1);
+  });
+
+  it("online: a 200 sign-in/onboarding page raises auth-needed and preserves the capture", async () => {
+    const authRequired = vi.fn();
+    const unsubscribe = onAuthRequired(authRequired);
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(htmlRes(200));
+    const result = await queuedFetch("/api/x", { a: 1 }, "Test");
+    expect(result.authRequired).toBe(true);
+    expect(authRequired).toHaveBeenCalledTimes(1);
+    expect(await getPending()).toHaveLength(1);
+    unsubscribe();
+  });
+
+  it("online: malformed JSON on a 200 is not a commit -- capture is queued", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response("{not valid json", { status: 200, headers: { "content-type": "application/json" } })
+    );
+    const result = await queuedFetch("/api/x", { a: 1 }, "Test");
+    expect(result.queued).toBe(true);
+    expect(result.data).toBeUndefined();
+    expect(await getPending()).toHaveLength(1);
+  });
+
+  it("flush: a 200 HTML shell never deletes the queued item (the data-loss bug)", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TypeError("offline"));
+    await queuedFetch("/api/x", { a: 1 }, "Test");
+    expect(await getPending()).toHaveLength(1);
+
+    const authRequired = vi.fn();
+    const unsubscribe = onAuthRequired(authRequired);
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(htmlRes(200));
+    await flushQueue();
+
+    expect(await getPending()).toHaveLength(1); // preserved, not deleted
+    expect(await getFailed()).toHaveLength(0); // and not misclassified as failed
+    expect(authRequired).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it("flush: a transient 5xx leaves the item queued to retry", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TypeError("offline"));
+    await queuedFetch("/api/x", { a: 1 }, "Test");
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response("{}", { status: 503 }));
+    await flushQueue();
+    expect(await getPending()).toHaveLength(1);
+    expect(await getFailed()).toHaveLength(0);
+  });
+
+  it("flush: a committed JSON acknowledgement clears the item", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TypeError("offline"));
+    await queuedFetch("/api/x", { a: 1 }, "Test");
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonRes({ id: "row-1" }));
+    await flushQueue();
+    expect(await getPending()).toHaveLength(0);
+  });
+
+  it("a successful server commit whose client response was lost replays and clears exactly once", async () => {
+    // First attempt commits server-side but the client never sees the response
+    // (network drop / timeout -> thrown) -> queued with a stable clientRequestId.
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TypeError("connection lost"));
+    await queuedFetch("/api/x", { a: 1 }, "Test");
+    const queued = await getPending();
+    expect(queued).toHaveLength(1);
+    const clientRequestId = (queued[0].body as { clientRequestId: string }).clientRequestId;
+
+    // Replay: the server recognizes the same clientRequestId and idempotently
+    // returns the committed row (echoing the id back). Two flushes must not
+    // duplicate work -- the second finds nothing left to do.
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonRes({ id: "row-1", clientRequestId }));
+    await flushQueue();
+    expect(await getPending()).toHaveLength(0);
+    await flushQueue();
+    expect(await getPending()).toHaveLength(0);
+  });
+
+  it("flush: a JSON payload echoing a DIFFERENT clientRequestId is rejected, not treated as this item's commit", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TypeError("offline"));
+    await queuedFetch("/api/x", { a: 1 }, "Test");
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonRes({ id: "z", clientRequestId: "some-other-request" }));
+    await flushQueue();
+    // Not a commit for this item -> preserved (never deleted on a mismatched ack).
+    expect(await getPending()).toHaveLength(1);
+    expect(await getFailed()).toHaveLength(0);
   });
 });
