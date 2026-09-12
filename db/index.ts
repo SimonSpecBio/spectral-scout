@@ -26,27 +26,41 @@ declare global {
   var __scoutDb: NodePgDatabase<typeof schema> | undefined;
 }
 
+// rejectUnauthorized: false previously disabled TLS certificate validation
+// entirely (MITM risk on the DB connection). Supabase's pooler presents its
+// own private CA chain (Supabase Root/Intermediate 2021 CA), not a
+// publicly-trusted one, so plain `ssl: true` fails with "self-signed
+// certificate in certificate chain" -- pinning the real root cert (captured
+// directly from this project's own DATABASE_URL host via `openssl s_client`,
+// valid until 2031) is what actually restores real certificate validation
+// instead of disabling it a different way. Inlined as a string rather than
+// read from a sibling .pem file -- Turbopack's bundled runtime rewrites
+// `__dirname` to a synthetic path with no real file behind it, so
+// fs.readFileSync(path.join(__dirname, ...)) 500s in practice even though
+// it works fine under plain Node/tsx; a public CA cert isn't sensitive, so
+// inlining it here has no downside.
 const SUPABASE_CA = `-----BEGIN CERTIFICATE-----
 MIIDxDCCAqygAwIBAgIUbLxMod62P2ktCiAkxnKJwtE9VPYwDQYJKoZIhvcNAQEL
 BQAwazELMAkGA1UEBhMCVVMxEDAOBgNVBAgMB0RlbHdhcmUxEzARBgNVBAcMCk5l
 dyBDYXN0bGUxFTATBgNVBAoMDFN1cGFiYXNlIEluYzEeMBwGA1UEAwwVU3VwYWJh
 c2UgUm9vdCAyMDIxIENBMB4XDTIxMDQyODEwNTY1M1oXDTMxMDQyNjEwNTY1M1ow
-azELMAkGA1UEBhMCVVMxEDAOBgNVBAcMCk5ldyBDYXN0bGUxFTATBgNVBAoMDFN1
-cGFiYXNlIEluYzEeMBwGA1UEAwwVU3VwYWJhc2UgUm9vdCAyMDIxIENBMIIBIjAN
-BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqQXWQyHOB+qR2GJobCq/CBmQ40G0
-oDmCC3mzVnn8sv4XNeWtE5XcEL0uVih7Jo4Dkx1QDmGHBH1zDfgs2qXiLb6xpw/
-CKQPypZW1JssOTMIfQppNQ87K75Ya0p25Y3ePS2t2GtvHxNjUV6kjOZjEn2yWEcB
-dpOVCUYBVFBNMB4YBHkNRDa/+S4uywAoaTWnCJLUi cvTlHmMw6xSQQn1UfRQHk50
-DMCEJ7Cy1RxrZJrkXXRP3LqQL2ijJ6F4yMfh+Gyb4O4XajoVj/+R4GwywKYrrS8Pr
-SNtwxr5StlQO8zIQUSMiq26wM8mgELFlS/32UcltNaQ1xBRizkzpZct9DwIDAQAB
-o2AwXjALBgNVHQ8EBAMCAQYwHQYDVR0OBBYEFKjXuXY32CztkhImng4yJNUtaUYs
-MB8GA1UdIwQYMBaAFKjXuXY32CztkhImng4yJNUtaUYsMA8GA1UdEwEB/wQFMAMB
-Af8wDQYJKoZIhvcNAQELBQADggEBAB8spzNn+4VUtVxbdMaX+39Z50sc7uATmus1
-6jmmHjhIHz+l/9GlJ5KqAMOx26mPZgfzG7oneL2bVW+WgYUkTT3XEPFWnTp2RJwQ
-ao8/tYPXWEJDc0WVQHrpmnWOFKU/d3MqBgBm5y+6jB81TU/RG2rVerPDWP+1MMcN
-Ny0491CTL5XQZ7JfDJJ9CCmXSdtTl4uUQnSuv/QxCea13BX2ZgJc7Au30vihLhub
-52De4P/4gonKsNHYdbWjg7OWKwNv/zitGDVDB9Y2CMTyZKG3XEu5Ghl1LEnI3QmE
-KsqaCLv12BnVjbkSeZsMnevJPs1Ye6TjjJwdik5Po/bKiIz+Fq8=
+azELMAkGA1UEBhMCVVMxEDAOBgNVBAgMB0RlbHdhcmUxEzARBgNVBAcMCk5ldyBD
+YXN0bGUxFTATBgNVBAoMDFN1cGFiYXNlIEluYzEeMBwGA1UEAwwVU3VwYWJhc2Ug
+Um9vdCAyMDIxIENBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqQXW
+QyHOB+qR2GJobCq/CBmQ40G0oDmCC3mzVnn8sv4XNeWtE5XcEL0uVih7Jo4Dkx1Q
+DmGHBH1zDfgs2qXiLb6xpw/CKQPypZW1JssOTMIfQppNQ87K75Ya0p25Y3ePS2t2
+GtvHxNjUV6kjOZjEn2yWEcBdpOVCUYBVFBNMB4YBHkNRDa/+S4uywAoaTWnCJLUi
+cvTlHmMw6xSQQn1UfRQHk50DMCEJ7Cy1RxrZJrkXXRP3LqQL2ijJ6F4yMfh+Gyb4
+O4XajoVj/+R4GwywKYrrS8PrSNtwxr5StlQO8zIQUSMiq26wM8mgELFlS/32Uclt
+NaQ1xBRizkzpZct9DwIDAQABo2AwXjALBgNVHQ8EBAMCAQYwHQYDVR0OBBYEFKjX
+uXY32CztkhImng4yJNUtaUYsMB8GA1UdIwQYMBaAFKjXuXY32CztkhImng4yJNUt
+aUYsMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAB8spzNn+4VU
+tVxbdMaX+39Z50sc7uATmus16jmmHjhIHz+l/9GlJ5KqAMOx26mPZgfzG7oneL2b
+VW+WgYUkTT3XEPFWnTp2RJwQao8/tYPXWEJDc0WVQHrpmnWOFKU/d3MqBgBm5y+6
+jB81TU/RG2rVerPDWP+1MMcNNy0491CTL5XQZ7JfDJJ9CCmXSdtTl4uUQnSuv/Qx
+Cea13BX2ZgJc7Au30vihLhub52De4P/4gonKsNHYdbWjg7OWKwNv/zitGDVDB9Y2
+CMTyZKG3XEu5Ghl1LEnI3QmEKsqaCLv12BnVjbkSeZsMnevJPs1Ye6TjjJwdik5P
+o/bKiIz+Fq8=
 -----END CERTIFICATE-----`;
 
 const pool = (global.__scoutPool ??= new Pool({
